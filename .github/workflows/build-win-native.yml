@@ -4,15 +4,11 @@ on:
   push:
     branches: [ main ]
     paths:
-      - '../../src/hwprobe/interops/win/include/**'
-      - '../../src/hwprobe/interops/win/src/**'
-      - '../../src/hwprobe/interops/win/CMakeLists.txt'
+      - 'src/hwprobe/interops/win/**'
       - '.github/workflows/build-win-native.yml'
   pull_request:
     paths:
-      - '../../src/hwprobe/interops/win/include/**'
-      - '../../src/hwprobe/interops/win/src/**'
-      - '../../src/hwprobe/interops/win/CMakeLists.txt'
+      - 'src/hwprobe/interops/win/**'
       - '.github/workflows/build-win-native.yml'
   workflow_dispatch:
 
@@ -38,29 +34,33 @@ jobs:
         shell: bash
         run: cmake --build build-win
 
-      - name: Verify artifact
+      - name: Verify artifacts
         shell: bash
         run: |
-          file src/hwprobe/interops/win/bindings/device_info.dll
-          objdump -p src/hwprobe/interops/win/bindings/device_info.dll | grep "DLL Name"
+          shopt -s nullglob
+          for dll in src/hwprobe/interops/win/bindings/*.dll; do
+            echo "--- $dll ---"
+            file "$dll"
+            objdump -p "$dll" | grep "DLL Name" || true
+          done
 
-      - name: Upload dll
+      - name: Upload DLLs
         uses: actions/upload-artifact@v4
         with:
-          name: device_info-windows
-          path: src/hwprobe/interops/win/bindings/device_info.dll
+          name: windows-native-bindings
+          path: src/hwprobe/interops/win/bindings/*.dll
 
-      - name: Commit updated binary
+      - name: Commit updated binaries
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/hwprobe/interops/win/bindings/device_info.dll
+          git add src/hwprobe/interops/win/bindings/*.dll
           if git diff --cached --quiet; then
             echo "No binary changes to commit"
           else
-            git commit -m "build: update Windows native binding [skip ci]"
+            git commit -m "build: update Windows native bindings [skip ci]"
             git pull --rebase
             git push
           fi
