@@ -1,13 +1,13 @@
 import json
 import re
 import subprocess
-from typing import Tuple, Optional
+from typing import Optional
 
 from hwprobe.core.common.edid import parse_edid
 from hwprobe.models.display_models import DisplayInfo, DisplayModuleInfo, ResolutionInfo
 
 
-def _get_monitor_resolution_from_system_profiler(monitor_info: dict) -> Optional[Tuple[int, int]]:
+def _get_monitor_resolution_from_system_profiler(monitor_info: dict) -> Optional[tuple[int, int]]:
     precedence = [
         "spdisplays_pixelresolution",
         "spdisplays_resolution",

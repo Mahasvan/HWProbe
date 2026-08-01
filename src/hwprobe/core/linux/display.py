@@ -63,7 +63,7 @@ def _fetch_individual_monitor_info(device_path: str) -> Optional[DisplayModuleIn
 
     acpi_file = os.path.join(device_path, "firmware_node", "path")
     if os.path.exists(acpi_file):
-        with open(acpi_file, "r") as f:
+        with open(acpi_file) as f:
             monitor_data.acpi_path = f.read().strip()
 
     return monitor_data

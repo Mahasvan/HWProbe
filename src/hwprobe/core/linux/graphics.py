@@ -39,7 +39,7 @@ def _pcie_gen(device) -> Optional[int]:
         return None
 
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             raw_speed = f.read().strip()  # e.g., "16.0 GT/s"
 
         # Mapping Dictionary

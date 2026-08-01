@@ -22,20 +22,20 @@ def _enrich_with_sysfs_info(nic: NICInfo, status: Status) -> None:
         raise ValueError(f"Interface is virtual: {interface_name}")
 
     try:
-        with open(f"{base_path}/vendor", "r") as f:
+        with open(f"{base_path}/vendor") as f:
             nic.vendor_id = f.read().strip()
             # todo: Manufacturer
     except FileNotFoundError:
         status.make_partial(f"Vendor ID not found for interface {interface_name}")
 
     try:
-        with open(f"{base_path}/device", "r") as f:
+        with open(f"{base_path}/device") as f:
             nic.device_id = f.read().strip()
     except FileNotFoundError:
         status.make_partial(f"Device ID not found for interface {interface_name}")
 
     try:
-        with open(f"{base_path}/firmware_node/path", "r") as f:
+        with open(f"{base_path}/firmware_node/path") as f:
             nic.acpi_path = f.read().strip()
     except FileNotFoundError:
         status.make_partial(f"Path not found for interface {interface_name}")

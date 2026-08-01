@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 from hwprobe.models.component_model import ComponentInfo
 from pydantic import BaseModel, Field
@@ -29,4 +29,4 @@ class NICInfo(BaseModel):
 
 
 class NetworkInfo(ComponentInfo):
-    modules: List[NICInfo] = Field(default_factory=list)
+    modules: list[NICInfo] = Field(default_factory=list)

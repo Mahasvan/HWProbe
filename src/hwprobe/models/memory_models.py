@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 from hwprobe.models.component_model import ComponentInfo
 from hwprobe.models.size_models import StorageSize
@@ -29,4 +29,4 @@ class MemoryModuleInfo(BaseModel):
 
 
 class MemoryInfo(ComponentInfo):
-    modules: List[MemoryModuleInfo] = Field(default_factory=list)
+    modules: list[MemoryModuleInfo] = Field(default_factory=list)

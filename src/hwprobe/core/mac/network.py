@@ -1,18 +1,18 @@
 import plistlib
 import re
 import subprocess
-from typing import List, Dict, Optional
+from typing import Optional
 
 from hwprobe.models.network_models import NetworkInfo, NICInfo
 
 
-def _fetch_controllers() -> List[str]:
+def _fetch_controllers() -> list[str]:
     output = subprocess.run(["ipconfig", "getiflist"], capture_output=True)
     stripped = output.stdout.decode("utf-8").strip()
     return stripped.split(" ") if stripped else []
 
 
-def _fetch_ethernet_details() -> Dict[str, NICInfo]:
+def _fetch_ethernet_details() -> dict[str, NICInfo]:
     output = subprocess.run(["system_profiler", "SPEthernetDataType", "-xml"], capture_output=True)
     plist = plistlib.loads(output.stdout)
     res = {}
@@ -35,7 +35,7 @@ def _find_child(children: list, key: str, value: str) -> Optional[dict]:
     return next((x for x in children if x and x.get(key) == value), None)
 
 
-def _traverse_ioreg(root: dict, steps: List[tuple], result_key: str = "IORegistryEntryName") -> Optional[str]:
+def _traverse_ioreg(root: dict, steps: list[tuple], result_key: str = "IORegistryEntryName") -> Optional[str]:
     """
     Generic IORegistry depth-first traversal.
 
@@ -95,7 +95,7 @@ def _get_bsd_interface_apple_silicon(item: dict, driver: str = "AppleBCMWLANCore
     )
 
 
-def _fetch_airport_details() -> Dict[str, NICInfo]:
+def _fetch_airport_details() -> dict[str, NICInfo]:
     """
     Earlier, `system_profiler SPAirPortDataType -xml` was used to get the vendor and device id.
     However, this was too slow, and we can get the same details from `ioreg`, while it being faster.
@@ -195,13 +195,13 @@ def _fetch_airport_details() -> Dict[str, NICInfo]:
     return res
 
 
-def _fetch_system_profiler_details(valid_bsd_interfaces: List[str]) -> NetworkInfo:
+def _fetch_system_profiler_details(valid_bsd_interfaces: list[str]) -> NetworkInfo:
     output = subprocess.run(["system_profiler", "SPNetworkDataType", "-xml"], capture_output=True)
     plist = plistlib.loads(output.stdout)
     network_info = NetworkInfo()
 
-    ethernet_info: Optional[Dict[str, NICInfo]] = None
-    airport_info: Optional[Dict[str, NICInfo]] = None
+    ethernet_info: Optional[dict[str, NICInfo]] = None
+    airport_info: Optional[dict[str, NICInfo]] = None
 
     for item in plist:
         for network_controller in item.get("_items", []):

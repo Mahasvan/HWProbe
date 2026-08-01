@@ -1,13 +1,12 @@
 import plistlib
 import subprocess
-from typing import List
 
 from hwprobe.models.memory_models import MemoryInfo, MemoryModuleInfo, MemoryModuleSlot
 from hwprobe.models.size_models import Megabyte, StorageSize, Gigabyte
 from hwprobe.models.status_models import StatusType
 
 
-def get_ram_size_from_reg(reg) -> List[StorageSize]:
+def get_ram_size_from_reg(reg) -> list[StorageSize]:
     """
     Observed values of reg:
     "02 00 00 00 00 00 00 00 02 00 00 00 00 00 00 00" -> Two sticks of 4GB each
@@ -76,7 +75,7 @@ def get_arm_ram_info() -> MemoryInfo:
     return memory_info
 
 
-def get_ram_size_from_system_profiler() -> List[StorageSize]:
+def get_ram_size_from_system_profiler() -> list[StorageSize]:
     sizes = []
     value = subprocess.check_output(["system_profiler", "SPMemoryDataType", "-xml"])
     pl = plistlib.loads(value, fmt=plistlib.FMT_XML)

@@ -2,7 +2,6 @@ import ctypes
 import os
 import winreg
 from ctypes import wintypes
-from typing import List
 
 from hwprobe.core.windows.win_enum import FEATURE_ID_MAP
 from hwprobe.models.cpu_models import CPUInfo
@@ -44,7 +43,7 @@ def get_arm_version() -> str:
         return "7 or lower"
 
 
-def get_features() -> List[str]:
+def get_features() -> list[str]:
     """
     We use the Win32 API function IsProcessorFeaturePresent to check for SSE features.
     https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocessorfeaturepresent

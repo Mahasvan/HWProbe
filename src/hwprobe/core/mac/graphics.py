@@ -1,4 +1,3 @@
-from typing import List
 
 from hwprobe.models.gpu_models import GraphicsInfo, GPUInfo, AppleExtendedGPUInfo
 from hwprobe.models.size_models import Megabyte
@@ -24,7 +23,7 @@ def fetch_graphics_info() -> GraphicsInfo:
     # and RuntimeError at call time if the C library returns -1
     try:
         from hwprobe.interops.mac.bindings.gpu_info import get_gpu_info, GPUProperties
-        gpu_list: List[GPUProperties] = get_gpu_info()
+        gpu_list: list[GPUProperties] = get_gpu_info()
 
     except FileNotFoundError as e:
         graphics_info.status.type = StatusType.FAILED

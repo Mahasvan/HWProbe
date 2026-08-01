@@ -1,8 +1,7 @@
 import subprocess
-from typing import Tuple
 
 
-def fetch_gpu_details_nvidia(device: str) -> Tuple[str, int, int, int]:
+def fetch_gpu_details_nvidia(device: str) -> tuple[str, int, int, int]:
     """
     :param device: format: <domain>:<bus>:<slot>.<function>
     :return: GPU name, PCI Width, PCI Gen, Total VRAM in MB

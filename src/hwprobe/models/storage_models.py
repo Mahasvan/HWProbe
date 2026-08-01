@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 from hwprobe.models.component_model import ComponentInfo
 from hwprobe.models.size_models import StorageSize
@@ -32,4 +32,4 @@ class DiskInfo(BaseModel):
 
 
 class StorageInfo(ComponentInfo):
-    modules: List[DiskInfo] = Field(default_factory=list)
+    modules: list[DiskInfo] = Field(default_factory=list)

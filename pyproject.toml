@@ -37,3 +37,7 @@ where = ["src"]
 [project.urls]
 Homepage = "https://github.com/Mahasvan/HWProbe"
 Issues = "https://github.com/Mahasvan/HWProbe/issues"
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120

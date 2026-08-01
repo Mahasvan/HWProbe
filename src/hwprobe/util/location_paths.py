@@ -9,7 +9,7 @@ from ctypes import (
     c_wchar_p,
     sizeof,
 )
-from typing import List, Optional, Tuple
+from typing import Optional
 
 cfgmgr = WinDLL("cfgmgr32.dll")
 
@@ -142,7 +142,7 @@ def CM_Get_DevNode_PropertyW(
     return (propType, propBuff, propBuffSize)
 
 
-def decode_location_paths(raw_bytes: bytes) -> List[str]:
+def decode_location_paths(raw_bytes: bytes) -> list[str]:
     """
     Decode the raw location paths bytes into a list of strings.
 
@@ -203,7 +203,7 @@ def _fetch_property(pnp_device_id: str, key_def: list):  # type: ignore[type-arg
     return CM_Get_DevNode_PropertyW(dnDevInst, dpKey)
 
 
-def get_location_paths(pnp_device_id: str) -> Optional[List[str]]:
+def get_location_paths(pnp_device_id: str) -> Optional[list[str]]:
     """
     Get the location paths for a PNP device.
 
@@ -281,7 +281,7 @@ def get_pcie_link_width(pnp_device_id: str) -> Optional[int]:
 
 def fetch_device_properties(
         pnp_device_id: str,
-) -> Tuple[Optional[List[str]], Optional[str], Optional[str]]:
+) -> tuple[Optional[list[str]], Optional[str], Optional[str]]:
     """
     Fetch location paths, bus number, and device address in one call.
 
@@ -298,7 +298,7 @@ def fetch_device_properties(
     )
 
 
-def fetch_pcie_info(pnp_device_id: str) -> Optional[Tuple[Optional[int], Optional[int]]]:
+def fetch_pcie_info(pnp_device_id: str) -> Optional[tuple[Optional[int], Optional[int]]]:
     """
     Fetch PCIe link speed and width for a PNP device.
 

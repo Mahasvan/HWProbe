@@ -1,6 +1,6 @@
 import re
 import subprocess
-from typing import Optional, List
+from typing import Optional
 
 from hwprobe.models.cpu_models import CPUInfo
 from hwprobe.models.status_models import StatusType
@@ -59,7 +59,7 @@ def _cpu_threads(raw_cpu_info: str) -> Optional[int]:
         return None
 
 
-def _x86_flags(cpu_lines: str) -> Optional[List[str]]:
+def _x86_flags(cpu_lines: str) -> Optional[list[str]]:
     flags_match = re.search(r"flags\s+:\s+(.+)", cpu_lines)
     if not flags_match:
         return None

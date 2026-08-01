@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 
 from hwprobe.models.component_model import ComponentInfo
 from pydantic import BaseModel, Field
@@ -49,4 +49,4 @@ class DisplayInfo(ComponentInfo):
     """Contains a list of ``DisplayModuleInfo`` objects."""
 
     #: List of GPU modules present in the system.
-    modules: List[DisplayModuleInfo] = Field(default_factory=list)
+    modules: list[DisplayModuleInfo] = Field(default_factory=list)

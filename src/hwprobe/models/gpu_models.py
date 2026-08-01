@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 
 from hwprobe.models.component_model import ComponentInfo
 from hwprobe.models.size_models import StorageSize
@@ -61,4 +61,4 @@ class GraphicsInfo(ComponentInfo):
     """Contains list of ``GPUInfo`` objects."""
 
     #: List of GPU modules present in the system.
-    modules: List[GPUInfo] = Field(default_factory=list)
+    modules: list[GPUInfo] = Field(default_factory=list)

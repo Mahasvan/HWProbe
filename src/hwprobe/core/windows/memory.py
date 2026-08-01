@@ -1,5 +1,4 @@
 import ctypes
-from typing import Tuple
 
 from hwprobe.core.windows.win_enum import ECC_MEMORY_TYPE, MEMORY_TYPE
 # todo: refactor to new bindings
@@ -14,7 +13,7 @@ from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
 
 
-def check_ecc() -> Tuple[bool, str]:
+def check_ecc() -> tuple[bool, str]:
     """
     Checks if the system supports ECC memory by querying Win32_PhysicalMemoryArray.
 
