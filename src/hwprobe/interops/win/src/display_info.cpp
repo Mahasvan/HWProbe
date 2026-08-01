@@ -113,7 +113,7 @@ int get_display_devices(DisplayDeviceInfo *out, int max_count) {
                         copy_str(out[d].display_path, sizeof(out[d].display_path),
                                  WideToUtf8(tgtName.monitorDevicePath));
                         copy_str(out[d].monitor_name, sizeof(out[d].monitor_name),
-                                 WideToUtf8(tgtName.monitorFriendlyName));
+                                 WideToUtf8(tgtName.monitorFriendlyDeviceName));
                         out[d].output_technology = static_cast<int>(path.targetInfo.outputTechnology);
                         break;
                     }
