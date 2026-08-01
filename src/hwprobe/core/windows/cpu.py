@@ -34,8 +34,10 @@ def get_arm_version() -> str:
 
     Otherwise
     - we can assume it's ARMv7 or lower.
+
+    ref: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocessorfeaturepresent
     """
-    if any([is_processor_feature_present(i) for i in [78, 79, 80]]):
+    if any(is_processor_feature_present(i) for i in [78, 79, 80]):
         return "9"
     elif is_processor_feature_present(88):
         return "8"
@@ -96,7 +98,7 @@ def get_core_count() -> int:
             ULONGLONG Reserved[2];
         };
     } SYSTEM_LOGICAL_PROCESSOR_INFORMATION;
-    
+
     ProcessorMask - Pointer - 8 bytes
     Relationship - DWORD - 4 bytes
     Padding - 4 byt
@@ -143,12 +145,12 @@ def fetch_cpu_info() -> CPUInfo:
     """
     The CPU Architecture is exposed as an environment variable on Windows systems.
     https://www.tenforums.com/tutorials/176966-how-check-if-processor-32-bit-64-bit-arm-windows-10-a.html
-    
+
     Possible outputs:
     - x86 -> x86 32-bit
     - AMD64 -> x86 64-bit
     - ARM64 -> ARM 64-bit
-    
+
     We account for "x86_64" and "i386" as well, just in case.
     """
     architecture = os.environ.get("PROCESSOR_ARCHITECTURE", "").lower()
