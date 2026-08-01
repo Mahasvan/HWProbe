@@ -1,3 +1,4 @@
+# https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocessorfeaturepresent
 FEATURE_ID_MAP = {
     "SSE": 6,
     "SSE2": 10,
@@ -7,6 +8,7 @@ FEATURE_ID_MAP = {
     "SSE4.2": 38,
 }
 
+# https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ne-winioctl-storage_bus_type
 BUS_TYPE = {
     0: {"type": "Unknown", "location": "Unknown"},
     1: {"type": "SCSI", "location": "Internal (Guessed)"},
@@ -29,6 +31,7 @@ BUS_TYPE = {
     18: {"type": "Microsoft Reserved", "location": "Reserved"},
 }
 
+# https://learn.microsoft.com/en-us/windows-hardware/drivers/storage/msft-physicaldisk
 MEDIA_TYPE = {
     0: "Unspecified",
     3: "Hard Disk Drive (HDD)",
@@ -36,6 +39,7 @@ MEDIA_TYPE = {
     5: "Storage Class Memory (SCM)",
 }
 
+# https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-physicalmemoryarray
 ECC_MEMORY_TYPE = {
     0: "Reserved",
     1: "Other",
@@ -47,6 +51,7 @@ ECC_MEMORY_TYPE = {
     7: "CRC",
 }
 
+# https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-physicalmemory
 MEMORY_TYPE = {
     0: "Unknown",
     1: "Other",
@@ -76,6 +81,7 @@ MEMORY_TYPE = {
     26: "DDR4",
 }
 
+# https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-pointingdevice
 POINT_DEV_INTERFACE = {
     1: "Other",
     2: "Unknown",
