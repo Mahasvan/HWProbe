@@ -171,7 +171,7 @@ def decode_uint32(raw_bytes: bytes) -> Optional[int]:
     """
     try:
         return int.from_bytes(raw_bytes[:4], byteorder="little")
-    except:
+    except Exception:
         return None
 
 

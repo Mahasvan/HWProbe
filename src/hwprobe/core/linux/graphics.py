@@ -93,12 +93,9 @@ def _populate_nvidia_info(gpu: GPUInfo, device: str) -> GPUInfo:
 
 
 def _populate_lspci_info(gpu: GPUInfo, device: str) -> GPUInfo:
-    try:
-        lspci_output = subprocess.run(["lspci", "-s", device, "-vmm"], capture_output=True, text=True).stdout
-        # We gather all data here and parse whatever data we have. Subsystem data may not be returned.
-    except Exception:
-        # lspci may not be available in some distros
-        raise
+    lspci_output = subprocess.run(["lspci", "-s", device, "-vmm"], capture_output=True, text=True, check=True).stdout
+    # We gather all data here and parse whatever data we have. Subsystem data may not be returned.
+    # If LSPCI not found, check=True ensures error is thrown
 
     data = {}
     for line in lspci_output.splitlines():

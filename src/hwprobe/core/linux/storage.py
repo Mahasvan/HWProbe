@@ -5,6 +5,12 @@ from hwprobe.models.status_models import Status, StatusType
 from hwprobe.models.storage_models import DiskInfo, StorageInfo
 
 
+def _read_sysfs(path: str) -> str:
+    """Read a sysfs file and return its stripped contents."""
+    with open(path) as f:
+        return f.read().strip()
+
+
 def _fetch_emmc_info(folder: str) -> tuple[DiskInfo, Status]:
     """
     Helper function for eMMC devices, which have different places to get some data.
@@ -18,13 +24,13 @@ def _fetch_emmc_info(folder: str) -> tuple[DiskInfo, Status]:
 
     disk.identifier = folder.strip()
 
-    model = open(f"{path}/device/name").read().strip()
+    model = _read_sysfs(f"{path}/device/name")
     disk.model = model
     if not model:
         status.type = StatusType.PARTIAL
         status.messages.append("Disk Model could not be found")
 
-    removable = open(f"{path}/removable").read().strip()
+    removable = _read_sysfs(f"{path}/removable")
 
     if removable == "0":
         disk.type = "Embedded MultiMediaCard (eMMC)"
@@ -34,19 +40,19 @@ def _fetch_emmc_info(folder: str) -> tuple[DiskInfo, Status]:
     disk.location = "Internal" if removable == "0" else "External"
     disk.connector = "Unknown"
 
-    vendor_id = open(f"{path}/device/manfid").read().strip()
+    vendor_id = _read_sysfs(f"{path}/device/manfid")
     disk.vendor_id = vendor_id
     if not vendor_id:
         status.type = StatusType.PARTIAL
         status.messages.append("Disk vendor id could not be found")
 
-    device_id = open(f"{path}/device/oemid").read().strip()
+    device_id = _read_sysfs(f"{path}/device/oemid")
     disk.device_id = device_id
     if not device_id:
         status.type = StatusType.PARTIAL
         status.messages.append("Disk device id could not be found")
 
-    size = open(f"{path}/size").read().strip()
+    size = _read_sysfs(f"{path}/size")
     size_in_bytes = int(size) * 512
     disk.size = Megabyte(capacity=(size_in_bytes // 1024**2))
 
@@ -66,15 +72,15 @@ def _fetch_standard_disk_info(folder: str) -> tuple[DiskInfo, Status]:
 
     disk.identifier = folder.strip()
 
-    model = open(f"{path}/device/model").read().strip()
+    model = _read_sysfs(f"{path}/device/model")
     if model:
         disk.model = model
     else:
         status.type = StatusType.PARTIAL
         status.messages.append("Disk Model could not be found")
 
-    rotational = open(f"{path}/queue/rotational").read().strip()
-    removable = open(f"{path}/removable").read().strip()
+    rotational = _read_sysfs(f"{path}/queue/rotational")
+    removable = _read_sysfs(f"{path}/removable")
 
     disk.type = "Solid State Drive (SSD)" if rotational == "0" else "Hard Disk Drive (HDD)"
     disk.location = "Internal" if removable == "0" else "External"
@@ -82,15 +88,15 @@ def _fetch_standard_disk_info(folder: str) -> tuple[DiskInfo, Status]:
     if "nvme" in folder:
         disk.connector = "PCIe"
         disk.type = "Non-Volatile Memory Express (NVMe)"
-        disk.device_id = open(f"{path}/device/device/device").read().strip()
-        disk.vendor_id = open(f"{path}/device/device/vendor").read().strip()
+        disk.device_id = _read_sysfs(f"{path}/device/device/device")
+        disk.vendor_id = _read_sysfs(f"{path}/device/device/vendor")
     elif "sd" in folder:
         disk.connector = "SCSI"
-        disk.vendor_id = open(f"{path}/device/vendor").read().strip()
+        disk.vendor_id = _read_sysfs(f"{path}/device/vendor")
     else:
         disk.connector = "Unknown"
 
-    size = open(f"{path}/size").read().strip()
+    size = _read_sysfs(f"{path}/size")
     size_in_bytes = int(size) * 512
     disk.size = Megabyte(capacity=(size_in_bytes // 1024**2))
 

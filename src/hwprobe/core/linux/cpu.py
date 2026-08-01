@@ -168,7 +168,7 @@ def fetch_cpu_info() -> CPUInfo:
         cpu_info.status.messages.append("/proc/cpuinfo has no content")
         return cpu_info
 
-    architecture = subprocess.run(["uname", "-m"], capture_output=True, text=True)
+    architecture = subprocess.run(["uname", "-m"], capture_output=True, text=True, check=True)
 
     if ("aarch64" in architecture.stdout) or ("arm" in architecture.stdout):
         return fetch_arm_cpu_info(raw_cpu_info)
