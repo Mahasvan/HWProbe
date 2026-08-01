@@ -222,7 +222,11 @@ int get_edid(const char *pnp_device_id, unsigned char *out, int max_size) {
 
         std::vector<BYTE> detailBuf(requiredSize);
         auto *detail = reinterpret_cast<PSP_DEVICE_INTERFACE_DETAIL_DATA_W>(detailBuf.data());
-        detail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
+        // cbSize must be 8 on 64-bit, 6 on 32-bit — a well-known SetupAPI quirk.
+        // sizeof() gives 6 on both because the struct has no 8-byte member,
+        // but SetupDiGetDeviceInterfaceDetailW silently fails on 64-bit if
+        // cbSize isn't 8. The old Python ctypes code got this right.
+        detail->cbSize = sizeof(void *) == 8 ? 8 : 6;
 
         SP_DEVINFO_DATA devData = {};
         devData.cbSize = sizeof(devData);
