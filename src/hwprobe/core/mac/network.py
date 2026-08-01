@@ -89,10 +89,7 @@ def _get_bsd_interface_apple_silicon(item: dict, driver: str = "AppleBCMWLANCore
     if driver in mapping:
         return _traverse_ioreg(item, mapping[driver])
 
-    return (
-            _traverse_ioreg(item, _STEPS_BCM_WLAN)
-            or _traverse_ioreg(item, _STEPS_WLAN_DRIVER)
-    )
+    return _traverse_ioreg(item, _STEPS_BCM_WLAN) or _traverse_ioreg(item, _STEPS_WLAN_DRIVER)
 
 
 def _fetch_airport_details() -> dict[str, NICInfo]:
@@ -110,7 +107,8 @@ def _fetch_airport_details() -> dict[str, NICInfo]:
     for item in plist:
         driver = item.get("IORegistryEntryName")
 
-        if not driver: continue
+        if not driver:
+            continue
 
         if driver == "AirPort_BrcmNIC":
             # Intel Macs, usually
@@ -122,7 +120,8 @@ def _fetch_airport_details() -> dict[str, NICInfo]:
             nic_info = NICInfo()
             nic_info.vendor_id = "0x" + vendor
             nic_info.device_id = "0x" + device
-            if io_model: nic_info.name = io_model
+            if io_model:
+                nic_info.name = io_model
 
             for child in item.get("IORegistryEntryChildren", []):
                 if not child.get("IOObjectClass", "") == "AirPort_BrcmNIC_Interface":
@@ -161,7 +160,8 @@ def _fetch_airport_details() -> dict[str, NICInfo]:
             else:
                 nic_info.manufacturer = "Apple"
 
-            if chipset: nic_info.name = f"Wi-Fi ({chipset} chipset)"
+            if chipset:
+                nic_info.name = f"Wi-Fi ({chipset} chipset)"
 
             res[bsd_identifier] = nic_info
 
@@ -208,7 +208,8 @@ def _fetch_system_profiler_details(valid_bsd_interfaces: list[str]) -> NetworkIn
             module = NICInfo()
 
             bsd_interface_name = network_controller.get("interface")
-            if bsd_interface_name not in valid_bsd_interfaces: continue
+            if bsd_interface_name not in valid_bsd_interfaces:
+                continue
 
             module.interface = bsd_interface_name
             module.name = network_controller.get("_name", "")
@@ -224,15 +225,17 @@ def _fetch_system_profiler_details(valid_bsd_interfaces: list[str]) -> NetworkIn
             if ip_addresses:
                 module.ip_address = ip_addresses[0]
 
-            if module.type == 'Ethernet':
-                if ethernet_info is None: ethernet_info = _fetch_ethernet_details()
+            if module.type == "Ethernet":
+                if ethernet_info is None:
+                    ethernet_info = _fetch_ethernet_details()
                 if bsd_interface_name in ethernet_info:
                     module.vendor_id = ethernet_info[bsd_interface_name].vendor_id
                     module.manufacturer = ethernet_info[bsd_interface_name].manufacturer
                     module.device_id = ethernet_info[bsd_interface_name].device_id
 
-            elif module.type == 'AirPort':
-                if airport_info is None: airport_info = _fetch_airport_details()
+            elif module.type == "AirPort":
+                if airport_info is None:
+                    airport_info = _fetch_airport_details()
                 if bsd_interface_name in airport_info:
                     if manufacturer := airport_info[bsd_interface_name].manufacturer:
                         module.manufacturer = manufacturer

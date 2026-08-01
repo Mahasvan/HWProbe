@@ -50,5 +50,5 @@ MEMORY_TYPE = {
     0x1A: "DDR4",
     0x1B: "LPDDR",
     0x1C: "LPDDR2",
-    0x1D: "LPDDR3"
+    0x1D: "LPDDR3",
 }

@@ -1,8 +1,8 @@
 import os
 
 from hwprobe.models.size_models import Megabyte
-from hwprobe.models.status_models import StatusType, Status
-from hwprobe.models.storage_models import StorageInfo, DiskInfo
+from hwprobe.models.status_models import Status, StatusType
+from hwprobe.models.storage_models import DiskInfo, StorageInfo
 
 
 def _fetch_emmc_info(folder: str) -> tuple[DiskInfo, Status]:
@@ -48,7 +48,7 @@ def _fetch_emmc_info(folder: str) -> tuple[DiskInfo, Status]:
 
     size = open(f"{path}/size").read().strip()
     size_in_bytes = int(size) * 512
-    disk.size = Megabyte(capacity=(size_in_bytes // 1024 ** 2))
+    disk.size = Megabyte(capacity=(size_in_bytes // 1024**2))
 
     return disk, status
 
@@ -76,11 +76,7 @@ def _fetch_standard_disk_info(folder: str) -> tuple[DiskInfo, Status]:
     rotational = open(f"{path}/queue/rotational").read().strip()
     removable = open(f"{path}/removable").read().strip()
 
-    disk.type = (
-        "Solid State Drive (SSD)"
-        if rotational == "0"
-        else "Hard Disk Drive (HDD)"
-    )
+    disk.type = "Solid State Drive (SSD)" if rotational == "0" else "Hard Disk Drive (HDD)"
     disk.location = "Internal" if removable == "0" else "External"
 
     if "nvme" in folder:
@@ -96,7 +92,7 @@ def _fetch_standard_disk_info(folder: str) -> tuple[DiskInfo, Status]:
 
     size = open(f"{path}/size").read().strip()
     size_in_bytes = int(size) * 512
-    disk.size = Megabyte(capacity=(size_in_bytes // 1024 ** 2))
+    disk.size = Megabyte(capacity=(size_in_bytes // 1024**2))
 
     return disk, status
 
@@ -134,6 +130,6 @@ def fetch_storage_info() -> StorageInfo:
 
         except Exception as e:
             storage_info.status.type = StatusType.PARTIAL
-            storage_info.status.messages.append(f"Disk Info ({folder}): {str(e)}")
+            storage_info.status.messages.append(f"Disk Info ({folder}): {e!s}")
 
     return storage_info

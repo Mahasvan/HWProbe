@@ -43,14 +43,7 @@ def _pcie_gen(device) -> Optional[int]:
             raw_speed = f.read().strip()  # e.g., "16.0 GT/s"
 
         # Mapping Dictionary
-        speed_to_gen = {
-            "2.5 GT/s": 1,
-            "5.0 GT/s": 2,
-            "8.0 GT/s": 3,
-            "16.0 GT/s": 4,
-            "32.0 GT/s": 5,
-            "64.0 GT/s": 6
-        }
+        speed_to_gen = {"2.5 GT/s": 1, "5.0 GT/s": 2, "8.0 GT/s": 3, "16.0 GT/s": 4, "32.0 GT/s": 5, "64.0 GT/s": 6}
 
         for k, v in speed_to_gen.items():
             """ `8.0 GT/s PCIe` may be a possible candidate, so we dont use direct matching"""
@@ -59,7 +52,7 @@ def _pcie_gen(device) -> Optional[int]:
 
         return None
 
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -87,10 +80,14 @@ def _populate_amd_info(gpu: GPUInfo, device: str) -> GPUInfo:
 
 def _populate_nvidia_info(gpu: GPUInfo, device: str) -> GPUInfo:
     gpu_name, pcie_width, pcie_gen, vram_total = fetch_gpu_details_nvidia(device)
-    if gpu_name: gpu.name = gpu_name
-    if pcie_width: gpu.pcie_width = pcie_width
-    if pcie_gen: gpu.pcie_gen = pcie_gen
-    if vram_total: gpu.vram = Megabyte(capacity=vram_total)
+    if gpu_name:
+        gpu.name = gpu_name
+    if pcie_width:
+        gpu.pcie_width = pcie_width
+    if pcie_gen:
+        gpu.pcie_gen = pcie_gen
+    if vram_total:
+        gpu.vram = Megabyte(capacity=vram_total)
 
     return gpu
 
@@ -99,14 +96,14 @@ def _populate_lspci_info(gpu: GPUInfo, device: str) -> GPUInfo:
     try:
         lspci_output = subprocess.run(["lspci", "-s", device, "-vmm"], capture_output=True, text=True).stdout
         # We gather all data here and parse whatever data we have. Subsystem data may not be returned.
-    except Exception as e:
+    except Exception:
         # lspci may not be available in some distros
         raise
 
     data = {}
     for line in lspci_output.splitlines():
         if ":" in line:
-            key, value = line.split(':', maxsplit=1)
+            key, value = line.split(":", maxsplit=1)
             data[key.strip()] = value.strip()
 
     gpu.manufacturer = data.get("Vendor")
@@ -168,7 +165,7 @@ def fetch_graphics_info() -> GraphicsInfo:
             gpu.pcie_gen = pcie_gen
         else:
             graphics_info.status.type = StatusType.PARTIAL
-            graphics_info.status.messages.append(f"Could not get PCI gen")
+            graphics_info.status.messages.append("Could not get PCI gen")
 
         if gpu.vendor_id == "0x1002":
             gpu = _populate_amd_info(gpu, device)

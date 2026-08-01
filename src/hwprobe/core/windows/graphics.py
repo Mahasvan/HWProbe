@@ -1,4 +1,4 @@
-from hwprobe.interops.win.bindings.gpu_info import get_gpu_info, GPUProperties
+from hwprobe.interops.win.bindings.gpu_info import GPUProperties, get_gpu_info
 from hwprobe.models.gpu_models import GPUInfo, GraphicsInfo
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType

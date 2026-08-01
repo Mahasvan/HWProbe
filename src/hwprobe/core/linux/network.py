@@ -10,7 +10,8 @@ from hwprobe.models.status_models import Status
 def _enrich_with_sysfs_info(nic: NICInfo, status: Status) -> None:
     """Helper to read hardware details directly from Linux sysfs."""
     interface_name = nic.interface
-    if not interface_name: return
+    if not interface_name:
+        return
 
     # todo: pci.ids file may be locally stored in Linux distros.
     # When a scraper-parser is made, make use of this, to get device name.

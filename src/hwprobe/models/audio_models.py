@@ -1,7 +1,8 @@
 from typing import Optional
 
-from hwprobe.models.component_model import ComponentInfo, BaseModel
 from pydantic import Field
+
+from hwprobe.models.component_model import BaseModel, ComponentInfo
 
 
 # Also known as an audio endpoint

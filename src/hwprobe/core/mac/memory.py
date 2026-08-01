@@ -2,7 +2,7 @@ import plistlib
 import subprocess
 
 from hwprobe.models.memory_models import MemoryInfo, MemoryModuleInfo, MemoryModuleSlot
-from hwprobe.models.size_models import Megabyte, StorageSize, Gigabyte
+from hwprobe.models.size_models import Gigabyte, Megabyte, StorageSize
 from hwprobe.models.status_models import StatusType
 
 
@@ -161,25 +161,25 @@ def fetch_memory_info() -> MemoryInfo:
                         dimm_sizes = get_ram_size_from_reg(v)
 
                     if "manufacturer" in k.lower():
-                        dimm_manufacturer.extend([x.decode() for x in v.split(b'\x00') if x.decode().strip()])
+                        dimm_manufacturer.extend([x.decode() for x in v.split(b"\x00") if x.decode().strip()])
 
                     if "part-number" in k.lower():
-                        dimm_part_numbers.extend([x.decode() for x in v.split(b'\x00') if x.decode().strip()])
+                        dimm_part_numbers.extend([x.decode() for x in v.split(b"\x00") if x.decode().strip()])
 
                     if "serial-number" in k.lower():
-                        dimm_serial_number.extend([x.decode() for x in v.split(b'\x00') if x.decode().strip()])
+                        dimm_serial_number.extend([x.decode() for x in v.split(b"\x00") if x.decode().strip()])
 
                     if "speed" in k.lower():
-                        dimm_speeds.extend([x.decode() for x in v.split(b'\x00') if x.decode().strip()])
+                        dimm_speeds.extend([x.decode() for x in v.split(b"\x00") if x.decode().strip()])
 
                     if "type" in k.lower():
-                        dimm_types.extend([x.decode() for x in v.split(b'\x00') if x.decode().strip()])
+                        dimm_types.extend([x.decode() for x in v.split(b"\x00") if x.decode().strip()])
 
                     if "ecc-enabled" in k.lower():
                         ecc_enabled = ecc_enabled or v
 
                     if "slot-name" in k.lower():
-                        dimm_slots = [x.decode().split("/") for x in v.split(b'\x00') if x.decode().strip()]
+                        dimm_slots = [x.decode().split("/") for x in v.split(b"\x00") if x.decode().strip()]
 
         # Now we attempt to get more accurate RAM Module Capacities
         """
@@ -202,13 +202,20 @@ def fetch_memory_info() -> MemoryInfo:
                 "Failed to get RAM size from system profiler. RAM Capacity may not be accurate: " + str(e)
             )
 
-
     except Exception as e:
         memory_info.status.type = StatusType.PARTIAL
         memory_info.status.messages.append("Error parsing ioreg plist: " + str(e))
 
-    n_modules = max([len(dimm_manufacturer), len(dimm_part_numbers), len(dimm_serial_number),
-                     len(dimm_speeds), len(dimm_types), len(dimm_slots)])
+    n_modules = max(
+        [
+            len(dimm_manufacturer),
+            len(dimm_part_numbers),
+            len(dimm_serial_number),
+            len(dimm_speeds),
+            len(dimm_types),
+            len(dimm_slots),
+        ]
+    )
 
     for i in range(n_modules):
         module = MemoryModuleInfo()
@@ -222,10 +229,7 @@ def fetch_memory_info() -> MemoryInfo:
             if i < len(dimm_sizes):
                 module.capacity = dimm_sizes[i]
             if i < len(dimm_slots):
-                module.slot = MemoryModuleSlot(
-                    channel=dimm_slots[i][0],
-                    bank=dimm_slots[i][1]
-                )
+                module.slot = MemoryModuleSlot(channel=dimm_slots[i][0], bank=dimm_slots[i][1])
             if i < len(dimm_speeds):
                 module.frequency_mhz = int(dimm_speeds[i].removesuffix("MHz"))
             module.supports_ecc = ecc_enabled

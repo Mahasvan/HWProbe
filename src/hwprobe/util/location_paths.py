@@ -1,10 +1,10 @@
 from ctypes import (
     Structure,
     WinDLL,
-    c_char,
-    c_ulong,
     byref,
     c_buffer,
+    c_char,
+    c_ulong,
     c_ushort,
     c_wchar_p,
     sizeof,
@@ -106,11 +106,11 @@ def get_device_instance(pnp_device_id: str) -> c_ulong:
 
 
 def CM_Get_DevNode_PropertyW(
-        dnDevInst=c_ulong(),
-        propKey=None,
-        propType=c_ulong(),
-        propBuff=None,
-        propBuffSize=c_ulong(),
+    dnDevInst=c_ulong(),
+    propKey=None,
+    propType=c_ulong(),
+    propBuff=None,
+    propBuffSize=c_ulong(),
 ):
     if propKey is None:
         return None
@@ -280,7 +280,7 @@ def get_pcie_link_width(pnp_device_id: str) -> Optional[int]:
 
 
 def fetch_device_properties(
-        pnp_device_id: str,
+    pnp_device_id: str,
 ) -> tuple[Optional[list[str]], Optional[str], Optional[str]]:
     """
     Fetch location paths, bus number, and device address in one call.

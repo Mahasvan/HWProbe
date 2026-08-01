@@ -1,7 +1,8 @@
 from typing import Optional
 
-from hwprobe.models.component_model import ComponentInfo
 from pydantic import BaseModel, Field
+
+from hwprobe.models.component_model import ComponentInfo
 
 
 class ResolutionInfo(BaseModel):
@@ -19,6 +20,7 @@ class ResolutionInfo(BaseModel):
 
 class DisplayModuleInfo(BaseModel):
     """Information for one Display is stored here"""
+
     name: Optional[str] = None
 
     #: Year it was manufactured / designed.

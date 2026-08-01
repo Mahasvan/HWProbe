@@ -2,27 +2,26 @@ import plistlib
 from unittest.mock import patch
 
 import pytest
+
 from hwprobe.core.mac.memory import (
-    get_ram_size_from_reg,
-    get_arm_ram_info,
-    get_ram_size_from_system_profiler,
     fetch_memory_info,
+    get_arm_ram_info,
+    get_ram_size_from_reg,
+    get_ram_size_from_system_profiler,
 )
 from hwprobe.models.memory_models import MemoryInfo
 from hwprobe.models.status_models import StatusType
 
-
 # ── get_ram_size_from_reg ────────────────────────────────────────────────────
 
-class TestGetRamSizeFromReg:
 
+class TestGetRamSizeFromReg:
     def test_two_sticks_of_4gb(self):
         """
         "02 00 00 00 00 00 00 00 02 00 00 00 00 00 00 00"
         Non-zero bytes: 0x02, 0x02 => 2 * 4096 = 8192 MB each.
         """
-        reg = bytes([0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                     0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        reg = bytes([0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
         sizes = get_ram_size_from_reg(reg)
         assert len(sizes) == 2
         assert all(s.capacity == 8192 for s in sizes)
@@ -42,6 +41,7 @@ class TestGetRamSizeFromReg:
 
     def test_return_type_is_megabyte(self):
         from hwprobe.models.size_models import Megabyte
+
         reg = bytes([0x01])
         sizes = get_ram_size_from_reg(reg)
         assert isinstance(sizes[0], Megabyte)
@@ -49,17 +49,21 @@ class TestGetRamSizeFromReg:
 
 # ── get_arm_ram_info ─────────────────────────────────────────────────────────
 
-class TestGetArmRamInfo:
 
+class TestGetArmRamInfo:
     @patch("hwprobe.core.mac.memory.subprocess.check_output")
     def test_single_arm_module(self, mock_co):
-        plist_data = [{
-            "_items": [{
-                "SPMemoryDataType": "8 GB",
-                "dimm_manufacturer": "Samsung",
-                "dimm_type": "LPDDR5",
-            }]
-        }]
+        plist_data = [
+            {
+                "_items": [
+                    {
+                        "SPMemoryDataType": "8 GB",
+                        "dimm_manufacturer": "Samsung",
+                        "dimm_type": "LPDDR5",
+                    }
+                ]
+            }
+        ]
         mock_co.return_value = plistlib.dumps(plist_data, fmt=plistlib.FMT_XML)
 
         info = get_arm_ram_info()
@@ -86,18 +90,22 @@ class TestGetArmRamInfo:
 
 # ── get_ram_size_from_system_profiler ────────────────────────────────────────
 
-class TestGetRamSizeFromSystemProfiler:
 
+class TestGetRamSizeFromSystemProfiler:
     @patch("hwprobe.core.mac.memory.subprocess.check_output")
     def test_two_dimms(self, mock_co):
-        plist_data = [{
-            "_items": [{
+        plist_data = [
+            {
                 "_items": [
-                    {"dimm_size": "8 GB"},
-                    {"dimm_size": "8 GB"},
+                    {
+                        "_items": [
+                            {"dimm_size": "8 GB"},
+                            {"dimm_size": "8 GB"},
+                        ]
+                    }
                 ]
-            }]
-        }]
+            }
+        ]
         mock_co.return_value = plistlib.dumps(plist_data, fmt=plistlib.FMT_XML)
 
         sizes = get_ram_size_from_system_profiler()
@@ -115,28 +123,37 @@ class TestGetRamSizeFromSystemProfiler:
 
 # ── fetch_memory_info (x86 path) ────────────────────────────────────────────
 
-class TestFetchMemoryInfoX86:
 
+class TestFetchMemoryInfoX86:
     def _make_ioreg_plist(self, memory_entry):
         """Build a fake ioreg plist structure with the given memory dict."""
-        return plistlib.dumps({
-            "IORegistryEntryChildren": [{
-                "IORegistryEntryChildren": [{
-                    "IORegistryEntryName": "memory",
-                    **memory_entry,
-                }]
-            }]
-        }, fmt=plistlib.FMT_XML)
+        return plistlib.dumps(
+            {
+                "IORegistryEntryChildren": [
+                    {
+                        "IORegistryEntryChildren": [
+                            {
+                                "IORegistryEntryName": "memory",
+                                **memory_entry,
+                            }
+                        ]
+                    }
+                ]
+            },
+            fmt=plistlib.FMT_XML,
+        )
 
     @patch("hwprobe.core.mac.memory.get_ram_size_from_system_profiler")
     @patch("hwprobe.core.mac.memory.subprocess.check_output")
     def test_intel_two_dimms(self, mock_co, mock_sp):
         from hwprobe.models.size_models import Gigabyte
+
         mock_sp.return_value = [Gigabyte(capacity=8), Gigabyte(capacity=8)]
 
         memory_entry = {
-            "reg": bytes([0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                          0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+            "reg": bytes(
+                [0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+            ),
             "dimm-manufacturer": b"Samsung\x00Samsung\x00",
             "dimm-part-number": b"M471A1K43CB1-CTD\x00M471A1K43CB1-CTD\x00",
             "dimm-serial-number": b"ABCD1234\x00EFGH5678\x00",
@@ -170,11 +187,15 @@ class TestFetchMemoryInfoX86:
     @patch("hwprobe.core.mac.memory.subprocess.check_output")
     def test_arm_detected_delegates_to_get_arm_ram_info(self, mock_co):
         """When uname returns arm64, fetch_memory_info should use get_arm_ram_info."""
-        plist_data = [{
-            "_items": [{
-                "SPMemoryDataType": "16 GB",
-            }]
-        }]
+        plist_data = [
+            {
+                "_items": [
+                    {
+                        "SPMemoryDataType": "16 GB",
+                    }
+                ]
+            }
+        ]
 
         def side_effect(cmd):
             if cmd == ["uname", "-m"]:
@@ -214,14 +235,21 @@ class TestFetchMemoryInfoX86:
             "dimm-types": b"DDR4\x00",
             "slot-names": b"DIMM0/BANK0\x00",
         }
-        ioreg_plist = plistlib.dumps({
-            "IORegistryEntryChildren": [{
-                "IORegistryEntryChildren": [{
-                    "IORegistryEntryName": "memory",
-                    **memory_entry,
-                }]
-            }]
-        }, fmt=plistlib.FMT_XML)
+        ioreg_plist = plistlib.dumps(
+            {
+                "IORegistryEntryChildren": [
+                    {
+                        "IORegistryEntryChildren": [
+                            {
+                                "IORegistryEntryName": "memory",
+                                **memory_entry,
+                            }
+                        ]
+                    }
+                ]
+            },
+            fmt=plistlib.FMT_XML,
+        )
 
         def side_effect(cmd):
             if cmd == ["uname", "-m"]:
@@ -245,14 +273,21 @@ class TestFetchMemoryInfoX86:
         memory_entry = {
             "reg": b"\x00" * 16,
         }
-        ioreg_plist = plistlib.dumps({
-            "IORegistryEntryChildren": [{
-                "IORegistryEntryChildren": [{
-                    "IORegistryEntryName": "memory",
-                    **memory_entry,
-                }]
-            }]
-        }, fmt=plistlib.FMT_XML)
+        ioreg_plist = plistlib.dumps(
+            {
+                "IORegistryEntryChildren": [
+                    {
+                        "IORegistryEntryChildren": [
+                            {
+                                "IORegistryEntryName": "memory",
+                                **memory_entry,
+                            }
+                        ]
+                    }
+                ]
+            },
+            fmt=plistlib.FMT_XML,
+        )
 
         def side_effect(cmd):
             if cmd == ["uname", "-m"]:
@@ -269,12 +304,13 @@ class TestFetchMemoryInfoX86:
 
 # ── BUG: ecc_enabled is always False ─────────────────────────────────────────
 
-class TestECCDetection:
 
+class TestECCDetection:
     @patch("hwprobe.core.mac.memory.get_ram_size_from_system_profiler")
     @patch("hwprobe.core.mac.memory.subprocess.check_output")
     def test_ecc_enabled_detected(self, mock_co, mock_sp):
         from hwprobe.models.size_models import Gigabyte
+
         mock_sp.return_value = [Gigabyte(capacity=32)]
 
         memory_entry = {
@@ -287,14 +323,21 @@ class TestECCDetection:
             "ecc-enabled": True,
             "slot-names": b"DIMM0/BANK0\x00",
         }
-        ioreg_plist = plistlib.dumps({
-            "IORegistryEntryChildren": [{
-                "IORegistryEntryChildren": [{
-                    "IORegistryEntryName": "memory",
-                    **memory_entry,
-                }]
-            }]
-        }, fmt=plistlib.FMT_XML)
+        ioreg_plist = plistlib.dumps(
+            {
+                "IORegistryEntryChildren": [
+                    {
+                        "IORegistryEntryChildren": [
+                            {
+                                "IORegistryEntryName": "memory",
+                                **memory_entry,
+                            }
+                        ]
+                    }
+                ]
+            },
+            fmt=plistlib.FMT_XML,
+        )
 
         def side_effect(cmd):
             if cmd == ["uname", "-m"]:
@@ -312,6 +355,7 @@ class TestECCDetection:
 
 # ── BUG: Uneven list lengths cause IndexError ────────────────────────────────
 
+
 class TestUnevenListLengths:
     """When lists have different lengths, shorter ones should be skipped
     gracefully and both modules should still be appended."""
@@ -320,6 +364,7 @@ class TestUnevenListLengths:
     @patch("hwprobe.core.mac.memory.subprocess.check_output")
     def test_mismatched_list_lengths_still_appends_both(self, mock_co, mock_sp):
         from hwprobe.models.size_models import Gigabyte
+
         mock_sp.return_value = [Gigabyte(capacity=8)]
 
         # 2 manufacturers but only 1 of everything else
@@ -332,14 +377,21 @@ class TestUnevenListLengths:
             "dimm-types": b"DDR4\x00",
             "slot-names": b"DIMM0/BANK0\x00",
         }
-        ioreg_plist = plistlib.dumps({
-            "IORegistryEntryChildren": [{
-                "IORegistryEntryChildren": [{
-                    "IORegistryEntryName": "memory",
-                    **memory_entry,
-                }]
-            }]
-        }, fmt=plistlib.FMT_XML)
+        ioreg_plist = plistlib.dumps(
+            {
+                "IORegistryEntryChildren": [
+                    {
+                        "IORegistryEntryChildren": [
+                            {
+                                "IORegistryEntryName": "memory",
+                                **memory_entry,
+                            }
+                        ]
+                    }
+                ]
+            },
+            fmt=plistlib.FMT_XML,
+        )
 
         def side_effect(cmd):
             if cmd == ["uname", "-m"]:

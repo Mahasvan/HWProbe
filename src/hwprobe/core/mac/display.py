@@ -32,7 +32,8 @@ def _enrich_data_from_edid(monitor_info: DisplayModuleInfo, edid_string: str) ->
         if getattr(monitor_info, field) is None:
             setattr(monitor_info, field, getattr(data, field))
     # Update the resolution as well
-    if data.resolution is None: return monitor_info
+    if data.resolution is None:
+        return monitor_info
     if monitor_info.resolution is None:
         monitor_info.resolution = data.resolution
         return monitor_info

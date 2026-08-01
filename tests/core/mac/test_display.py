@@ -1,37 +1,43 @@
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from hwprobe.core.mac.display import (
-    _get_monitor_resolution_from_system_profiler,
-    _get_refresh_rate_from_system_profiler,
     _enrich_data_from_edid,
     _fetch_monitor_info_system_profiler,
+    _get_monitor_resolution_from_system_profiler,
+    _get_refresh_rate_from_system_profiler,
     fetch_display_info,
 )
 from hwprobe.models.display_models import DisplayModuleInfo
 from hwprobe.models.status_models import StatusType
 
-
 # ── sample system_profiler JSON structures ───────────────────────────────────
+
 
 def _make_sp_output(monitors_per_controller=None):
     """Build a fake system_profiler SPDisplaysDataType JSON structure."""
     if monitors_per_controller is None:
-        monitors_per_controller = [[{
-            "_name": "Built-in Retina Display",
-            "spdisplays_pixelresolution": "3024 x 1964 @ 120.00Hz",
-            "_spdisplays_display-serial-number": "SN12345",
-            "_spdisplays_display-year": "2023",
-            "sppci_model": "Apple M3 Pro",
-        }]]
+        monitors_per_controller = [
+            [
+                {
+                    "_name": "Built-in Retina Display",
+                    "spdisplays_pixelresolution": "3024 x 1964 @ 120.00Hz",
+                    "_spdisplays_display-serial-number": "SN12345",
+                    "_spdisplays_display-year": "2023",
+                    "sppci_model": "Apple M3 Pro",
+                }
+            ]
+        ]
 
     controllers = []
     for i, monitors in enumerate(monitors_per_controller):
-        controllers.append({
-            "_name": f"Controller {i}",
-            "sppci_model": f"GPU {i}",
-            "spdisplays_ndrvs": monitors,
-        })
+        controllers.append(
+            {
+                "_name": f"Controller {i}",
+                "sppci_model": f"GPU {i}",
+                "spdisplays_ndrvs": monitors,
+            }
+        )
 
     return {"SPDisplaysDataType": controllers}
 
@@ -46,8 +52,8 @@ def _make_subprocess_run_mock(sp_output):
 
 # ── _get_monitor_resolution_from_system_profiler ─────────────────────────────
 
-class TestGetMonitorResolution:
 
+class TestGetMonitorResolution:
     def test_pixelresolution_key(self):
         monitor = {"spdisplays_pixelresolution": "3024 x 1964 @ 120.00Hz"}
         result = _get_monitor_resolution_from_system_profiler(monitor)
@@ -90,8 +96,8 @@ class TestGetMonitorResolution:
 
 # ── _get_refresh_rate_from_system_profiler ───────────────────────────────────
 
-class TestGetRefreshRate:
 
+class TestGetRefreshRate:
     def test_refresh_rate_from_pixelresolution(self):
         monitor = {"spdisplays_pixelresolution": "3024 x 1964 @ 120.00Hz"}
         result = _get_refresh_rate_from_system_profiler(monitor)
@@ -125,8 +131,8 @@ class TestGetRefreshRate:
 
 # ── _enrich_data_from_edid ───────────────────────────────────────────────────
 
-class TestEnrichDataFromEdid:
 
+class TestEnrichDataFromEdid:
     def test_hex_prefix_stripped(self):
         """EDID strings starting with 0x should have the prefix removed."""
         monitor = DisplayModuleInfo()
@@ -153,21 +159,27 @@ class TestEnrichDataFromEdid:
 
 # ── _fetch_monitor_info_system_profiler ──────────────────────────────────────
 
-class TestFetchMonitorInfoSystemProfiler:
 
+class TestFetchMonitorInfoSystemProfiler:
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_single_monitor_basic_info(self, mock_run):
         # gpu_name comes from the controller-level sppci_model, not the monitor dict
-        sp_data = {"SPDisplaysDataType": [{
-            "_name": "Controller",
-            "sppci_model": "Apple M3 Pro",
-            "spdisplays_ndrvs": [{
-                "_name": "Built-in Display",
-                "spdisplays_pixelresolution": "3024 x 1964 @ 120.00Hz",
-                "_spdisplays_display-serial-number": "SN123",
-                "_spdisplays_display-year": "2023",
-            }],
-        }]}
+        sp_data = {
+            "SPDisplaysDataType": [
+                {
+                    "_name": "Controller",
+                    "sppci_model": "Apple M3 Pro",
+                    "spdisplays_ndrvs": [
+                        {
+                            "_name": "Built-in Display",
+                            "spdisplays_pixelresolution": "3024 x 1964 @ 120.00Hz",
+                            "_spdisplays_display-serial-number": "SN123",
+                            "_spdisplays_display-year": "2023",
+                        }
+                    ],
+                }
+            ]
+        }
         mock_result = MagicMock()
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
@@ -186,9 +198,15 @@ class TestFetchMonitorInfoSystemProfiler:
 
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_missing_name_is_partial(self, mock_run):
-        sp_data = _make_sp_output([[{
-            "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz",
-        }]])
+        sp_data = _make_sp_output(
+            [
+                [
+                    {
+                        "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz",
+                    }
+                ]
+            ]
+        )
         mock_result = MagicMock()
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
@@ -200,10 +218,16 @@ class TestFetchMonitorInfoSystemProfiler:
 
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_missing_serial_is_partial(self, mock_run):
-        sp_data = _make_sp_output([[{
-            "_name": "Display",
-            "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz",
-        }]])
+        sp_data = _make_sp_output(
+            [
+                [
+                    {
+                        "_name": "Display",
+                        "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz",
+                    }
+                ]
+            ]
+        )
         mock_result = MagicMock()
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
@@ -214,11 +238,17 @@ class TestFetchMonitorInfoSystemProfiler:
 
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_missing_year_is_partial(self, mock_run):
-        sp_data = _make_sp_output([[{
-            "_name": "Display",
-            "_spdisplays_display-serial-number": "SN1",
-            "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz",
-        }]])
+        sp_data = _make_sp_output(
+            [
+                [
+                    {
+                        "_name": "Display",
+                        "_spdisplays_display-serial-number": "SN1",
+                        "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz",
+                    }
+                ]
+            ]
+        )
         mock_result = MagicMock()
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
@@ -228,14 +258,20 @@ class TestFetchMonitorInfoSystemProfiler:
 
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_missing_gpu_name_is_partial(self, mock_run):
-        sp_data = {"SPDisplaysDataType": [{
-            "spdisplays_ndrvs": [{
-                "_name": "Display",
-                "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz",
-                "_spdisplays_display-serial-number": "SN1",
-                "_spdisplays_display-year": "2023",
-            }]
-        }]}
+        sp_data = {
+            "SPDisplaysDataType": [
+                {
+                    "spdisplays_ndrvs": [
+                        {
+                            "_name": "Display",
+                            "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz",
+                            "_spdisplays_display-serial-number": "SN1",
+                            "_spdisplays_display-year": "2023",
+                        }
+                    ]
+                }
+            ]
+        }
         mock_result = MagicMock()
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
@@ -263,10 +299,12 @@ class TestFetchMonitorInfoSystemProfiler:
 
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_multiple_monitors_across_controllers(self, mock_run):
-        sp_data = _make_sp_output([
-            [{"_name": "Monitor A", "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz"}],
-            [{"_name": "Monitor B", "spdisplays_pixelresolution": "2560 x 1440 @ 144Hz"}],
-        ])
+        sp_data = _make_sp_output(
+            [
+                [{"_name": "Monitor A", "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz"}],
+                [{"_name": "Monitor B", "spdisplays_pixelresolution": "2560 x 1440 @ 144Hz"}],
+            ]
+        )
         mock_result = MagicMock()
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
@@ -281,14 +319,20 @@ class TestFetchMonitorInfoSystemProfiler:
         """When _spdisplays_edid is present, _enrich_data_from_edid is called."""
         # 128 bytes of zeros is a minimal (invalid but parseable) EDID
         edid_hex = "00" * 128
-        sp_data = _make_sp_output([[{
-            "_name": "External Monitor",
-            "spdisplays_pixelresolution": "3840 x 2160 @ 60Hz",
-            "_spdisplays_display-serial-number": "SN1",
-            "_spdisplays_display-year": "2020",
-            "sppci_model": "AMD GPU",
-            "_spdisplays_edid": edid_hex,
-        }]])
+        sp_data = _make_sp_output(
+            [
+                [
+                    {
+                        "_name": "External Monitor",
+                        "spdisplays_pixelresolution": "3840 x 2160 @ 60Hz",
+                        "_spdisplays_display-serial-number": "SN1",
+                        "_spdisplays_display-year": "2020",
+                        "sppci_model": "AMD GPU",
+                        "_spdisplays_edid": edid_hex,
+                    }
+                ]
+            ]
+        )
         mock_result = MagicMock()
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
@@ -298,13 +342,19 @@ class TestFetchMonitorInfoSystemProfiler:
 
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_missing_edid_is_partial(self, mock_run):
-        sp_data = _make_sp_output([[{
-            "_name": "Display",
-            "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz",
-            "_spdisplays_display-serial-number": "SN1",
-            "_spdisplays_display-year": "2023",
-            "sppci_model": "GPU",
-        }]])
+        sp_data = _make_sp_output(
+            [
+                [
+                    {
+                        "_name": "Display",
+                        "spdisplays_pixelresolution": "1920 x 1080 @ 60Hz",
+                        "_spdisplays_display-serial-number": "SN1",
+                        "_spdisplays_display-year": "2023",
+                        "sppci_model": "GPU",
+                    }
+                ]
+            ]
+        )
         mock_result = MagicMock()
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
@@ -315,11 +365,12 @@ class TestFetchMonitorInfoSystemProfiler:
 
 # ── fetch_display_info ───────────────────────────────────────────────────────
 
-class TestFetchDisplayInfo:
 
+class TestFetchDisplayInfo:
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_returns_display_info_type(self, mock_run):
         from hwprobe.models.display_models import DisplayInfo
+
         sp_data = _make_sp_output()
         mock_result = MagicMock()
         mock_result.stdout = json.dumps(sp_data)
@@ -330,10 +381,14 @@ class TestFetchDisplayInfo:
 
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_modules_populated(self, mock_run):
-        sp_data = _make_sp_output([[
-            {"_name": "A", "spdisplays_pixelresolution": "1920x1080 @ 60Hz"},
-            {"_name": "B", "spdisplays_pixelresolution": "2560x1440 @ 120Hz"},
-        ]])
+        sp_data = _make_sp_output(
+            [
+                [
+                    {"_name": "A", "spdisplays_pixelresolution": "1920x1080 @ 60Hz"},
+                    {"_name": "B", "spdisplays_pixelresolution": "2560x1440 @ 120Hz"},
+                ]
+            ]
+        )
         mock_result = MagicMock()
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result

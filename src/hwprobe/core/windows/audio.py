@@ -23,9 +23,7 @@ def fetch_audio_info_fast() -> AudioInfo:
     # the method couldn't execute successfully
     if res != STATUS_OK:
         audio_info.status.type = StatusType.FAILED
-        audio_info.status.messages.append(
-            f"Audio HW info query failed with status code: {res}"
-        )
+        audio_info.status.messages.append(f"Audio HW info query failed with status code: {res}")
         return audio_info
 
     decoded = raw_data.value.decode("utf-8", errors="ignore").strip()

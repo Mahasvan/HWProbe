@@ -7,7 +7,6 @@ from hwprobe.models.status_models import StatusType
 
 
 class TestLinuxStorage:
-
     def test_fetch_storage_info_no_sys_block(self, monkeypatch):
         monkeypatch.setattr(os.path, "isdir", lambda x: False)
 
@@ -26,9 +25,7 @@ class TestLinuxStorage:
             content = ""
             if "nvme0n1/device/model" in path:
                 content = "Samsung SSD 970 EVO Plus 1TB"
-            elif "nvme0n1/queue/rotational" in path:
-                content = "0"
-            elif "nvme0n1/removable" in path:
+            elif "nvme0n1/queue/rotational" in path or "nvme0n1/removable" in path:
                 content = "0"
             elif "nvme0n1/device/device/device" in path:
                 content = "0xa808"
@@ -258,18 +255,34 @@ class TestLinuxStorage:
 
     def test_fetch_storage_info_filters_partitions_and_boot_devices(self, monkeypatch):
         monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        monkeypatch.setattr(os, "listdir", lambda x: [
-            "sda", "sda1", "sda2",  # sda is disk, sda1/sda2 are partitions
-            "mmcblk0", "mmcblk0p1", "mmcblk0boot0", "mmcblk0boot1", "mmcblk0rpmb",
-            # mmcblk0 is disk, others should be filtered
-            "nvme0n1", "nvme0n1p1", "nvme0n1p2"  # nvme0n1 is disk, partitions should be filtered
-        ])
+        monkeypatch.setattr(
+            os,
+            "listdir",
+            lambda x: [
+                "sda",
+                "sda1",
+                "sda2",  # sda is disk, sda1/sda2 are partitions
+                "mmcblk0",
+                "mmcblk0p1",
+                "mmcblk0boot0",
+                "mmcblk0boot1",
+                "mmcblk0rpmb",
+                # mmcblk0 is disk, others should be filtered
+                "nvme0n1",
+                "nvme0n1p1",
+                "nvme0n1p2",  # nvme0n1 is disk, partitions should be filtered
+            ],
+        )
 
         def mock_exists(path):
             # Only partition files exist for actual partitions
-            return ("sda1/partition" in path or "sda2/partition" in path or
-                    "mmcblk0p1/partition" in path or
-                    "nvme0n1p1/partition" in path or "nvme0n1p2/partition" in path)
+            return (
+                "sda1/partition" in path
+                or "sda2/partition" in path
+                or "mmcblk0p1/partition" in path
+                or "nvme0n1p1/partition" in path
+                or "nvme0n1p2/partition" in path
+            )
 
         monkeypatch.setattr(os.path, "exists", mock_exists)
 
@@ -280,9 +293,7 @@ class TestLinuxStorage:
             # Mock for sda
             if "sda/device/model" in path:
                 content = "Test SSD"
-            elif "sda/queue/rotational" in path:
-                content = "0"
-            elif "sda/removable" in path:
+            elif "sda/queue/rotational" in path or "sda/removable" in path:
                 content = "0"
             elif "sda/device/vendor" in path:
                 content = "TestVendor"
@@ -304,9 +315,7 @@ class TestLinuxStorage:
             # Mock for nvme0n1
             elif "nvme0n1/device/model" in path:
                 content = "Test NVMe"
-            elif "nvme0n1/queue/rotational" in path:
-                content = "0"
-            elif "nvme0n1/removable" in path:
+            elif "nvme0n1/queue/rotational" in path or "nvme0n1/removable" in path:
                 content = "0"
             elif "nvme0n1/device/device/device" in path:
                 content = "0x1234"

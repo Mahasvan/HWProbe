@@ -13,13 +13,13 @@ the real dataclasses from the binding, without importing the dylib at all.
 
 from dataclasses import dataclass
 from typing import Optional
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from hwprobe.core.mac.graphics import fetch_graphics_info
 from hwprobe.models.status_models import StatusType
 
-
 # ── lightweight stand-ins for the binding's dataclasses ─────────────────────
+
 
 @dataclass
 class FakeAppleGPUProperties:
@@ -43,14 +43,15 @@ class FakeGPUProperties:
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+
 def _apple_gpu(
-        name="Apple M3 Pro",
-        vendor_id=0x106B,
-        device_id=0x0000,
-        core_count=20,
-        gpu_perf_shaders=8,
-        gpu_gen=15,
-        unified_memory_mb=18432,
+    name="Apple M3 Pro",
+    vendor_id=0x106B,
+    device_id=0x0000,
+    core_count=20,
+    gpu_perf_shaders=8,
+    gpu_gen=15,
+    unified_memory_mb=18432,
 ) -> FakeGPUProperties:
     """Return a fully-populated Apple Silicon GPU stub."""
     return FakeGPUProperties(
@@ -68,10 +69,10 @@ def _apple_gpu(
 
 
 def _discrete_gpu(
-        name="NVIDIA GeForce RTX 3090",
-        vendor_id=0x10DE,
-        device_id=0x2204,
-        vram_mb=24576,
+    name="NVIDIA GeForce RTX 3090",
+    vendor_id=0x10DE,
+    device_id=0x2204,
+    vram_mb=24576,
 ) -> FakeGPUProperties:
     """Return a fully-populated discrete (non-Apple-Silicon) GPU stub."""
     return FakeGPUProperties(
@@ -101,6 +102,7 @@ def _patch_binding(gpu_list):
 
 # ── dylib / binding load failures ────────────────────────────────────────────
 
+
 class TestBindingLoadFailures:
     """fetch_graphics_info must gracefully handle errors that arise when the
     C binding cannot be imported or when IOKit enumeration fails."""
@@ -117,8 +119,8 @@ class TestBindingLoadFailures:
         raises FileNotFoundError whenever that specific module is imported,
         then evicting it from sys.modules so the lazy import is forced to run.
         """
-        import sys
         import importlib.machinery
+        import sys
 
         _TARGET = "hwprobe.interops.mac.bindings.gpu_info"
 
@@ -129,7 +131,6 @@ class TestBindingLoadFailures:
                         "libdevice_info.dylib not found at …/bindings/libdevice_info.dylib.\n"
                         "Build the project first:  cmake --build cmake-build-debug"
                     )
-                return None
 
         finder = _DylibMissingFinder()
         sys.meta_path.insert(0, finder)
@@ -141,20 +142,16 @@ class TestBindingLoadFailures:
             sys.modules.pop(_TARGET, None)
 
         assert info.status.type == StatusType.FAILED
-        assert any(
-            "libdevice_info.dylib" in m or "rebuild" in m.lower()
-            for m in info.status.messages
-        )
+        assert any("libdevice_info.dylib" in m or "rebuild" in m.lower() for m in info.status.messages)
         assert info.modules == []
 
     def test_iokit_enumeration_failure_returns_failed_status(self):
         """RuntimeError (get_gpu_info returns -1) → FAILED."""
         mock_module = MagicMock()
-        mock_module.get_gpu_info.side_effect = RuntimeError(
-            "get_gpu_info() failed (C library returned -1)"
-        )
+        mock_module.get_gpu_info.side_effect = RuntimeError("get_gpu_info() failed (C library returned -1)")
 
         import sys
+
         sys.modules.pop("hwprobe.interops.mac.bindings.gpu_info", None)
 
         with patch.dict("sys.modules", {"hwprobe.interops.mac.bindings.gpu_info": mock_module}):
@@ -170,6 +167,7 @@ class TestBindingLoadFailures:
         mock_module.get_gpu_info.side_effect = OSError("Unexpected OS error")
 
         import sys
+
         sys.modules.pop("hwprobe.interops.mac.bindings.gpu_info", None)
 
         with patch.dict("sys.modules", {"hwprobe.interops.mac.bindings.gpu_info": mock_module}):
@@ -182,11 +180,13 @@ class TestBindingLoadFailures:
 
 # ── Apple Silicon GPU (happy path) ───────────────────────────────────────────
 
+
 class TestAppleSiliconGPU:
     """Tests covering normal Apple Silicon GPU enumeration."""
 
     def _run(self, gpu_list):
         import sys
+
         sys.modules.pop("hwprobe.interops.mac.bindings.gpu_info", None)
         with _patch_binding(gpu_list):
             return fetch_graphics_info()
@@ -231,7 +231,8 @@ class TestAppleSiliconGPU:
 
     def test_apple_m1_gpu(self):
         info = self._run(
-            [_apple_gpu(name="Apple M1", core_count=7, gpu_perf_shaders=0, gpu_gen=13, unified_memory_mb=8192)])
+            [_apple_gpu(name="Apple M1", core_count=7, gpu_perf_shaders=0, gpu_gen=13, unified_memory_mb=8192)]
+        )
         gpu = info.modules[0]
         assert gpu.name == "Apple M1"
         assert gpu.vram.capacity == 8192
@@ -240,7 +241,8 @@ class TestAppleSiliconGPU:
 
     def test_apple_m2_max_gpu(self):
         info = self._run(
-            [_apple_gpu(name="Apple M2 Max", core_count=38, gpu_perf_shaders=16, gpu_gen=14, unified_memory_mb=32768)])
+            [_apple_gpu(name="Apple M2 Max", core_count=38, gpu_perf_shaders=16, gpu_gen=14, unified_memory_mb=32768)]
+        )
         gpu = info.modules[0]
         assert gpu.name == "Apple M2 Max"
         assert gpu.vram.capacity == 32768
@@ -271,18 +273,21 @@ class TestAppleSiliconGPU:
 
 # ── Discrete / non-Apple-Silicon GPU ─────────────────────────────────────────
 
+
 class TestDiscreteGPU:
     """Tests for Intel, AMD, and NVIDIA GPUs on x86 Macs."""
 
     def _run(self, gpu_list):
         import sys
+
         sys.modules.pop("hwprobe.interops.mac.bindings.gpu_info", None)
         with _patch_binding(gpu_list):
             return fetch_graphics_info()
 
     def test_nvidia_gpu_success(self):
         info = self._run(
-            [_discrete_gpu(name="NVIDIA GeForce RTX 3090", vendor_id=0x10DE, device_id=0x2204, vram_mb=24576)])
+            [_discrete_gpu(name="NVIDIA GeForce RTX 3090", vendor_id=0x10DE, device_id=0x2204, vram_mb=24576)]
+        )
         assert info.status.type == StatusType.SUCCESS
         gpu = info.modules[0]
         assert gpu.name == "NVIDIA GeForce RTX 3090"
@@ -358,21 +363,25 @@ class TestDiscreteGPU:
 
 # ── Multiple GPUs ─────────────────────────────────────────────────────────────
 
+
 class TestMultipleGPUs:
     """Tests for machines with more than one GPU."""
 
     def _run(self, gpu_list):
         import sys
+
         sys.modules.pop("hwprobe.interops.mac.bindings.gpu_info", None)
         with _patch_binding(gpu_list):
             return fetch_graphics_info()
 
     def test_two_discrete_gpus(self):
         """Dual-GPU Intel Mac Pro style."""
-        info = self._run([
-            _discrete_gpu("AMD Radeon Pro W6800X", 0x1002, 0x73A3),
-            _discrete_gpu("AMD Radeon Pro W6800X Duo", 0x1002, 0x73A5),
-        ])
+        info = self._run(
+            [
+                _discrete_gpu("AMD Radeon Pro W6800X", 0x1002, 0x73A3),
+                _discrete_gpu("AMD Radeon Pro W6800X Duo", 0x1002, 0x73A5),
+            ]
+        )
         assert info.status.type == StatusType.SUCCESS
         assert len(info.modules) == 2
         assert info.modules[0].name == "AMD Radeon Pro W6800X"
@@ -418,11 +427,13 @@ class TestMultipleGPUs:
 
 # ── Edge cases & name handling ────────────────────────────────────────────────
 
+
 class TestEdgeCases:
     """Misc edge-case and boundary tests."""
 
     def _run(self, gpu_list):
         import sys
+
         sys.modules.pop("hwprobe.interops.mac.bindings.gpu_info", None)
         with _patch_binding(gpu_list):
             return fetch_graphics_info()
@@ -468,7 +479,9 @@ class TestEdgeCases:
             device_id=0x0000,
             is_apple_silicon=True,
             apple_gpu=FakeAppleGPUProperties(
-                core_count=20, gpu_perf_shaders=8, gpu_gen=15,
+                core_count=20,
+                gpu_perf_shaders=8,
+                gpu_gen=15,
                 unified_memory_mb=0,  # bad value from binding
             ),
         )
@@ -507,5 +520,6 @@ class TestEdgeCases:
 
     def test_return_type_is_graphics_info(self):
         from hwprobe.models.gpu_models import GraphicsInfo
+
         info = self._run([_apple_gpu()])
         assert isinstance(info, GraphicsInfo)

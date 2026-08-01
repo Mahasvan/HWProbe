@@ -21,14 +21,14 @@ _LIB_PATH = _HERE / "libdevice_info.dylib"
 
 if not _LIB_PATH.exists():
     raise FileNotFoundError(
-        f"libdevice_info.dylib not found at {_LIB_PATH}.\n"
-        "Build the project first:  cmake --build cmake-build-debug"
+        f"libdevice_info.dylib not found at {_LIB_PATH}.\nBuild the project first:  cmake --build cmake-build-debug"
     )
 
 _lib = ctypes.CDLL(str(_LIB_PATH))
 
 
 # ── mirror the C structs ─────────────────────────────────────────────────────
+
 
 class _AppleGPUProperties(ctypes.Structure):
     _fields_ = [
@@ -58,6 +58,7 @@ _lib.get_gpu_info.argtypes = [ctypes.POINTER(_GPUProperties), ctypes.c_int]
 
 
 # ── Python-facing dataclasses ────────────────────────────────────────────────
+
 
 @dataclass
 class AppleGPUProperties:
@@ -131,16 +132,18 @@ def get_gpu_info() -> list[GPUProperties]:
         acpi = raw.acpi_path.decode("utf-8", errors="replace").strip("\x00") or None
         pci = raw.pci_path.decode("utf-8", errors="replace").strip("\x00") or None
 
-        result.append(GPUProperties(
-            name=raw.name.decode("utf-8", errors="replace"),
-            vendor_id=raw.vendor_id,
-            device_id=raw.device_id,
-            is_apple_silicon=bool(raw.is_apple_silicon),
-            apple_gpu=apple,
-            acpi_path=acpi,
-            pci_path=pci,
-            vram_mb=raw.vram_mb,
-        ))
+        result.append(
+            GPUProperties(
+                name=raw.name.decode("utf-8", errors="replace"),
+                vendor_id=raw.vendor_id,
+                device_id=raw.device_id,
+                is_apple_silicon=bool(raw.is_apple_silicon),
+                apple_gpu=apple,
+                acpi_path=acpi,
+                pci_path=pci,
+                vram_mb=raw.vram_mb,
+            )
+        )
     return result
 
 

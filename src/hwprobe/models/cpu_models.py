@@ -1,7 +1,8 @@
 from typing import Optional
 
-from hwprobe.models.component_model import ComponentInfo
 from pydantic import Field
+
+from hwprobe.models.component_model import ComponentInfo
 
 
 class CPUInfo(ComponentInfo):

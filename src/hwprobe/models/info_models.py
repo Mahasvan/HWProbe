@@ -1,11 +1,12 @@
 from typing import Optional
 
+from pydantic import BaseModel
+
 from hwprobe.models.cpu_models import CPUInfo
 from hwprobe.models.gpu_models import GraphicsInfo
 from hwprobe.models.memory_models import MemoryInfo
 from hwprobe.models.network_models import NetworkInfo
 from hwprobe.models.storage_models import StorageInfo
-from pydantic import BaseModel
 
 
 class HardwareInfo(BaseModel):
@@ -37,24 +38,18 @@ class HardwareManagerInterface:
     def fetch_hardware_info(self) -> HardwareInfo:
         """Fetches all hardware Information."""
 
-    pass
 
     def fetch_cpu_info(self) -> CPUInfo:
         """Fetches CPU Information."""
-        pass
 
     def fetch_graphics_info(self) -> GraphicsInfo:
         """Fetches GPU Information."""
-        pass
 
     def fetch_memory_info(self) -> MemoryInfo:
         """Fetches RAM Information."""
-        pass
 
     def fetch_storage_info(self) -> StorageInfo:
         """Fetches Disk Information."""
-        pass
 
     def fetch_network_info(self) -> NetworkInfo:
         """Fetches Network Information."""
-        pass

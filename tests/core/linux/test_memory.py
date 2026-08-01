@@ -3,16 +3,16 @@ import os
 from unittest.mock import MagicMock
 
 from hwprobe.core.linux.memory import (
-    fetch_memory_info,
-    _part_no,
-    _dimm_type,
-    _dimm_slot,
     _dimm_capacity,
-    _ecc_support,
+    _dimm_slot,
     _dimm_speed,
+    _dimm_type,
+    _ecc_support,
+    _part_no,
+    fetch_memory_info,
 )
 from hwprobe.models.memory_models import MemoryModuleSlot
-from hwprobe.models.size_models import Megabyte, Kilobyte
+from hwprobe.models.size_models import Kilobyte, Megabyte
 from hwprobe.models.status_models import StatusType
 
 
@@ -111,7 +111,7 @@ class TestDimmCapacity:
     def test_dimm_capacity_megabytes(self):
         value = bytearray(0x20)
         size_mb = 8192  # 8 GB
-        value[0x0C:0x0E] = size_mb.to_bytes(2, 'little')
+        value[0x0C:0x0E] = size_mb.to_bytes(2, "little")
 
         result = _dimm_capacity(bytes(value))
         assert result is not None
@@ -122,7 +122,7 @@ class TestDimmCapacity:
         value = bytearray(0x20)
         # Bit 15 set means kilobytes
         size_kb = 2048 | 0x8000
-        value[0x0C:0x0E] = size_kb.to_bytes(2, 'little')
+        value[0x0C:0x0E] = size_kb.to_bytes(2, "little")
 
         result = _dimm_capacity(bytes(value))
         assert result is not None
@@ -131,8 +131,8 @@ class TestDimmCapacity:
 
     def test_dimm_capacity_extended_size(self):
         value = bytearray(0x20)
-        value[0x0C:0x0E] = (0x7FFF).to_bytes(2, 'little')  # Use extended size
-        value[0x1C:0x20] = (32768).to_bytes(4, 'little')  # 32 GB
+        value[0x0C:0x0E] = (0x7FFF).to_bytes(2, "little")  # Use extended size
+        value[0x1C:0x20] = (32768).to_bytes(4, "little")  # 32 GB
 
         result = _dimm_capacity(bytes(value))
         assert result is not None
@@ -141,7 +141,7 @@ class TestDimmCapacity:
 
     def test_dimm_capacity_unknown(self):
         value = bytearray(0x20)
-        value[0x0C:0x0E] = (0xFFFF).to_bytes(2, 'little')  # Unknown size
+        value[0x0C:0x0E] = (0xFFFF).to_bytes(2, "little")  # Unknown size
 
         result = _dimm_capacity(bytes(value))
         assert result is None
@@ -152,16 +152,16 @@ class TestEccSupport:
 
     def test_ecc_support_true(self):
         value = bytearray(0x0C)
-        value[0x08:0x0A] = (72).to_bytes(2, 'little')  # Total width
-        value[0x0A:0x0C] = (64).to_bytes(2, 'little')  # Data width
+        value[0x08:0x0A] = (72).to_bytes(2, "little")  # Total width
+        value[0x0A:0x0C] = (64).to_bytes(2, "little")  # Data width
 
         result = _ecc_support(bytes(value))
         assert result is True
 
     def test_ecc_support_false(self):
         value = bytearray(0x0C)
-        value[0x08:0x0A] = (64).to_bytes(2, 'little')  # Total width
-        value[0x0A:0x0C] = (64).to_bytes(2, 'little')  # Data width
+        value[0x08:0x0A] = (64).to_bytes(2, "little")  # Total width
+        value[0x0A:0x0C] = (64).to_bytes(2, "little")  # Data width
 
         result = _ecc_support(bytes(value))
         assert result is False
@@ -172,29 +172,28 @@ class TestDimmSpeed:
 
     def test_dimm_speed_normal(self):
         value = bytearray(0x58)
-        value[0x15:0x17] = (3200).to_bytes(2, 'little')
+        value[0x15:0x17] = (3200).to_bytes(2, "little")
 
         result = _dimm_speed(bytes(value))
         assert result == 3200
 
     def test_dimm_speed_extended(self):
         value = bytearray(0x58)
-        value[0x15:0x17] = (0xFFFF).to_bytes(2, 'little')  # Use extended speed
-        value[0x54:0x58] = (4800).to_bytes(4, 'little')
+        value[0x15:0x17] = (0xFFFF).to_bytes(2, "little")  # Use extended speed
+        value[0x54:0x58] = (4800).to_bytes(4, "little")
 
         result = _dimm_speed(bytes(value))
         assert result == 4800
 
     def test_dimm_speed_unknown(self):
         value = bytearray(0x58)
-        value[0x15:0x17] = (0).to_bytes(2, 'little')  # Unknown speed
+        value[0x15:0x17] = (0).to_bytes(2, "little")  # Unknown speed
 
         result = _dimm_speed(bytes(value))
         assert result is None
 
 
 class TestLinuxMemory:
-
     def test_fetch_memory_info_no_dmi_dir(self, monkeypatch):
         monkeypatch.setattr(os.path, "isdir", lambda x: False)
 
@@ -225,18 +224,20 @@ class TestLinuxMemory:
         assert memory_info.status.type == StatusType.FAILED
         assert memory_info.status.messages is not None
 
-    def _create_dmi_blob(self,
-                         size_mb=8192,
-                         total_width=72,
-                         data_width=64,
-                         speed=3200,
-                         mem_type=0x1A,  # DDR4
-                         part_no="1234-5678",
-                         dev_loc="DIMM 0",
-                         bank_loc="BANK 0",
-                         manufacturer="Acme Corp",
-                         extended_size=None,
-                         extended_speed=None):
+    def _create_dmi_blob(
+        self,
+        size_mb=8192,
+        total_width=72,
+        data_width=64,
+        speed=3200,
+        mem_type=0x1A,  # DDR4
+        part_no="1234-5678",
+        dev_loc="DIMM 0",
+        bank_loc="BANK 0",
+        manufacturer="Acme Corp",
+        extended_size=None,
+        extended_speed=None,
+    ):
 
         # Header length
         length = 0x5C
@@ -245,13 +246,13 @@ class TestLinuxMemory:
         data[0x01] = length
 
         # Strings - include "DIMM" in the data for _part_no check
-        strings_bytes = b''
+        strings_bytes = b""
         string_indices = {}
         current_index = 1
 
         for s in [dev_loc, bank_loc, manufacturer, part_no]:
             if s:
-                strings_bytes += s.encode('ascii') + b'\0'
+                strings_bytes += s.encode("ascii") + b"\0"
                 string_indices[s] = current_index
                 current_index += 1
 
@@ -265,26 +266,26 @@ class TestLinuxMemory:
         data[0x12] = mem_type
 
         # Set Widths
-        data[0x08:0x0A] = total_width.to_bytes(2, 'little')
-        data[0x0A:0x0C] = data_width.to_bytes(2, 'little')
+        data[0x08:0x0A] = total_width.to_bytes(2, "little")
+        data[0x0A:0x0C] = data_width.to_bytes(2, "little")
 
         # Set Size
         if extended_size is not None:
-            data[0x0C:0x0E] = (0x7FFF).to_bytes(2, 'little')
-            data[0x1C:0x20] = extended_size.to_bytes(4, 'little')
+            data[0x0C:0x0E] = (0x7FFF).to_bytes(2, "little")
+            data[0x1C:0x20] = extended_size.to_bytes(4, "little")
         else:
             # Normal size - Bit 15 = 0 for MB.
-            data[0x0C:0x0E] = size_mb.to_bytes(2, 'little')
+            data[0x0C:0x0E] = size_mb.to_bytes(2, "little")
 
         # Set Speed
         if extended_speed is not None:
-            data[0x15:0x17] = (0xFFFF).to_bytes(2, 'little')
-            data[0x54:0x58] = extended_speed.to_bytes(4, 'little')
+            data[0x15:0x17] = (0xFFFF).to_bytes(2, "little")
+            data[0x54:0x58] = extended_speed.to_bytes(4, "little")
         else:
-            data[0x15:0x17] = speed.to_bytes(2, 'little')
+            data[0x15:0x17] = speed.to_bytes(2, "little")
 
         # Double null terminator at end of strings
-        strings_bytes += b'\0'
+        strings_bytes += b"\0"
 
         return bytes(data) + strings_bytes
 
@@ -304,6 +305,7 @@ class TestLinuxMemory:
 
         def mock_open(*args, **kwargs):
             from io import BytesIO
+
             return BytesIO(blob)
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -337,6 +339,7 @@ class TestLinuxMemory:
 
         def mock_open(*args, **kwargs):
             from io import BytesIO
+
             return BytesIO(blob)
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -355,11 +358,12 @@ class TestLinuxMemory:
         blob = self._create_dmi_blob()
         # Manually overwrite size to 0xFFFF
         data = bytearray(blob)
-        data[0x0C:0x0E] = (0xFFFF).to_bytes(2, 'little')
+        data[0x0C:0x0E] = (0xFFFF).to_bytes(2, "little")
         blob = bytes(data)
 
         def mock_open(*args, **kwargs):
             from io import BytesIO
+
             return BytesIO(blob)
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -382,6 +386,7 @@ class TestLinuxMemory:
 
         def mock_open(*args, **kwargs):
             from io import BytesIO
+
             return BytesIO(blob)
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -399,7 +404,8 @@ class TestLinuxMemory:
         # Return garbage that contains "DIMM" to trigger the parsing logic
         def mock_open(*args, **kwargs):
             from io import BytesIO
-            return BytesIO(b'DIMM')
+
+            return BytesIO(b"DIMM")
 
         monkeypatch.setattr(builtins, "open", mock_open)
 
@@ -421,10 +427,11 @@ class TestLinuxMemory:
 
         blob = self._create_dmi_blob()
         data = bytearray(blob)
-        data[0x0C:0x0E] = size_kb_val.to_bytes(2, 'little')
+        data[0x0C:0x0E] = size_kb_val.to_bytes(2, "little")
 
         def mock_open(*args, **kwargs):
             from io import BytesIO
+
             return BytesIO(bytes(data))
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -449,6 +456,7 @@ class TestLinuxMemory:
 
         def mock_open(*args, **kwargs):
             from io import BytesIO
+
             return BytesIO(bytes(data))
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -473,6 +481,7 @@ class TestLinuxMemory:
 
         def mock_open(*args, **kwargs):
             from io import BytesIO
+
             return BytesIO(bytes(data))
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -496,6 +505,7 @@ class TestLinuxMemory:
 
         def mock_open(*args, **kwargs):
             from io import BytesIO
+
             return BytesIO(bytes(data))
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -516,6 +526,7 @@ class TestLinuxMemory:
 
         def mock_open(*args, **kwargs):
             from io import BytesIO
+
             return BytesIO(blob)
 
         monkeypatch.setattr(builtins, "open", mock_open)

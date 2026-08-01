@@ -19,8 +19,7 @@ _LIB_PATH = _HERE / "libdevice_info.dylib"
 
 if not _LIB_PATH.exists():
     raise FileNotFoundError(
-        f"libdevice_info.dylib not found at {_LIB_PATH}.\n"
-        "Build the project first:  cmake --build cmake-build-debug"
+        f"libdevice_info.dylib not found at {_LIB_PATH}.\nBuild the project first:  cmake --build cmake-build-debug"
     )
 
 _lib = ctypes.CDLL(str(_LIB_PATH))
@@ -79,15 +78,17 @@ def get_storage_info() -> list[StorageDeviceProperties]:
     result = []
     for i in range(count):
         raw = buf[i]
-        result.append(StorageDeviceProperties(
-            product_name=raw.product_name.decode("utf-8", errors="replace").strip("\x00"),
-            vendor_name=raw.vendor_name.decode("utf-8", errors="replace").strip("\x00"),
-            medium_type=raw.medium_type.decode("utf-8", errors="replace").strip("\x00"),
-            interconnect=raw.interconnect.decode("utf-8", errors="replace").strip("\x00"),
-            location=raw.location.decode("utf-8", errors="replace").strip("\x00"),
-            bsd_name=raw.bsd_name.decode("utf-8", errors="replace").strip("\x00"),
-            size_bytes=raw.size_bytes,
-        ))
+        result.append(
+            StorageDeviceProperties(
+                product_name=raw.product_name.decode("utf-8", errors="replace").strip("\x00"),
+                vendor_name=raw.vendor_name.decode("utf-8", errors="replace").strip("\x00"),
+                medium_type=raw.medium_type.decode("utf-8", errors="replace").strip("\x00"),
+                interconnect=raw.interconnect.decode("utf-8", errors="replace").strip("\x00"),
+                location=raw.location.decode("utf-8", errors="replace").strip("\x00"),
+                bsd_name=raw.bsd_name.decode("utf-8", errors="replace").strip("\x00"),
+                size_bytes=raw.size_bytes,
+            )
+        )
     return result
 
 

@@ -6,9 +6,7 @@ from hwprobe.core.mac.network import fetch_network_info
 from hwprobe.core.mac.storage import fetch_storage_info
 from hwprobe.models.cpu_models import CPUInfo
 from hwprobe.models.gpu_models import GraphicsInfo
-from hwprobe.models.info_models import HardwareInfo
-from hwprobe.models.info_models import HardwareManagerInterface
-from hwprobe.models.info_models import MacHardwareInfo
+from hwprobe.models.info_models import HardwareInfo, HardwareManagerInterface, MacHardwareInfo
 from hwprobe.models.memory_models import MemoryInfo
 from hwprobe.models.network_models import NetworkInfo
 from hwprobe.models.storage_models import StorageInfo

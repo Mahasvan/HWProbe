@@ -1,11 +1,12 @@
 import ctypes
 
-from hwprobe.core.windows.win_enum import MEDIA_TYPE, BUS_TYPE
+from hwprobe.core.windows.win_enum import BUS_TYPE, MEDIA_TYPE
+
 # todo: refactor to new bindings
 from hwprobe.interops.win.legacy.signatures import GetWmiInfo
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
-from hwprobe.models.storage_models import StorageInfo, DiskInfo
+from hwprobe.models.storage_models import DiskInfo, StorageInfo
 
 
 def fetch_wmi_storage_info() -> StorageInfo:
@@ -19,10 +20,7 @@ def fetch_wmi_storage_info() -> StorageInfo:
     buf_size = 256 * 6 * 10
     buffer = ctypes.create_string_buffer(buf_size)
 
-    query = (
-        b"SELECT FriendlyName, MediaType, BusType, Size, Manufacturer, Model FROM "
-        b"MSFT_PhysicalDisk"
-    )
+    query = b"SELECT FriendlyName, MediaType, BusType, Size, Manufacturer, Model FROM MSFT_PhysicalDisk"
 
     GetWmiInfo(query, b"ROOT\\Microsoft\\Windows\\Storage", buffer, buf_size)
 
@@ -37,9 +35,7 @@ def fetch_wmi_storage_info() -> StorageInfo:
             continue
 
         disk = DiskInfo()
-        props = {
-            x.split("=", 1)[0]: x.split("=", 1)[1] for x in line.split("|") if "=" in x
-        }
+        props = {x.split("=", 1)[0]: x.split("=", 1)[1] for x in line.split("|") if "=" in x}
 
         friendly_name = props.get("FriendlyName")
         media_type = props.get("MediaType")
@@ -48,20 +44,10 @@ def fetch_wmi_storage_info() -> StorageInfo:
         manufacturer = props.get("Manufacturer")
         model = props.get("Model")
 
-        disk.model = (
-            model.strip() if model else friendly_name.strip() if friendly_name else None
-        )
+        disk.model = model.strip() if model else friendly_name.strip() if friendly_name else None
         disk.manufacturer = manufacturer.strip() if manufacturer else None
-        disk.type = (
-            MEDIA_TYPE.get(int(media_type), "Unknown")
-            if media_type and media_type.isdigit()
-            else "Unknown"
-        )
-        disk.size = (
-            Megabyte(capacity=int(size) // (1024 * 1024))
-            if size and size.isdigit()
-            else None
-        )
+        disk.type = MEDIA_TYPE.get(int(media_type), "Unknown") if media_type and media_type.isdigit() else "Unknown"
+        disk.size = Megabyte(capacity=int(size) // (1024 * 1024)) if size and size.isdigit() else None
 
         # Map bus type
         conn_type, location = None, None

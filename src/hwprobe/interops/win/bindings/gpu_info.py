@@ -20,14 +20,14 @@ _LIB_PATH = _HERE / "device_info.dll"
 
 if not _LIB_PATH.exists():
     raise FileNotFoundError(
-        f"device_info.dll not found at {_LIB_PATH}.\n"
-        "Build the project first:  cmake --build build --config Release"
+        f"device_info.dll not found at {_LIB_PATH}.\nBuild the project first:  cmake --build build --config Release"
     )
 
 _lib = ctypes.WinDLL(str(_LIB_PATH))
 
 
 # ---- Mirror the C structs ----
+
 
 class _WinGPUProperties(ctypes.Structure):
     _fields_ = [
@@ -50,6 +50,7 @@ _lib.get_gpu_info.argtypes = [ctypes.POINTER(_WinGPUProperties), ctypes.c_int]
 
 
 # ---- Python-facing dataclass ----
+
 
 @dataclass
 class GPUProperties:
@@ -104,19 +105,21 @@ def get_gpu_info() -> list[GPUProperties]:
         acpi = raw.acpi_path.decode("utf-8", errors="replace").strip("\x00") or None
         pci = raw.pci_path.decode("utf-8", errors="replace").strip("\x00") or None
 
-        result.append(GPUProperties(
-            name=raw.name.decode("utf-8", errors="replace").strip("\x00"),
-            manufacturer=raw.manufacturer.decode("utf-8", errors="replace").strip("\x00"),
-            vendor_id=raw.vendor_id,
-            device_id=raw.device_id,
-            subsystem_vendor_id=raw.subsystem_vendor_id,
-            subsystem_device_id=raw.subsystem_device_id,
-            acpi_path=acpi,
-            pci_path=pci,
-            vram_mb=raw.vram_mb,
-            pcie_gen=raw.pcie_gen,
-            pcie_width=raw.pcie_width,
-        ))
+        result.append(
+            GPUProperties(
+                name=raw.name.decode("utf-8", errors="replace").strip("\x00"),
+                manufacturer=raw.manufacturer.decode("utf-8", errors="replace").strip("\x00"),
+                vendor_id=raw.vendor_id,
+                device_id=raw.device_id,
+                subsystem_vendor_id=raw.subsystem_vendor_id,
+                subsystem_device_id=raw.subsystem_device_id,
+                acpi_path=acpi,
+                pci_path=pci,
+                vram_mb=raw.vram_mb,
+                pcie_gen=raw.pcie_gen,
+                pcie_width=raw.pcie_width,
+            )
+        )
     return result
 
 

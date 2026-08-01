@@ -45,7 +45,7 @@ ECC_MEMORY_TYPE = {
     4: "Parity",
     5: "Single-bit ECC",
     6: "Multi-bit ECC",
-    7: "CRC"
+    7: "CRC",
 }
 
 MEMORY_TYPE = {

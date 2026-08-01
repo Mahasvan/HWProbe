@@ -1,5 +1,4 @@
-
-from hwprobe.models.gpu_models import GraphicsInfo, GPUInfo, AppleExtendedGPUInfo
+from hwprobe.models.gpu_models import AppleExtendedGPUInfo, GPUInfo, GraphicsInfo
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
 
@@ -22,7 +21,8 @@ def fetch_graphics_info() -> GraphicsInfo:
     # The binding raises FileNotFoundError at import time if libdevice_info.dylib is missing,
     # and RuntimeError at call time if the C library returns -1
     try:
-        from hwprobe.interops.mac.bindings.gpu_info import get_gpu_info, GPUProperties
+        from hwprobe.interops.mac.bindings.gpu_info import GPUProperties, get_gpu_info
+
         gpu_list: list[GPUProperties] = get_gpu_info()
 
     except FileNotFoundError as e:
@@ -52,9 +52,7 @@ def fetch_graphics_info() -> GraphicsInfo:
             module.vendor_id = hex(gpu.vendor_id)
             module.manufacturer = _VENDOR_MAP.get(gpu.vendor_id, "Unknown")
         else:
-            graphics_info.status.make_partial(
-                f"Could not get vendor ID for GPU: {module.name}"
-            )
+            graphics_info.status.make_partial(f"Could not get vendor ID for GPU: {module.name}")
 
         # Apple Silicon GPUs report 0x0000 for device_id. Flag it as partial for non-Apple-Silicon GPUs.
         if gpu.device_id:
@@ -98,4 +96,3 @@ def fetch_graphics_info() -> GraphicsInfo:
         graphics_info.modules.append(module)
 
     return graphics_info
-
