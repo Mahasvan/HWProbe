@@ -43,7 +43,7 @@ class TestArmCpuCores:
 
     def test_arm_cpu_cores_failure(self, monkeypatch):
         def mock_run(*args, **kwargs):
-            raise RuntimeError("lscpu failed")
+            raise subprocess.CalledProcessError(1, "lscpu")
 
         monkeypatch.setattr(subprocess, "run", mock_run)
 

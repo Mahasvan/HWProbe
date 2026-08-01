@@ -184,7 +184,7 @@ class TestFetchMonitorInfoSystemProfiler:
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
 
-        monitors = _fetch_monitor_info_system_profiler()
+        monitors, status = _fetch_monitor_info_system_profiler()
 
         assert len(monitors) == 1
         m = monitors[0]
@@ -211,10 +211,10 @@ class TestFetchMonitorInfoSystemProfiler:
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
 
-        monitors = _fetch_monitor_info_system_profiler()
+        monitors, status = _fetch_monitor_info_system_profiler()
         assert len(monitors) == 1
-        assert monitors[0].status.type == StatusType.PARTIAL
-        assert any("name" in m.lower() for m in monitors[0].status.messages)
+        assert status.type == StatusType.PARTIAL
+        assert any("name" in m.lower() for m in status.messages)
 
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_missing_serial_is_partial(self, mock_run):
@@ -232,9 +232,9 @@ class TestFetchMonitorInfoSystemProfiler:
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
 
-        monitors = _fetch_monitor_info_system_profiler()
-        assert monitors[0].status.type == StatusType.PARTIAL
-        assert any("serial" in m.lower() for m in monitors[0].status.messages)
+        monitors, status = _fetch_monitor_info_system_profiler()
+        assert status.type == StatusType.PARTIAL
+        assert any("serial" in m.lower() for m in status.messages)
 
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_missing_year_is_partial(self, mock_run):
@@ -253,8 +253,8 @@ class TestFetchMonitorInfoSystemProfiler:
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
 
-        monitors = _fetch_monitor_info_system_profiler()
-        assert any("year" in m.lower() for m in monitors[0].status.messages)
+        monitors, status = _fetch_monitor_info_system_profiler()
+        assert any("year" in m.lower() for m in status.messages)
 
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_missing_gpu_name_is_partial(self, mock_run):
@@ -276,8 +276,8 @@ class TestFetchMonitorInfoSystemProfiler:
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
 
-        monitors = _fetch_monitor_info_system_profiler()
-        assert any("GPU" in m for m in monitors[0].status.messages)
+        monitors, status = _fetch_monitor_info_system_profiler()
+        assert any("GPU" in m for m in status.messages)
 
     @patch("hwprobe.core.mac.display.subprocess.run")
     def test_empty_sp_output_returns_empty_list(self, mock_run):
@@ -285,7 +285,7 @@ class TestFetchMonitorInfoSystemProfiler:
         mock_result.stdout = json.dumps({})
         mock_run.return_value = mock_result
 
-        monitors = _fetch_monitor_info_system_profiler()
+        monitors, status = _fetch_monitor_info_system_profiler()
         assert monitors == []
 
     @patch("hwprobe.core.mac.display.subprocess.run")
@@ -294,7 +294,7 @@ class TestFetchMonitorInfoSystemProfiler:
         mock_result.stdout = "NOT JSON"
         mock_run.return_value = mock_result
 
-        monitors = _fetch_monitor_info_system_profiler()
+        monitors, status = _fetch_monitor_info_system_profiler()
         assert monitors == []
 
     @patch("hwprobe.core.mac.display.subprocess.run")
@@ -309,7 +309,7 @@ class TestFetchMonitorInfoSystemProfiler:
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
 
-        monitors = _fetch_monitor_info_system_profiler()
+        monitors, status = _fetch_monitor_info_system_profiler()
         assert len(monitors) == 2
         assert monitors[0].name == "Monitor A"
         assert monitors[1].name == "Monitor B"
@@ -337,7 +337,7 @@ class TestFetchMonitorInfoSystemProfiler:
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
 
-        monitors = _fetch_monitor_info_system_profiler()
+        monitors, status = _fetch_monitor_info_system_profiler()
         assert len(monitors) == 1
 
     @patch("hwprobe.core.mac.display.subprocess.run")
@@ -359,8 +359,8 @@ class TestFetchMonitorInfoSystemProfiler:
         mock_result.stdout = json.dumps(sp_data)
         mock_run.return_value = mock_result
 
-        monitors = _fetch_monitor_info_system_profiler()
-        assert any("EDID" in m for m in monitors[0].status.messages)
+        monitors, status = _fetch_monitor_info_system_profiler()
+        assert any("EDID" in m for m in status.messages)
 
 
 # ── fetch_display_info ───────────────────────────────────────────────────────

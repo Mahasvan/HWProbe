@@ -1,10 +1,12 @@
 import json
 import re
 import subprocess
+from subprocess import CalledProcessError
 from typing import Optional
 
 from hwprobe.core.common.edid import parse_edid
 from hwprobe.models.display_models import DisplayInfo, DisplayModuleInfo, ResolutionInfo
+from hwprobe.models.status_models import Status
 
 
 def _get_monitor_resolution_from_system_profiler(monitor_info: dict) -> Optional[tuple[int, int]]:
@@ -60,36 +62,38 @@ def _get_refresh_rate_from_system_profiler(monitor_info: dict) -> Optional[float
     return None
 
 
-def _fetch_monitor_info_system_profiler():
+def _fetch_monitor_info_system_profiler() -> tuple[list[DisplayModuleInfo], Status]:
     monitors = []
 
     command = ["system_profiler", "-json", "SPDisplaysDataType"]
 
     try:
-        output = json.loads(subprocess.run(command, capture_output=True, text=True).stdout)
-    except (json.JSONDecodeError, FileNotFoundError):
+        output = json.loads(subprocess.run(command, capture_output=True, text=True, check=True).stdout)
+    except (json.JSONDecodeError, FileNotFoundError, CalledProcessError):
         output = {}
 
     # # todo: remove after testing
     # with open("quangle.json") as f:
     #     output = json.load(f)
 
+    display_status = Status()
+
     for display_controller in output.get("SPDisplaysDataType", []):
         monitor_instances = display_controller.get("spdisplays_ndrvs", [])
-        for monitor in monitor_instances:
+        for i, monitor in enumerate(monitor_instances):
             monitor_info = DisplayModuleInfo()
             if name := monitor.get("_name"):
                 monitor_info.name = name
             else:
-                monitor_info.status.make_partial("Could not retrieve monitor name from system profiler")
+                display_status.make_partial(f"Could not retrieve name from system profiler for monitor {i}")
             if serial := monitor.get("_spdisplays_display-serial-number"):
                 monitor_info.serial_number = serial
             else:
-                monitor_info.status.make_partial("Could not retrieve serial number from system profiler")
+                display_status.make_partial(f"Could not retrieve serial number from system profiler for monitor {i}")
             if year := monitor.get("_spdisplays_display-year"):
                 monitor_info.year = int(year)
             else:
-                monitor_info.status.make_partial("Could not retrieve year from system profiler")
+                display_status.make_partial(f"Could not retrieve year from system profiler for monitor {i}")
 
             retrieved_resolution = _get_monitor_resolution_from_system_profiler(monitor)
             retrieved_refresh_rate = _get_refresh_rate_from_system_profiler(monitor)
@@ -97,16 +101,16 @@ def _fetch_monitor_info_system_profiler():
             if retrieved_resolution:
                 res.width, res.height = retrieved_resolution
             else:
-                monitor_info.status.make_partial("Could not retrieve resolution from system profiler")
+                display_status.make_partial(f"Could not retrieve resolution from system profiler for monitor {i}")
             if retrieved_refresh_rate:
                 res.refresh_rate = retrieved_refresh_rate
             else:
-                monitor_info.status.make_partial("Could not retrieve refresh rate from system profiler")
+                display_status.make_partial(f"Could not retrieve refresh rate from system profiler for monitor {i}")
             monitor_info.resolution = res
 
             monitor_info.gpu_name = display_controller.get("sppci_model")
             if not monitor_info.gpu_name:
-                monitor_info.status.make_partial("Could not retrieve GPU name from system profiler")
+                display_status.make_partial(f"Could not retrieve GPU name from system profiler for monitor {i}")
                 # Backup name just in case, sometimes is the same,
                 # sometimes is something like `kHW_AMDRadeonPro560XItem`
                 monitor_info.gpu_name = display_controller.get("_name")
@@ -114,14 +118,16 @@ def _fetch_monitor_info_system_profiler():
             if edid := monitor.get("_spdisplays_edid"):
                 monitor_info = _enrich_data_from_edid(monitor_info, edid)
             else:
-                monitor_info.status.make_partial("Could not retrieve EDID from system profiler. Is this Apple Silicon?")
+                display_status.make_partial(
+                    f"Could not retrieve EDID from system profiler for monitor {i}. Is this Apple Silicon?"
+                )
             monitors.append(monitor_info)
 
-    return monitors
+    return monitors, display_status
 
 
 def fetch_display_info() -> DisplayInfo:
     display_info = DisplayInfo()
-    display_info.modules = _fetch_monitor_info_system_profiler()
+    display_info.modules, display_info.status = _fetch_monitor_info_system_profiler()
 
     return display_info

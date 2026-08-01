@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 import subprocess
 from typing import Optional
@@ -8,13 +10,13 @@ from hwprobe.models.status_models import StatusType
 
 def _arm_cpu_cores() -> Optional[int]:
     try:
-        result = subprocess.run(["lscpu", "-p"], capture_output=True, text=True).stdout
+        result = subprocess.run(["lscpu", "-p"], capture_output=True, text=True, check=True).stdout
         lines = [x for x in result.splitlines() if not x.startswith("#")]
         # Format: CPU,Core,Socket,Node,,L1d,L1i,L2,L3
         core_ids = [x.split(",")[1] for x in lines]
         # The number of distinct Core IDs is the number of cores
         return len(set(core_ids))
-    except Exception:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
 
