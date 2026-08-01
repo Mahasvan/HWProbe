@@ -15,9 +15,10 @@ _COMMON_PATH = pathlib.Path(__file__).resolve().parents[3] / "src" / "hwprobe" /
 
 def _load_common_module():
     """Load common.py directly (format_acpi_path / format_pci_path) without
-    triggering core.windows.__init__ which chains into legacy imports.
-    Always force-load — other test modules may have stubbed sys.modules."""
+    triggering core.windows.__init__ which chains into legacy imports."""
     mod_name = "hwprobe.core.windows.common"
+    if mod_name in sys.modules:
+        return sys.modules[mod_name]
     spec = importlib.util.spec_from_file_location(mod_name, _COMMON_PATH)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[mod_name] = mod

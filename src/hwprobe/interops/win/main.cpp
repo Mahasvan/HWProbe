@@ -104,7 +104,9 @@ static int test_wmi() {
     return 0;
 }
 
-typedef int (*get_display_devices_ptr)(DisplayDeviceInfo *, int);
+typedef int (*get_monitor_devices_ptr)(MonitorDevice *, int);
+typedef int (*get_display_connectors_ptr)(ConnectorInfo *, int);
+typedef int (*get_gpu_for_display_ptr)(const char *, char *, int);
 typedef int (*get_edid_ptr)(const char *, unsigned char *, int);
 
 static int test_display() {
@@ -114,42 +116,61 @@ static int test_display() {
         return 1;
     }
 
-    auto fnDevices = reinterpret_cast<get_display_devices_ptr>(
-        GetProcAddress(hLib, "get_display_devices"));
+    auto fnMonitors = reinterpret_cast<get_monitor_devices_ptr>(
+        GetProcAddress(hLib, "get_monitor_devices"));
+    auto fnConnectors = reinterpret_cast<get_display_connectors_ptr>(
+        GetProcAddress(hLib, "get_display_connectors"));
+    auto fnGpu = reinterpret_cast<get_gpu_for_display_ptr>(
+        GetProcAddress(hLib, "get_gpu_for_display"));
     auto fnEdid = reinterpret_cast<get_edid_ptr>(
         GetProcAddress(hLib, "get_edid"));
 
-    if (!fnDevices || !fnEdid) {
+    if (!fnMonitors || !fnConnectors || !fnGpu || !fnEdid) {
         printf("[display] missing exports\n");
         FreeLibrary(hLib);
         return 1;
     }
 
-    DisplayDeviceInfo devices[8] = {};
-    int nd = fnDevices(devices, 8);
-    if (nd < 0) {
-        printf("[display] get_display_devices failed\n");
+    // Monitors
+    MonitorDevice monitors[8] = {};
+    int nm = fnMonitors(monitors, 8);
+    if (nm < 0) {
+        printf("[display] get_monitor_devices failed\n");
         FreeLibrary(hLib);
         return 1;
     }
 
-    printf("[display] Found %d display(s):\n\n", nd);
-    for (int i = 0; i < nd; ++i) {
-        printf("Display %d:\n", i);
-        printf("  DeviceID:    %s\n", devices[i].device_id);
-        printf("  PNPDeviceID: %s\n", devices[i].pnp_device_id);
-        printf("  MonitorName: %s\n", devices[i].monitor_name);
-        printf("  DisplayPath: %s\n", devices[i].display_path);
-        printf("  GPU:         %s\n", devices[i].gpu_name);
-        printf("  Resolution:  %dx%d @ %d Hz\n",
-               devices[i].width, devices[i].height, devices[i].refresh_rate);
-        printf("  Connector:   tech=%d\n", devices[i].output_technology);
+    // Connectors (for matching)
+    ConnectorInfo connectors[8] = {};
+    int nc = fnConnectors(connectors, 8);
 
-        if (devices[i].display_path[0]) {
-            unsigned char edidBuf[1024] = {};
-            int edidLen = fnEdid(devices[i].display_path, edidBuf, sizeof(edidBuf));
-            if (edidLen > 0) {
-                printf("  EDID:        %d bytes\n", edidLen);
+    printf("[display] Found %d monitor(s):\n\n", nm);
+    for (int i = 0; i < nm; ++i) {
+        printf("Monitor %d:\n", i);
+        printf("  DeviceID:    %s\n", monitors[i].device_id);
+        printf("  PNPDeviceID: %s\n", monitors[i].pnp_device_id);
+        printf("  Resolution:  %dx%d @ %d Hz\n",
+               monitors[i].width, monitors[i].height, monitors[i].refresh_rate);
+
+        // GPU for this display
+        char gpuName[256] = {};
+        if (fnGpu(monitors[i].device_id, gpuName, sizeof(gpuName)) == 0) {
+            printf("  GPU:         %s\n", gpuName);
+        }
+
+        // Connector info
+        for (int j = 0; j < nc; ++j) {
+            if (strcmp(connectors[j].display_id, monitors[i].device_id) == 0) {
+                printf("  Connector:   %s (tech=%d)\n",
+                       connectors[j].display_path, connectors[j].output_technology);
+
+                // EDID via display path
+                unsigned char edidBuf[1024] = {};
+                int edidLen = fnEdid(connectors[j].display_path, edidBuf, sizeof(edidBuf));
+                if (edidLen > 0) {
+                    printf("  EDID:        %d bytes\n", edidLen);
+                }
+                break;
             }
         }
         printf("\n");

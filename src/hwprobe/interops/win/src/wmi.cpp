@@ -83,35 +83,6 @@ static void VariantToUtf8Slot(VARIANT &vt, char *dst, int dst_size) {
         return;
     }
 
-    // WMI classes like WmiMonitorID return string data as uint16 arrays
-    // (VT_ARRAY | VT_UI2). VariantChangeType can't handle arrays, so
-    // decode each element as a wchar and build a wide string.
-    if (vt.vt == (VT_ARRAY | VT_UI2)) {
-        SAFEARRAY *psa = vt.parray;
-        LONG lb = 0, ub = 0;
-        if (FAILED(SafeArrayGetLBound(psa, 1, &lb)) ||
-            FAILED(SafeArrayGetUBound(psa, 1, &ub)) || ub < lb) {
-            return;
-        }
-        LONG count = ub - lb + 1;
-        if (count <= 0) return;
-
-        std::wstring w(count, L'\0');
-        for (LONG i = 0; i < count; ++i) {
-            LONG idx = lb + i;
-            USHORT val = 0;
-            if (FAILED(SafeArrayGetElement(psa, &idx, &val))) {
-                w[i] = L'\0';
-            } else {
-                w[i] = static_cast<wchar_t>(val);
-            }
-        }
-        // Trim trailing NULs (WMI pads arrays with zeros)
-        while (!w.empty() && w.back() == L'\0') w.pop_back();
-        WideToUtf8Slot(w.c_str(), dst, dst_size);
-        return;
-    }
-
     VARIANT vtBstr;
     VariantInit(&vtBstr);
     HRESULT hr = VariantChangeType(&vtBstr, &vt, 0, VT_BSTR);

@@ -1,5 +1,5 @@
-// Display info: one-pass monitor enumeration (user32 + CCD + DXGI) + SetupAPI EDID.
-// Returns raw values — Python does EDID parsing and connector type mapping.
+// Display info: monitor enumeration + CCD connectors + DXGI GPU match + SetupAPI EDID.
+// Returns raw values — Python does all parsing (EDID decode, connector type mapping).
 // See display_info.h for the ABI.
 
 #include "display_info.h"
@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <dxgi.h>
 #include <setupapi.h>
+#include <cfgmgr32.h>
 
 #include <cstring>
 #include <string>
@@ -28,17 +29,12 @@ static std::string WideToUtf8(const wchar_t *src) {
     return out;
 }
 
-static void copy_str(char *dst, int dst_size, const std::string &src) {
-    std::strncpy(dst, src.c_str(), dst_size - 1);
-    dst[dst_size - 1] = '\0';
-}
-
 // =====================================================================
-// get_display_devices — user32 + CCD + DXGI in one pass
+// get_monitor_devices — user32 monitor enumeration
 // =====================================================================
 
 struct MonitorEnumCtx {
-    DisplayDeviceInfo *devices;
+    MonitorDevice *devices;
     int max_count;
     int count;
 };
@@ -61,96 +57,132 @@ static BOOL CALLBACK _monitorEnumProc(HMONITOR hMonitor, HDC, LPRECT, LPARAM lpa
     EnumDisplayDevicesA(mi.szDevice, 0, &dd, 0);
     if (dd.DeviceID[0] == '\0') return TRUE;
 
-    DisplayDeviceInfo &dev = ctx->devices[ctx->count];
-    std::memset(&dev, 0, sizeof(dev));
-    copy_str(dev.device_id, sizeof(dev.device_id), mi.szDevice);
-    copy_str(dev.pnp_device_id, sizeof(dev.pnp_device_id), dd.DeviceID);
-    dev.width = static_cast<int>(dm.dmPelsWidth);
-    dev.height = static_cast<int>(dm.dmPelsHeight);
-    dev.refresh_rate = static_cast<int>(dm.dmDisplayFrequency);
+    MonitorDevice &md = ctx->devices[ctx->count];
+    std::memset(&md, 0, sizeof(md));
+    std::strncpy(md.device_id, mi.szDevice, sizeof(md.device_id) - 1);
+    std::strncpy(md.pnp_device_id, dd.DeviceID, sizeof(md.pnp_device_id) - 1);
+    md.width = static_cast<int>(dm.dmPelsWidth);
+    md.height = static_cast<int>(dm.dmPelsHeight);
+    md.refresh_rate = static_cast<int>(dm.dmDisplayFrequency);
     ++ctx->count;
 
     return TRUE;
 }
 
-int get_display_devices(DisplayDeviceInfo *out, int max_count) {
+int get_monitor_devices(MonitorDevice *out, int max_count) {
     if (!out || max_count <= 0) return -1;
 
-    // 1. user32 — base monitor list (device_id, pnp_device_id, resolution)
     MonitorEnumCtx ctx = {out, max_count, 0};
     EnumDisplayMonitors(nullptr, nullptr, _monitorEnumProc, reinterpret_cast<LPARAM>(&ctx));
-    int count = ctx.count;
+    return ctx.count;
+}
 
-    // 2. CCD — connector info (display_path, monitor_name, output_technology)
-    //    Match by GDI device name (\\.\DISPLAY1).
+// =====================================================================
+// get_display_connectors — CCD API (QueryDisplayConfig)
+// =====================================================================
+
+int get_display_connectors(ConnectorInfo *out, int max_count) {
+    if (!out || max_count <= 0) return -1;
+
     UINT32 pathCount = 0, modeCount = 0;
-    if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount) == ERROR_SUCCESS) {
-        std::vector<DISPLAYCONFIG_PATH_INFO> paths(pathCount);
-        std::vector<DISPLAYCONFIG_MODE_INFO> modes(modeCount);
+    LONG rc = GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount);
+    if (rc != ERROR_SUCCESS) return -1;
 
-        if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, paths.data(),
-                               &modeCount, modes.data(), nullptr) == ERROR_SUCCESS) {
-            for (UINT32 i = 0; i < pathCount; ++i) {
-                const auto &path = paths[i];
+    std::vector<DISPLAYCONFIG_PATH_INFO> paths(pathCount);
+    std::vector<DISPLAYCONFIG_MODE_INFO> modes(modeCount);
 
-                DISPLAYCONFIG_SOURCE_DEVICE_NAME srcName = {};
-                srcName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
-                srcName.header.size = sizeof(srcName);
-                srcName.header.adapterId = path.sourceInfo.adapterId;
-                srcName.header.id = path.sourceInfo.id;
-                if (DisplayConfigGetDeviceInfo(&srcName.header) != ERROR_SUCCESS) continue;
+    rc = QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, paths.data(),
+                            &modeCount, modes.data(), nullptr);
+    if (rc != ERROR_SUCCESS) return -1;
 
-                DISPLAYCONFIG_TARGET_DEVICE_NAME tgtName = {};
-                tgtName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
-                tgtName.header.size = sizeof(tgtName);
-                tgtName.header.adapterId = path.targetInfo.adapterId;
-                tgtName.header.id = path.targetInfo.id;
-                if (DisplayConfigGetDeviceInfo(&tgtName.header) != ERROR_SUCCESS) continue;
+    int count = 0;
+    for (UINT32 i = 0; i < pathCount && count < max_count; ++i) {
+        const auto &path = paths[i];
 
-                std::string src = WideToUtf8(srcName.viewGdiDeviceName);
-                for (int d = 0; d < count; ++d) {
-                    if (out[d].device_id[0] != '\0' && src == out[d].device_id) {
-                        copy_str(out[d].display_path, sizeof(out[d].display_path),
-                                 WideToUtf8(tgtName.monitorDevicePath));
-                        copy_str(out[d].monitor_name, sizeof(out[d].monitor_name),
-                                 WideToUtf8(tgtName.monitorFriendlyDeviceName));
-                        out[d].output_technology = static_cast<int>(path.targetInfo.outputTechnology);
-                        break;
-                    }
-                }
-            }
-        }
-    }
+        // Source device name (GDI device name like \\.\DISPLAY1)
+        DISPLAYCONFIG_SOURCE_DEVICE_NAME srcName = {};
+        srcName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+        srcName.header.size = sizeof(srcName);
+        srcName.header.adapterId = path.sourceInfo.adapterId;
+        srcName.header.id = path.sourceInfo.id;
 
-    // 3. DXGI — GPU name for each display. One factory, match by device name.
-    IDXGIFactory1 *factory = nullptr;
-    if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
-        IDXGIAdapter1 *adapter = nullptr;
-        for (UINT a = 0; factory->EnumAdapters1(a, &adapter) != DXGI_ERROR_NOT_FOUND; ++a) {
-            DXGI_ADAPTER_DESC1 adesc;
-            if (FAILED(adapter->GetDesc1(&adesc))) { adapter->Release(); continue; }
+        if (DisplayConfigGetDeviceInfo(&srcName.header) != ERROR_SUCCESS)
+            continue;
 
-            IDXGIOutput *output = nullptr;
-            for (UINT o = 0; adapter->EnumOutputs(o, &output) != DXGI_ERROR_NOT_FOUND; ++o) {
-                DXGI_OUTPUT_DESC odesc;
-                if (FAILED(output->GetDesc(&odesc))) { output->Release(); continue; }
+        // Target device name (monitor device path like \\?\DISPLAY#...)
+        DISPLAYCONFIG_TARGET_DEVICE_NAME tgtName = {};
+        tgtName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
+        tgtName.header.size = sizeof(tgtName);
+        tgtName.header.adapterId = path.targetInfo.adapterId;
+        tgtName.header.id = path.targetInfo.id;
 
-                std::string devName = WideToUtf8(odesc.DeviceName);
-                for (int d = 0; d < count; ++d) {
-                    if (out[d].gpu_name[0] == '\0' && devName == out[d].device_id) {
-                        copy_str(out[d].gpu_name, sizeof(out[d].gpu_name),
-                                 WideToUtf8(adesc.Description));
-                        break;
-                    }
-                }
-                output->Release();
-            }
-            adapter->Release();
-        }
-        factory->Release();
+        if (DisplayConfigGetDeviceInfo(&tgtName.header) != ERROR_SUCCESS)
+            continue;
+
+        ConnectorInfo &ci = out[count];
+        std::memset(&ci, 0, sizeof(ci));
+
+        std::string src = WideToUtf8(srcName.viewGdiDeviceName);
+        std::strncpy(ci.display_id, src.c_str(), sizeof(ci.display_id) - 1);
+
+        std::string tgt = WideToUtf8(tgtName.monitorDevicePath);
+        std::strncpy(ci.display_path, tgt.c_str(), sizeof(ci.display_path) - 1);
+
+        ci.output_technology = static_cast<int>(path.targetInfo.outputTechnology);
+        ++count;
     }
 
     return count;
+}
+
+// =====================================================================
+// get_gpu_for_display — DXGI output -> adapter name match
+// =====================================================================
+
+int get_gpu_for_display(const char *device_name, char *out_gpu_name, int buf_size) {
+    if (!device_name || !out_gpu_name || buf_size <= 0) return -1;
+    out_gpu_name[0] = '\0';
+
+    IDXGIFactory1 *factory = nullptr;
+    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+        return -1;
+
+    int result = -1;
+    IDXGIAdapter1 *adapter = nullptr;
+
+    for (UINT a = 0; factory->EnumAdapters1(a, &adapter) != DXGI_ERROR_NOT_FOUND; ++a) {
+        DXGI_ADAPTER_DESC1 adesc;
+        if (FAILED(adapter->GetDesc1(&adesc))) {
+            adapter->Release();
+            continue;
+        }
+
+        IDXGIOutput *output = nullptr;
+        for (UINT o = 0; adapter->EnumOutputs(o, &output) != DXGI_ERROR_NOT_FOUND; ++o) {
+            DXGI_OUTPUT_DESC odesc;
+            if (FAILED(output->GetDesc(&odesc))) {
+                output->Release();
+                continue;
+            }
+
+            std::string devName = WideToUtf8(odesc.DeviceName);
+            if (devName == device_name) {
+                std::string gpuName = WideToUtf8(adesc.Description);
+                std::strncpy(out_gpu_name, gpuName.c_str(), buf_size - 1);
+                out_gpu_name[buf_size - 1] = '\0';
+                result = 0;
+                output->Release();
+                adapter->Release();
+                factory->Release();
+                return result;
+            }
+            output->Release();
+        }
+        adapter->Release();
+    }
+
+    factory->Release();
+    return result;
 }
 
 // =====================================================================
@@ -166,6 +198,7 @@ static const GUID GUID_DEVINTERFACE_MONITOR = {
 int get_edid(const char *pnp_device_id, unsigned char *out, int max_size) {
     if (!pnp_device_id || !out || max_size <= 0) return -1;
 
+    // Convert the search key to uppercase wide string for case-insensitive matching.
     std::string key(pnp_device_id);
     for (auto &ch : key) ch = static_cast<char>(toupper(static_cast<unsigned char>(ch)));
 
@@ -181,6 +214,7 @@ int get_edid(const char *pnp_device_id, unsigned char *out, int max_size) {
     for (DWORD i = 0; SetupDiEnumDeviceInterfaces(devInfoSet, nullptr,
          &GUID_DEVINTERFACE_MONITOR, i, &ifaceData); ++i) {
 
+        // Get required buffer size for interface detail.
         DWORD requiredSize = 0;
         SetupDiGetDeviceInterfaceDetailW(devInfoSet, &ifaceData, nullptr, 0,
                                          &requiredSize, nullptr);
@@ -188,8 +222,7 @@ int get_edid(const char *pnp_device_id, unsigned char *out, int max_size) {
 
         std::vector<BYTE> detailBuf(requiredSize);
         auto *detail = reinterpret_cast<PSP_DEVICE_INTERFACE_DETAIL_DATA_W>(detailBuf.data());
-        // cbSize must be 8 on 64-bit, 6 on 32-bit — a well-known SetupAPI quirk.
-        detail->cbSize = sizeof(void *) == 8 ? 8 : 6;
+        detail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
 
         SP_DEVINFO_DATA devData = {};
         devData.cbSize = sizeof(devData);
@@ -198,15 +231,20 @@ int get_edid(const char *pnp_device_id, unsigned char *out, int max_size) {
              requiredSize, nullptr, &devData))
             continue;
 
+        // Device path is a wide string starting after the cbSize field.
         std::string devPath = WideToUtf8(detail->DevicePath);
         for (auto &ch : devPath) ch = static_cast<char>(toupper(static_cast<unsigned char>(ch)));
 
+        // Match against the search key (substring match — the PNP ID is
+        // typically a portion of the full device path).
         if (key.find(devPath) == std::string::npos && devPath.find(key) == std::string::npos)
             continue;
 
+        // Open the device registry key and read EDID.
         HKEY hKey = SetupDiOpenDevRegKey(devInfoSet, &devData, DICS_FLAG_GLOBAL,
                                          0, DIREG_DEV, KEY_READ);
-        if (hKey == INVALID_HANDLE_VALUE || hKey == nullptr) continue;
+        if (hKey == INVALID_HANDLE_VALUE || hKey == nullptr)
+            continue;
 
         DWORD edidSize = 0;
         if (RegQueryValueExW(hKey, L"EDID", nullptr, nullptr, nullptr, &edidSize) == ERROR_SUCCESS) {
