@@ -9,6 +9,7 @@
 #include <dxgi.h>
 #include <setupapi.h>
 #include <devguid.h>
+#include <cfgmgr32.h>
 
 #include <cstring>
 #include <string>
