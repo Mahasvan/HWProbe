@@ -9,11 +9,14 @@
 #include <comdef.h>
 
 #include <string>
-#include <cstdio>
 
+// #pragma comment(lib, ...) is MSVC-only; mingw ignores it. Linking is
+// handled by CMakeLists.txt (target_link_libraries ... ole32 oleaut32 wbemuuid).
+#ifdef _MSC_VER
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "oleaut32.lib")
 #pragma comment(lib, "wbemuuid.lib")
+#endif
 
 // ---- VARIANT -> fixed UTF-8 slot ----
 // Writes a null-terminated UTF-8 rendering of vt into dst[0..dst_size-1].
@@ -97,9 +100,22 @@ extern "C" __declspec(dllexport) int get_wmi_data(const char *wmi_class,
         return -1;
     }
 
+    // ConnectServer signature:
+    //   HRESULT ConnectServer(BSTR strNetworkResource, BSTR strUser,
+    //                          BSTR strPassword, BSTR strLocale,
+    //                          LONG lSecurityFlags, BSTR strAuthority,
+    //                          IWbemContext *pCtx, IWbemServices **ppNamespace)
+    // lSecurityFlags is LONG — pass 0, not nullptr. nullptr won't convert to
+    // long under mingw (MSVC tolerates it via NULL==0, mingw does not).
     IWbemServices *pSvc = nullptr;
-    hr = pLoc->ConnectServer(_bstr_t(namespace_str), nullptr, nullptr, 0,
-                             nullptr, 0, 0, &pSvc);
+    hr = pLoc->ConnectServer(_bstr_t(namespace_str),
+                             nullptr,   // strUser
+                             nullptr,   // strPassword
+                             nullptr,   // strLocale
+                             0,         // lSecurityFlags
+                             nullptr,   // strAuthority
+                             nullptr,   // pCtx
+                             &pSvc);    // ppNamespace
     if (FAILED(hr)) {
         pLoc->Release();
         if (did_init) CoUninitialize();
@@ -119,8 +135,10 @@ extern "C" __declspec(dllexport) int get_wmi_data(const char *wmi_class,
     wql += " FROM ";
     wql += wmi_class;
 
+    // _bstr_t (not bstr_t — the lowercase typedef is MSVC-only, mingw does
+    // not define it). _bstr_t is the actual class in both MSVC and mingw-w64.
     IEnumWbemClassObject *pEnum = nullptr;
-    hr = pSvc->ExecQuery(bstr_t("WQL"), bstr_t(wql.c_str()),
+    hr = pSvc->ExecQuery(_bstr_t("WQL"), _bstr_t(wql.c_str()),
                          WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
                          nullptr, &pEnum);
     if (FAILED(hr)) {

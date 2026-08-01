@@ -1,12 +1,9 @@
-# WinWmi (staging: `interops/win_new/`)
+# WinWmi (`interops/win/`)
 
 New WMI wrapper binding, intended to replace the legacy `GetWmiInfo` text-format
-export in `hw_helper.dll`. This is the staging directory; once `core/windows/`
-consumers are migrated, this merges into `interops/win/` (see
+export in `hw_helper.dll` (now in `interops/win_old/`). Once `core/windows/`
+consumers are migrated, the old `win_old/` directory can be deleted (see
 `windows-rewrite-llm-plan.md` §5).
-
-> The brief said `win-new`, but a hyphen is not importable in Python, so the
-> directory is `win_new` (underscore). Temporary either way.
 
 ## What it exports
 
@@ -70,13 +67,13 @@ C++ self-test (queries `Win32_Processor`):
 Python self-check (same query, via ctypes):
 
 ```sh
-python -m hwprobe.interops.win_new.bindings.wmi
+python -m hwprobe.interops.win.bindings.wmi
 ```
 
 Programmatic use (the way `core/windows/*.py` will call it once migrated):
 
 ```python
-from hwprobe.interops.win_new.bindings.wmi import get_wmi_data
+from hwprobe.interops.win.bindings.wmi import get_wmi_data
 
 rows = get_wmi_data(
     "MSFT_PhysicalDisk",

@@ -2,7 +2,7 @@
 wmi.py  -  Python ctypes binding for the new WMI wrapper in device_info.dll.
 
 Public API:
-    from hwprobe.interops.win_new.bindings.wmi import get_wmi_data
+    from hwprobe.interops.win.bindings.wmi import get_wmi_data
     rows = get_wmi_data("Win32_PhysicalMemory",
                         ["BankLabel", "Capacity", "Manufacturer"],
                         namespace=r"ROOT\\CIMV2")
@@ -13,7 +13,7 @@ Returns one dict per WMI row, keyed by the requested field names. Missing or
 null properties come back as empty strings. Raises RuntimeError if the C++
 side returns -1 (COM/WMI failure).
 
-Source: interops/win_new/include/wmi.h and interops/win_new/src/wmi.cpp.
+Source: interops/win/include/wmi.h and interops/win/src/wmi.cpp.
 """
 
 import ctypes
@@ -112,7 +112,7 @@ def get_wmi_data(
 
 # ---- quick self-check ----
 # ponytail: one runnable check, no test framework. Fails if COM/WMI/encoding
-# is broken. Run with:  python -m hwprobe.interops.win_new.bindings.wmi
+# is broken. Run with:  python -m hwprobe.interops.win.bindings.wmi
 if __name__ == "__main__":
     rows = get_wmi_data("Win32_Processor", ["Name", "Manufacturer"])
     print(f"Found {len(rows)} CPU(s):\n")
