@@ -4,16 +4,26 @@ import subprocess
 from typing import Optional
 
 from hwprobe.models.network_models import NetworkInfo, NICInfo
+from hwprobe.models.status_models import StatusType
+
+_IO_NAME_PATTERN = re.compile(r"pci([0-9a-fA-F]{4}),([0-9a-fA-F]{4})")
 
 
 def _fetch_controllers() -> list[str]:
-    output = subprocess.run(["ipconfig", "getiflist"], capture_output=True)
+    try:
+        output = subprocess.run(["ipconfig", "getiflist"], capture_output=True, check=True)
+    except subprocess.CalledProcessError:
+        return []
     stripped = output.stdout.decode("utf-8").strip()
     return stripped.split(" ") if stripped else []
 
 
 def _fetch_ethernet_details() -> dict[str, NICInfo]:
-    output = subprocess.run(["system_profiler", "SPEthernetDataType", "-xml"], capture_output=True)
+    try:
+        output = subprocess.run(["system_profiler", "SPEthernetDataType", "-xml"], capture_output=True, check=True)
+    except subprocess.CalledProcessError:
+        return {}
+
     plist = plistlib.loads(output.stdout)
     res = {}
     for item in plist:
@@ -97,12 +107,14 @@ def _fetch_airport_details() -> dict[str, NICInfo]:
     Earlier, `system_profiler SPAirPortDataType -xml` was used to get the vendor and device id.
     However, this was too slow, and we can get the same details from `ioreg`, while it being faster.
     """
-    output = subprocess.run(["ioreg", "-c", "IO80211Controller", "-r", "-a"], capture_output=True)
+    try:
+        output = subprocess.run(["ioreg", "-c", "IO80211Controller", "-r", "-a"], capture_output=True, check=True)
+    except subprocess.CalledProcessError:
+        return {}
+
     plist = plistlib.loads(output.stdout)
 
     res = {}
-
-    io_name_pattern = re.compile(r"pci([0-9a-fA-F]{4}),([0-9a-fA-F]{4})")
 
     for item in plist:
         driver = item.get("IORegistryEntryName")
@@ -114,7 +126,9 @@ def _fetch_airport_details() -> dict[str, NICInfo]:
             # Intel Macs, usually
             io_name = item.get("IONameMatched", "")
             io_model = item.get("IOModel", "")
-            match = io_name_pattern.match(io_name)
+            match = _IO_NAME_PATTERN.match(io_name)
+            if not match:
+                continue
             vendor, device = match.groups()
 
             nic_info = NICInfo()
@@ -123,12 +137,9 @@ def _fetch_airport_details() -> dict[str, NICInfo]:
             if io_model:
                 nic_info.name = io_model
 
-            for child in item.get("IORegistryEntryChildren", []):
-                if not child.get("IOObjectClass", "") == "AirPort_BrcmNIC_Interface":
-                    continue
-                bcm_identifier = child.get("IORegistryEntryName")
-                res[bcm_identifier] = nic_info
-                break
+            child = _find_child(item.get("IORegistryEntryChildren", []), "IOObjectClass", "AirPort_BrcmNIC_Interface")
+            if child:
+                res[child.get("IORegistryEntryName")] = nic_info
 
         elif driver == "AppleBCMWLANCore":
             # Most Apple Silicon Macs
@@ -147,12 +158,14 @@ def _fetch_airport_details() -> dict[str, NICInfo]:
         elif driver == "AppleWLANDriver":
             # Wi-Fi 7 driver for the M5 series
 
-            device_info = item.get("AirshipDeviceCriteria")
+            device_info = item.get("AirshipDeviceCriteria") or {}
 
             chipset = device_info.get("Chipset")
             vendor = device_info.get("Vendor")
 
             bsd_identifier = _get_bsd_interface_apple_silicon(item, driver=driver)
+            if not bsd_identifier:
+                continue
             nic_info = NICInfo()
 
             if vendor:
@@ -169,7 +182,7 @@ def _fetch_airport_details() -> dict[str, NICInfo]:
             # Older Intel Macs with Broadcom BCM4331 chipset
             io_name = item.get("IONameMatched", "")
             io_model = item.get("IOModel", "")
-            match = io_name_pattern.match(io_name)
+            match = _IO_NAME_PATTERN.match(io_name)
 
             if match:
                 vendor, device = match.groups()
@@ -196,9 +209,16 @@ def _fetch_airport_details() -> dict[str, NICInfo]:
 
 
 def _fetch_system_profiler_details(valid_bsd_interfaces: list[str]) -> NetworkInfo:
-    output = subprocess.run(["system_profiler", "SPNetworkDataType", "-xml"], capture_output=True)
-    plist = plistlib.loads(output.stdout)
     network_info = NetworkInfo()
+
+    try:
+        output = subprocess.run(["system_profiler", "SPNetworkDataType", "-xml"], capture_output=True, check=True)
+    except subprocess.CalledProcessError as e:
+        network_info.status.type = StatusType.FAILED
+        network_info.status.messages.append(f"Could not get system_profiler output: {e}")
+        return network_info
+
+    plist = plistlib.loads(output.stdout)
 
     ethernet_info: Optional[dict[str, NICInfo]] = None
     airport_info: Optional[dict[str, NICInfo]] = None
