@@ -1,62 +1,47 @@
-#include "gpu_info.h"
-#include <cstdio>
-#include <windows.h>
-#include <string>
+// Standalone CLI test for the WMI binding. Loads device_info.dll at runtime
+// (same path the Python binding uses) so we exercise the real ABI.
 
-typedef int (*get_gpu_info_ptr)(WinGPUProperties *, int);
+#include "wmi.h"
+#include <windows.h>
+#include <cstdio>
+#include <cstring>
+
+typedef int (*get_wmi_data_ptr)(const char *, const char *const *, int,
+                                const char *, WmiRow *, int);
 
 int main() {
-    // Try multiple paths to find the DLL:
-    // 1. Current directory
-    // 2. Relative to where it's built (cmake-build-debug/../bindings/device_info.dll)
-    // 3. Absolute "bindings/device_info.dll" from project root
-    
     HMODULE hLib = LoadLibraryA("bindings/device_info.dll");
+    if (!hLib) hLib = LoadLibraryA("device_info.dll");
     if (!hLib) {
-        hLib = LoadLibraryA("../bindings/device_info.dll");
-    }
-    if (!hLib) {
-        hLib = LoadLibraryA("device_info.dll");
-    }
-
-    if (!hLib) {
-        DWORD err = GetLastError();
-        printf("Error: Could not load device_info.dll (Error code: %lu)\n", err);
+        printf("Error: could not load device_info.dll (GetLastError=%lu)\n", GetLastError());
         return 1;
     }
 
-    auto get_gpu_info_func = reinterpret_cast<get_gpu_info_ptr>(GetProcAddress(hLib, "get_gpu_info"));
-    if (!get_gpu_info_func) {
-        printf("Error: Could not find get_gpu_info in device_info.dll\n");
+    auto fn = reinterpret_cast<get_wmi_data_ptr>(
+        GetProcAddress(hLib, "get_wmi_data"));
+    if (!fn) {
+        printf("Error: get_wmi_data not exported\n");
         FreeLibrary(hLib);
         return 1;
     }
 
-    constexpr int MAX_GPUS = 8;
-    WinGPUProperties gpus[MAX_GPUS] = {};
+    const char *fields[] = {"Name", "Manufacturer", "NumberOfCores", "NumberOfLogicalProcessors"};
+    const int field_count = sizeof(fields) / sizeof(fields[0]);
 
-    int count = get_gpu_info_func(gpus, MAX_GPUS);
-    if (count < 0) {
-        printf("Error: get_gpu_info() failed\n");
+    WmiRow rows[WMI_MAX_ROWS] = {};
+    int n = fn("Win32_Processor", fields, field_count, "ROOT\\CIMV2", rows, WMI_MAX_ROWS);
+    if (n < 0) {
+        printf("Error: get_wmi_data returned -1\n");
         FreeLibrary(hLib);
         return 1;
     }
 
-    printf("Found %d GPU(s):\n\n", count);
-    for (int i = 0; i < count; ++i) {
-        const auto &g = gpus[i];
-        printf("GPU %d:\n", i);
-        printf("  Name:             %s\n", g.name);
-        printf("  Manufacturer:     %s\n", g.manufacturer);
-        printf("  Vendor ID:        0x%04X\n", g.vendor_id);
-        printf("  Device ID:        0x%04X\n", g.device_id);
-        printf("  Subsystem Vendor: 0x%04X\n", g.subsystem_vendor_id);
-        printf("  Subsystem Device: 0x%04X\n", g.subsystem_device_id);
-        printf("  VRAM:             %llu MB\n", g.vram_mb);
-        printf("  PCIe Gen:         %d\n", g.pcie_gen);
-        printf("  PCIe Width:       x%d\n", g.pcie_width);
-        if (g.acpi_path[0]) printf("  ACPI Path:        %s\n", g.acpi_path);
-        if (g.pci_path[0])  printf("  PCI Path:         %s\n", g.pci_path);
+    printf("Found %d CPU(s):\n\n", n);
+    for (int i = 0; i < n; ++i) {
+        printf("CPU %d:\n", i);
+        for (int f = 0; f < field_count; ++f) {
+            printf("  %-26s %s\n", fields[f], rows[i].values[f]);
+        }
         printf("\n");
     }
 

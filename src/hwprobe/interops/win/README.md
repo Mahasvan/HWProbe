@@ -1,23 +1,51 @@
-# WinDeviceInfo
+# WinWmi (staging: `interops/win_new/`)
 
-A Windows utility and shared library that enumerates GPU hardware via DXGI and the Windows Configuration Manager API.
+New WMI wrapper binding, intended to replace the legacy `GetWmiInfo` text-format
+export in `hw_helper.dll`. This is the staging directory; once `core/windows/`
+consumers are migrated, this merges into `interops/win/` (see
+`windows-rewrite-llm-plan.md` §5).
 
-The native library lives in `src/` and `include/`, and is exposed via a command-line tester (`main.cpp`).
-Also powers a thin Python `ctypes` binding in `bindings/gpu_info.py`.
+> The brief said `win-new`, but a hyphen is not importable in Python, so the
+> directory is `win_new` (underscore). Temporary either way.
 
-This is intended to be used via each hardware component's respective python interface, like `gpu_info.py`. The CLI tool
-is primarily for testing and demonstration purposes, but it can be used directly if desired.
+## What it exports
 
-Full disclosure: A big part of this C++ connector was written by Claude.
-If you are someone with more know-how, and find lapses in this code, we'd be more than happy to welcome Pull Requests.
+One C++ function, one Python function.
+
+```c
+// include/wmi.h
+int get_wmi_data(const char *wmi_class,
+                 const char *const *fields, int field_count,
+                 const char *namespace_str,
+                 WmiRow *out, int max_rows);
+```
+
+```python
+# bindings/wmi.py
+def get_wmi_data(
+    wmi_class: str,
+    fields: list[str],
+    namespace: str = r"ROOT\CIMV2",
+) -> list[dict[str, str]]: ...
+```
+
+Each row comes back as a `dict` keyed by the requested field names, in order.
+No `|`/`=`/`\n` delimiter parsing — each field is its own fixed UTF-8 buffer on
+the C side. Missing/null properties are empty strings.
+
+## Why this exists
+
+The legacy `GetWmiInfo` returns pipe-delimited text that breaks when a value
+contains `|`, `=`, or `\n` (PNPDeviceID paths do). It is also `void` — failure
+is indistinguishable from "no rows". This binding fixes both: structured rows
+and a `-1` error return.
 
 ## Requirements
 
-- Windows 10 or newer
-- Visual Studio 2019+ or MSVC Build Tools (C++17 support required)
+- Windows 10+
+- Visual Studio 2019+ / MSVC Build Tools (C++17)
 - CMake 3.21+
-- Python 3.7+ (for the `gpu_info.py` binding) - Assuming you want to compile this to use with HWProbe.
-- Windows SDK (for DXGI, SetupAPI, CfgMgr32 headers)
+- Windows SDK (for COM/WMI headers: `ole32`, `oleaut32`, `wbemuuid`)
 
 ## Build
 
@@ -26,86 +54,66 @@ cmake -S . -B build
 cmake --build build --config Release
 ```
 
-- `WinDeviceInfo.exe` (the CLI tool) is emitted to `build/Release/WinDeviceInfo.exe`.
-- `device_info.dll` is copied automatically into `bindings/` for the Python binding.
-- The default build type is **Release**. Pass `--config Debug` to the build command to include debug symbols.
+Outputs:
 
-## CLI Usage
+- `bindings/device_info.dll` — loaded by `bindings/wmi.py`.
+- `build/Release/WinWmiTest.exe` — standalone CLI self-test.
 
-```sh
-.\build\Release\WinDeviceInfo.exe
-```
+## Run
 
-The tool prints GPU info, and exits with code `0` when enumeration succeeds, or `1` if the underlying DXGI call fails.
-
-## Python Binding
-
-After building the project once (so that `bindings/device_info.dll` exists), you can inspect GPUs from Python:
+C++ self-test (queries `Win32_Processor`):
 
 ```sh
-cd bindings
-python gpu_info.py
+.\build\Release\WinWmiTest.exe
 ```
 
-or programmatically:
+Python self-check (same query, via ctypes):
+
+```sh
+python -m hwprobe.interops.win_new.bindings.wmi
+```
+
+Programmatic use (the way `core/windows/*.py` will call it once migrated):
 
 ```python
-from gpu_info import get_gpu_info
+from hwprobe.interops.win_new.bindings.wmi import get_wmi_data
 
-for idx, gpu in enumerate(get_gpu_info()):
-    print(f"GPU {idx}:")
-    print(gpu)
+rows = get_wmi_data(
+    "MSFT_PhysicalDisk",
+    ["FriendlyName", "MediaType", "BusType", "Size", "Manufacturer", "Model"],
+    namespace=r"ROOT\Microsoft\Windows\Storage",
+)
+for r in rows:
+    print(r["FriendlyName"], r["Size"])
 ```
 
-On import, the script loads the colocated `device_info.dll`; ensure you rebuild the CMake project whenever you make
-changes to the native code.
+## ABI caps
 
-## What the native library does
+Defined in `include/wmi.h`, mirrored in `bindings/wmi.py`:
 
-For each GPU discovered via DXGI:
+| Cap | Value | Why |
+|-----|-------|-----|
+| `WMI_MAX_FIELDS` | 16 | Max fields any hwprobe query uses today is 9 (`Win32_PhysicalMemory`). |
+| `WMI_FIELD_LEN` | 512 | Covers PNPDeviceID paths and uint64 string forms. |
+| `WMI_MAX_ROWS` | 64 | Covers memory modules, disks, NICs on any realistic machine. |
 
-1. **Enumerates adapters** using `IDXGIFactory1::EnumAdapters1`, skipping software/virtual adapters.
-2. **Resolves the PNP Device ID** by matching DXGI's VendorId/DeviceId/SubSysId against SetupAPI's display class.
-3. **Parses vendor/device/subsystem IDs** from the PNP device ID string.
-4. **Fetches VRAM** from DXGI's `DedicatedVideoMemory`; falls back to the registry
-   (`HardwareInformation.qwMemorySize`) for cards with >4 GB where DXGI may report a capped value.
-5. **Resolves ACPI and PCI paths** via `CM_Get_DevNode_PropertyW` (location paths), formatted to match the
-   project's conventions (e.g. `\_SB_.PCI0.RP05.PXSX`, `PciRoot(0x0)/Pci(0x1C,0x5)/Pci(0x0,0x0)`).
-6. **Fetches PCIe generation and lane width** via Configuration Manager device properties.
+Raising any cap is a recompile on both sides — the struct is the ABI. No
+runtime resizing.
 
-## Legacy bindings
+## Trust boundary
 
-The following files belong to the **old** monolithic binding approach and are kept for components that have not yet
-been migrated. They are marked with `# todo: refactor to new bindings` in the consuming code. Once all components
-are migrated, these files can be deleted:
+`wmi_class`, `fields`, `namespace` are WMI identifiers, not free text. They
+come from hardcoded literals in `core/windows/*.py`, never from end users. The
+C++ side builds `SELECT f1,f2,... FROM <class>` with no escaping. If a future
+caller ever passes user-supplied strings here, that caller must validate them —
+do not push escaping into the C++ layer.
 
-```
-interops/win/legacy/
-    constants.py      # Win32 constants, GUIDs, status codes
-    structs.py        # ctypes Structure mirrors (MONITORINFOEXA, DEVMODEA, etc.)
-    signatures.py     # Loads hw_helper.dll, sets argtypes/restypes for all exports
+## Status / scope
 
-interops/win/
-    hw_helper.hpp     # Monolithic C++ header (all structs + enums)
-    hw_helper.cpp     # Monolithic C++ source (GPU, audio, network, SMBIOS, WMI - all in one file)
-    dll/
-        hw_helper.dll # Pre-built monolithic DLL
-```
-
-Components still using the legacy bindings:
-
-- `core/windows/audio.py`
-- `core/windows/baseboard.py`
-- `core/windows/display.py`
-- `core/windows/memory.py`
-- `core/windows/network.py`
-- `core/windows/storage.py`
-
-## Troubleshooting
-
-- **`device_info.dll not found`**: run the CMake build so the shared library is (re)generated in `bindings/`.
-- **`get_gpu_info` returns -1**: verify that DXGI is available (Windows 10+ with a display driver installed).
-- **VRAM shows 0 MB**: the registry fallback may not find a matching `DriverDesc`/`DriverVersion` entry. Check that
-  the GPU driver is properly installed.
-- **PCIe gen/width shows 0**: the Configuration Manager property may not be exposed by all drivers. This is
-  driver-dependent and not a bug in the library.
+- **In scope (this directory):** the WMI wrapper itself.
+- **Out of scope (separate bindings, later):** audio (MMDevice), network (IP
+  Helper + SetupAPI), display (SetupAPI + EDID), baseboard (SMBIOS). These do
+  not go through WMI and are not served by this binding.
+- **Not yet wired:** no `core/windows/*.py` consumer imports this yet, per the
+  rewrite plan. `memory.py` and `storage.py` are the first two consumers once
+  the greenlight is given.

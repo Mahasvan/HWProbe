@@ -31,8 +31,8 @@ dependencies = [
 where = ["src"]
 
 [tool.setuptools.package-data]
+"hwprobe.interops.win_old.bindings" = ["*.dll"]
 "hwprobe.interops.win.bindings" = ["*.dll"]
-"hwprobe.interops.win_new.bindings" = ["*.dll"]
 "hwprobe.interops.mac.bindings" = ["*.dylib"]
 
 [project.urls]

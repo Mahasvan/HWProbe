@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(WinWmi LANGUAGES CXX)
+project(WinDeviceInfo LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,10 +11,11 @@ endif ()
 
 # ---- Shared library (DLL) ----
 add_library(device_info SHARED
-        src/wmi.cpp
+        src/win_helpers.cpp
+        src/gpu_info.cpp
 )
 
-# Static runtime to avoid dependency issues when loaded by Python.
+# Force static linking of runtime libraries to avoid dependency issues in Python
 target_link_options(device_info PRIVATE -static-libgcc -static-libstdc++ -static)
 
 target_include_directories(device_info
@@ -23,12 +24,13 @@ target_include_directories(device_info
 
 target_link_libraries(device_info
         PRIVATE
-        ole32
-        oleaut32
-        wbemuuid
+        dxgi
+        setupapi
+        cfgmgr32
+        advapi32
 )
 
-# Drop the DLL next to the Python binding.
+# Output the DLL next to the Python binding
 set_target_properties(device_info PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bindings
         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bindings
@@ -37,12 +39,11 @@ set_target_properties(device_info PROPERTIES
 )
 
 # ---- Standalone test executable ----
-add_executable(WinWmiTest main.cpp)
+add_executable(WinDeviceInfo main.cpp)
 
-target_include_directories(WinWmiTest
+target_include_directories(WinDeviceInfo
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# Load the DLL at runtime like the Python binding does, so the test exe does
-# not need a matching import lib.
-target_compile_definitions(WinWmiTest PRIVATE WINWMI_TEST_RUNTIME_LOAD)
+# No longer linking directly to device_info to allow dynamic loading from custom path
+# target_link_libraries(WinDeviceInfo PRIVATE device_info)
