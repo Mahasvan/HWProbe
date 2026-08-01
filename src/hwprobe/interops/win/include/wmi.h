@@ -7,7 +7,7 @@ extern "C" {
 #endif
 
 // ABI caps. Raising any of these is a recompile on both sides.
-// ponytail: fixed caps avoid heap ownership across the FFI boundary.
+// Fixed caps avoid heap ownership across the FFI boundary.
 //   16 fields covers every WMI class hwprobe queries (max today: 9).
 //   512 chars per field covers PNPDeviceID paths and uint64 string forms.
 //   64 rows covers memory modules, disks, NICs on any realistic machine.

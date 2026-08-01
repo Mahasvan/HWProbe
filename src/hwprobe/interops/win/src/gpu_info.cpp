@@ -1,5 +1,9 @@
+// Lean GPU enumeration: DXGI + SetupAPI + registry VRAM fallback only.
+// Returns raw values — all parsing (subsystem split, location paths, PCIe,
+// manufacturer name, VRAM unit conversion) is done in Python.
+// See gpu_info.h for the ABI.
+
 #include "gpu_info.h"
-#include "win_helpers.h"
 
 #include <windows.h>
 #include <dxgi.h>
@@ -8,18 +12,16 @@
 
 #include <cstring>
 #include <string>
-#include <regex>
-#include <vector>
 #include <set>
 
+#ifdef _MSC_VER
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "setupapi.lib")
+#endif
 
-// ---- WMI-free GPU enumeration via DXGI + SetupAPI ----
+// ---- PNP device ID from DXGI vendor/device/subsys via SetupAPI ----
 
 static std::wstring PnpDeviceIdFromDXGI(const DXGI_ADAPTER_DESC1 &desc) {
-    // DXGI gives us VendorId / DeviceId / SubSysId / Revision.
-    // We need to find the matching PNP device instance via SetupAPI.
     wchar_t match_hw_id[128];
     swprintf_s(match_hw_id, L"PCI\\VEN_%04X&DEV_%04X", desc.VendorId, desc.DeviceId);
 
@@ -62,13 +64,17 @@ static std::wstring PnpDeviceIdFromDXGI(const DXGI_ADAPTER_DESC1 &desc) {
 }
 
 // ---- Registry VRAM fallback for >4GB cards ----
+// DXGI's DedicatedVideoMemory is a UINT that can cap at 4GB on some drivers.
+// The registry stores the real size as HardwareInformation.qwMemorySize (uint64)
+// or HardwareInformation.MemorySize (uint32) under the display class key.
 
-static uint64_t FetchVramFromRegistry(const std::string &device_name, const std::string &driver_version) {
+static uint64_t FetchVramFromRegistry(const char *device_name, const char *driver_version) {
     const char *key_path = "SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}";
     HKEY hKey;
     if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, key_path, 0, KEY_READ, &hKey) != ERROR_SUCCESS)
         return 0;
 
+    uint64_t result = 0;
     for (DWORD i = 0; i < 100; ++i) {
         char sub_key_name[32];
         DWORD name_size = sizeof(sub_key_name);
@@ -90,24 +96,24 @@ static uint64_t FetchVramFromRegistry(const std::string &device_name, const std:
                         reinterpret_cast<LPBYTE>(drv_ver), &drv_ver_size) == ERROR_SUCCESS);
 
         if (got_desc && got_ver &&
-            device_name == drv_desc && driver_version == drv_ver) {
+            strcmp(device_name, drv_desc) == 0 && strcmp(driver_version, drv_ver) == 0) {
 
             uint64_t vram_bytes = 0;
             DWORD vram_size = sizeof(vram_bytes);
             if (RegQueryValueExA(hSubKey, "HardwareInformation.qwMemorySize", nullptr, nullptr,
                                  reinterpret_cast<LPBYTE>(&vram_bytes), &vram_size) == ERROR_SUCCESS && vram_bytes > 0) {
+                result = vram_bytes;
                 RegCloseKey(hSubKey);
-                RegCloseKey(hKey);
-                return vram_bytes / (1024 * 1024);
+                break;
             }
 
             DWORD alt_vram = 0;
             DWORD alt_size = sizeof(alt_vram);
             if (RegQueryValueExA(hSubKey, "HardwareInformation.MemorySize", nullptr, nullptr,
                                  reinterpret_cast<LPBYTE>(&alt_vram), &alt_size) == ERROR_SUCCESS && alt_vram > 0) {
+                result = static_cast<uint64_t>(alt_vram);
                 RegCloseKey(hSubKey);
-                RegCloseKey(hKey);
-                return static_cast<uint64_t>(alt_vram) / (1024 * 1024);
+                break;
             }
         }
 
@@ -115,22 +121,27 @@ static uint64_t FetchVramFromRegistry(const std::string &device_name, const std:
     }
 
     RegCloseKey(hKey);
-    return 0;
+    return result;
 }
 
 // ---- Get driver version from registry for a PNP device ----
 
-static std::string GetDriverVersion(const std::wstring &pnp_device_id) {
+static std::string GetDriverVersion(const wchar_t *pnp_device_id) {
     const char *key_path = "SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}";
     HKEY hKey;
     if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, key_path, 0, KEY_READ, &hKey) != ERROR_SUCCESS)
         return {};
 
-    std::string pnp_utf8 = WideToUtf8(pnp_device_id.c_str());
-    // Extract VEN_XXXX&DEV_XXXX portion for matching
-    std::string upper_pnp = pnp_utf8;
-    for (auto &ch : upper_pnp) ch = toupper(ch);
+    // Convert PNP ID to UTF-8 for substring matching
+    int utf8_len = WideCharToMultiByte(CP_UTF8, 0, pnp_device_id, -1, nullptr, 0, nullptr, nullptr);
+    if (utf8_len <= 0) { RegCloseKey(hKey); return {}; }
+    std::string pnp_utf8(utf8_len - 1, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, pnp_device_id, -1, pnp_utf8.data(), utf8_len, nullptr, nullptr);
 
+    std::string upper_pnp = pnp_utf8;
+    for (auto &ch : upper_pnp) ch = static_cast<char>(toupper(static_cast<unsigned char>(ch)));
+
+    std::string result;
     for (DWORD i = 0; i < 100; ++i) {
         char sub_key_name[32];
         DWORD name_size = sizeof(sub_key_name);
@@ -146,15 +157,15 @@ static std::string GetDriverVersion(const std::wstring &pnp_device_id) {
         if (RegQueryValueExA(hSubKey, "MatchingDeviceId", nullptr, nullptr,
                              reinterpret_cast<LPBYTE>(matching_id), &mid_size) == ERROR_SUCCESS) {
             std::string upper_mid = matching_id;
-            for (auto &ch : upper_mid) ch = toupper(ch);
-            if (upper_pnp.find(upper_mid) != std::string::npos || upper_mid.find("VEN_") != std::string::npos) {
+            for (auto &ch : upper_mid) ch = static_cast<char>(toupper(static_cast<unsigned char>(ch)));
+            if (upper_pnp.find(upper_mid) != std::string::npos) {
                 char drv_ver[256] = {};
                 DWORD ver_size = sizeof(drv_ver);
                 if (RegQueryValueExA(hSubKey, "DriverVersion", nullptr, nullptr,
                                      reinterpret_cast<LPBYTE>(drv_ver), &ver_size) == ERROR_SUCCESS) {
+                    result = drv_ver;
                     RegCloseKey(hSubKey);
-                    RegCloseKey(hKey);
-                    return drv_ver;
+                    break;
                 }
             }
         }
@@ -162,35 +173,12 @@ static std::string GetDriverVersion(const std::wstring &pnp_device_id) {
     }
 
     RegCloseKey(hKey);
-    return {};
-}
-
-// ---- Vendor/Device/Subsystem ID parsing from PNP Device ID ----
-
-struct PciIds {
-    uint32_t vendor_id;
-    uint32_t device_id;
-    uint32_t subsystem_vendor_id;
-    uint32_t subsystem_device_id;
-};
-
-static PciIds ParsePnpDeviceId(const std::string &pnp) {
-    PciIds ids = {};
-    std::regex re(R"(VEN_([0-9A-Fa-f]{4}).*DEV_([0-9A-Fa-f]{4}).*SUBSYS_([0-9A-Fa-f]{4})([0-9A-Fa-f]{4}))",
-                  std::regex::icase);
-    std::smatch m;
-    if (std::regex_search(pnp, m, re)) {
-        ids.vendor_id = std::stoul(m[1].str(), nullptr, 16);
-        ids.device_id = std::stoul(m[2].str(), nullptr, 16);
-        ids.subsystem_device_id = std::stoul(m[3].str(), nullptr, 16);
-        ids.subsystem_vendor_id = std::stoul(m[4].str(), nullptr, 16);
-    }
-    return ids;
+    return result;
 }
 
 // ---- Public API ----
 
-int get_gpu_info(WinGPUProperties *out, int max_count) {
+int get_gpu_info(WinGPURaw *out, int max_count) {
     if (!out || max_count <= 0) return -1;
 
     IDXGIFactory1 *factory = nullptr;
@@ -208,17 +196,16 @@ int get_gpu_info(WinGPUProperties *out, int max_count) {
             continue;
         }
 
-        // Skip software/remote adapters (DXGI_ADAPTER_FLAG_SOFTWARE = 2, defined in DXGI 1.2+)
-        // On Windows 7 no adapter sets this flag, so the check is a safe no-op.
+        // Skip software/remote adapters (DXGI_ADAPTER_FLAG_SOFTWARE = 2)
         if (desc.Flags & 2u) {
             adapter->Release();
             continue;
         }
 
         // Deduplicate: DXGI can enumerate the same physical GPU multiple times (common on AMD APUs)
-        std::wstring pnp_id_early = PnpDeviceIdFromDXGI(desc);
-        if (!pnp_id_early.empty()) {
-            std::wstring upper_pnp = pnp_id_early;
+        std::wstring pnp_id = PnpDeviceIdFromDXGI(desc);
+        if (!pnp_id.empty()) {
+            std::wstring upper_pnp = pnp_id;
             for (auto &ch : upper_pnp) ch = towupper(ch);
             if (seen_pnp_ids.count(upper_pnp)) {
                 adapter->Release();
@@ -227,65 +214,35 @@ int get_gpu_info(WinGPUProperties *out, int max_count) {
             seen_pnp_ids.insert(upper_pnp);
         }
 
-        WinGPUProperties gpu = {};
+        WinGPURaw gpu = {};
 
-        // Name from DXGI
-        char name_buf[256];
-        WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, name_buf, sizeof(name_buf), nullptr, nullptr);
-        strncpy_s(gpu.name, name_buf, _TRUNCATE);
+        // Name from DXGI (wide -> UTF-8)
+        WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, gpu.name, sizeof(gpu.name), nullptr, nullptr);
 
-        // IDs from DXGI
+        // Raw IDs from DXGI
         gpu.vendor_id = desc.VendorId;
         gpu.device_id = desc.DeviceId;
+        gpu.subsystem_id = desc.SubSysId;
 
-        // PNP device instance already resolved above for dedup
-        const std::wstring &pnp_id = pnp_id_early;
-        std::string pnp_utf8 = WideToUtf8(pnp_id.c_str());
+        // Raw VRAM bytes from DXGI
+        gpu.dedicated_video_memory_bytes = desc.DedicatedVideoMemory;
 
-        // Parse subsystem IDs from PNP device ID string
-        if (!pnp_utf8.empty()) {
-            PciIds ids = ParsePnpDeviceId(pnp_utf8);
-            gpu.subsystem_vendor_id = ids.subsystem_vendor_id;
-            gpu.subsystem_device_id = ids.subsystem_device_id;
-        }
-
-        // VRAM: DXGI reports DedicatedVideoMemory in bytes
-        uint64_t vram_mb = desc.DedicatedVideoMemory / (1024 * 1024);
-
-        // WMI/DXGI may report capped VRAM for >4GB cards; fall back to registry
-        if (vram_mb == 0 || desc.DedicatedVideoMemory >= 4194304000ULL) {
-            std::string drv_ver = GetDriverVersion(pnp_id);
-            uint64_t reg_vram = FetchVramFromRegistry(std::string(gpu.name), drv_ver);
-            if (reg_vram > 0) vram_mb = reg_vram;
-        }
-        gpu.vram_mb = vram_mb;
-
-        // Location paths (ACPI + PCI) and PCIe info via Configuration Manager
+        // PNP device ID (UTF-8) for Python-side location/PCIe lookup
         if (!pnp_id.empty()) {
-            std::string acpi, pci;
-            if (GetDevNodeLocationPaths(pnp_id, acpi, pci)) {
-                strncpy_s(gpu.acpi_path, acpi.c_str(), _TRUNCATE);
-                strncpy_s(gpu.pci_path, pci.c_str(), _TRUNCATE);
-            }
-
-            int gen = 0, width = 0;
-            if (GetDevNodePCIeInfo(pnp_id, gen, width)) {
-                gpu.pcie_gen = gen;
-                gpu.pcie_width = width;
-            }
+            WideCharToMultiByte(CP_UTF8, 0, pnp_id.c_str(), -1,
+                                gpu.pnp_device_id, sizeof(gpu.pnp_device_id), nullptr, nullptr);
         }
 
-        // Manufacturer: map common vendor IDs
-        switch (gpu.vendor_id) {
-            case 0x10DE: strncpy_s(gpu.manufacturer, "NVIDIA", _TRUNCATE); break;
-            case 0x1002: strncpy_s(gpu.manufacturer, "AMD", _TRUNCATE); break;
-            case 0x8086: strncpy_s(gpu.manufacturer, "Intel", _TRUNCATE); break;
-            default: {
-                char hex[16];
-                snprintf(hex, sizeof(hex), "0x%04X", gpu.vendor_id);
-                strncpy_s(gpu.manufacturer, hex, _TRUNCATE);
-                break;
-            }
+        // Registry VRAM fallback for >4GB cards (DXGI may cap at 4GB).
+        // Skip when SetupAPI failed to resolve a PNP ID — the registry lookup
+        // matches on DriverDesc + DriverVersion, and GetDriverVersion needs
+        // the PNP ID to find the right subkey.
+        if ((gpu.dedicated_video_memory_bytes == 0 ||
+             gpu.dedicated_video_memory_bytes >= 4194304000ULL) &&
+            !pnp_id.empty()) {
+            std::string drv_ver = GetDriverVersion(pnp_id.c_str());
+            uint64_t reg_vram = FetchVramFromRegistry(gpu.name, drv_ver.c_str());
+            if (reg_vram > 0) gpu.vram_bytes = reg_vram;
         }
 
         out[count++] = gpu;

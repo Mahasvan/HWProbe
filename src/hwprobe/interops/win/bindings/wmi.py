@@ -111,8 +111,7 @@ def get_wmi_data(
 
 
 # ---- quick self-check ----
-# ponytail: one runnable check, no test framework. Fails if COM/WMI/encoding
-# is broken. Run with:  python -m hwprobe.interops.win.bindings.wmi
+# Run with:  python -m hwprobe.interops.win.bindings.wmi
 if __name__ == "__main__":
     rows = get_wmi_data("Win32_Processor", ["Name", "Manufacturer"])
     print(f"Found {len(rows)} CPU(s):\n")

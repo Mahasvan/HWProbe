@@ -9,6 +9,7 @@
 #include <wbemidl.h>
 
 #include <string>
+#include <cstring>
 
 // #pragma comment(lib, ...) is MSVC-only; mingw ignores it. Linking is
 // handled by CMakeLists.txt (target_link_libraries ... ole32 oleaut32 wbemuuid).
@@ -43,48 +44,54 @@ private:
 
 // ---- VARIANT -> fixed UTF-8 slot ----
 // Writes a null-terminated UTF-8 rendering of vt into dst[0..dst_size-1].
-// Missing/null/empty -> "". Never overflows.
+// Missing/null/empty -> "". Overlong values are truncated cleanly at
+// dst_size-1 (WideCharToMultiByte fails rather than truncates when the
+// output doesn't fit, so we convert into a temp buffer first).
+static void WideToUtf8Slot(const wchar_t *src, char *dst, int dst_size) {
+    dst[0] = '\0';
+    if (!src) return;
+
+    int needed = WideCharToMultiByte(CP_UTF8, 0, src, -1, nullptr, 0, nullptr, nullptr);
+    if (needed <= 0) return;
+
+    if (needed <= dst_size) {
+        WideCharToMultiByte(CP_UTF8, 0, src, -1, dst, dst_size, nullptr, nullptr);
+        return;
+    }
+
+    // Value exceeds the slot: convert fully into a temp buffer, then copy
+    // the prefix. Walk back from the cut point to avoid splitting a UTF-8
+    // multi-byte sequence (continuation bytes have the high bits 10xxxxxx).
+    std::string tmp(needed - 1, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, src, -1, tmp.data(), needed, nullptr, nullptr);
+
+    int cut = dst_size - 1;
+    while (cut > 0 && (static_cast<unsigned char>(tmp[cut]) & 0xC0) == 0x80)
+        --cut;
+
+    std::memcpy(dst, tmp.data(), cut);
+    dst[cut] = '\0';
+}
+
 static void VariantToUtf8Slot(VARIANT &vt, char *dst, int dst_size) {
     if (dst_size <= 0) return;
     dst[0] = '\0';
     if (vt.vt == VT_NULL || vt.vt == VT_EMPTY) return;
 
-    HRESULT hr;
-    BSTR bstr = nullptr;
-
     if (vt.vt == VT_BSTR) {
-        bstr = vt.bstrVal;
-    } else {
-        VARIANT vtBstr;
-        VariantInit(&vtBstr);
-        hr = VariantChangeType(&vtBstr, &vt, 0, VT_BSTR);
-        if (FAILED(hr)) {
-            VariantClear(&vtBstr);
-            return;
-        }
-        bstr = vtBstr.bstrVal;
-        // Convert into dst, then clear.
-        if (bstr) {
-            int len = WideCharToMultiByte(CP_UTF8, 0, bstr, -1, nullptr, 0, nullptr, nullptr);
-            if (len > 0) {
-                if (len > dst_size) len = dst_size;
-                WideCharToMultiByte(CP_UTF8, 0, bstr, -1, dst, len, nullptr, nullptr);
-                dst[dst_size - 1] = '\0';
-            }
-        }
-        VariantClear(&vtBstr);
+        WideToUtf8Slot(vt.bstrVal, dst, dst_size);
         return;
     }
 
-    // VT_BSTR fast path.
-    if (bstr) {
-        int len = WideCharToMultiByte(CP_UTF8, 0, bstr, -1, nullptr, 0, nullptr, nullptr);
-        if (len > 0) {
-            if (len > dst_size) len = dst_size;
-            WideCharToMultiByte(CP_UTF8, 0, bstr, -1, dst, len, nullptr, nullptr);
-            dst[dst_size - 1] = '\0';
-        }
+    VARIANT vtBstr;
+    VariantInit(&vtBstr);
+    HRESULT hr = VariantChangeType(&vtBstr, &vt, 0, VT_BSTR);
+    if (FAILED(hr)) {
+        VariantClear(&vtBstr);
+        return;
     }
+    WideToUtf8Slot(vtBstr.bstrVal, dst, dst_size);
+    VariantClear(&vtBstr);
 }
 
 // ---- public entry ----
@@ -101,9 +108,7 @@ extern "C" __declspec(dllexport) int get_wmi_data(const char *wmi_class,
     if (max_rows > WMI_MAX_ROWS) max_rows = WMI_MAX_ROWS;
     if (!namespace_str || !*namespace_str) namespace_str = "ROOT\\CIMV2";
 
-    // ponytail: per-call CoInitializeEx. Idempotent via RPC_E_CHANGED_MODE.
-    //   Switch to a process-wide RAII guard if profiling shows COM init in the
-    //   hot path; today it isn't.
+    // Per-call CoInitializeEx. Idempotent via RPC_E_CHANGED_MODE.
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) return -1;
     bool did_init = (hr != RPC_E_CHANGED_MODE && hr != S_FALSE);

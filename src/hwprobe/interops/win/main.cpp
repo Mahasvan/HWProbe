@@ -11,7 +11,7 @@
 #include <cstdio>
 #include <cstring>
 
-typedef int (*get_gpu_info_ptr)(WinGPUProperties *, int);
+typedef int (*get_gpu_info_ptr)(WinGPURaw *, int);
 typedef int (*get_wmi_data_ptr)(const char *, const char *const *, int,
                                 const char *, WmiRow *, int);
 
@@ -37,7 +37,7 @@ static int test_gpu() {
     }
 
     constexpr int MAX_GPUS = 8;
-    WinGPUProperties gpus[MAX_GPUS] = {};
+    WinGPURaw gpus[MAX_GPUS] = {};
     int count = fn(gpus, MAX_GPUS);
     if (count < 0) {
         printf("[gpu] get_gpu_info() failed\n");
@@ -49,17 +49,15 @@ static int test_gpu() {
     for (int i = 0; i < count; ++i) {
         const auto &g = gpus[i];
         printf("GPU %d:\n", i);
-        printf("  Name:             %s\n", g.name);
-        printf("  Manufacturer:     %s\n", g.manufacturer);
-        printf("  Vendor ID:        0x%04X\n", g.vendor_id);
-        printf("  Device ID:        0x%04X\n", g.device_id);
-        printf("  Subsystem Vendor: 0x%04X\n", g.subsystem_vendor_id);
-        printf("  Subsystem Device: 0x%04X\n", g.subsystem_device_id);
-        printf("  VRAM:             %llu MB\n", (unsigned long long)g.vram_mb);
-        printf("  PCIe Gen:         %d\n", g.pcie_gen);
-        printf("  PCIe Width:       x%d\n", g.pcie_width);
-        if (g.acpi_path[0]) printf("  ACPI Path:        %s\n", g.acpi_path);
-        if (g.pci_path[0])  printf("  PCI Path:         %s\n", g.pci_path);
+        printf("  Name:              %s\n", g.name);
+        printf("  Vendor ID:         0x%04X\n", g.vendor_id);
+        printf("  Device ID:         0x%04X\n", g.device_id);
+        printf("  Subsystem ID:      0x%08X\n", g.subsystem_id);
+        printf("  Dedicated VRAM:    %llu bytes\n", (unsigned long long)g.dedicated_video_memory_bytes);
+        if (g.pnp_device_id[0])
+            printf("  PNP Device ID:     %s\n", g.pnp_device_id);
+        if (g.vram_bytes > 0)
+            printf("  Registry VRAM:     %llu bytes\n", (unsigned long long)g.vram_bytes);
         printf("\n");
     }
 

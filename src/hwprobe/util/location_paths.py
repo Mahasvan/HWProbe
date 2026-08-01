@@ -1,70 +1,24 @@
-from ctypes import (
-    Structure,
-    WinDLL,
-    byref,
-    c_buffer,
-    c_char,
-    c_ulong,
-    c_ushort,
-    c_wchar_p,
-    sizeof,
-)
+"""
+Thin ctypes wrapper over cfgmgr32.dll device-node properties.
+
+Public API (used by core/windows/graphics.py and core/windows/network.py):
+    get_location_paths(pnp_device_id) -> list[str] | None
+    fetch_pcie_info(pnp_device_id)   -> (speed, width) | None
+
+Internal: one _get_devnode_property(pnp_id, key) -> bytes | None handles the
+two-call buffer sizing pattern. Decoders for string-list and uint32 are
+module-level. DEVPROPKEY constants are built once at import, not per call.
+"""
+
+from ctypes import Structure, WinDLL, byref, c_buffer, c_char, c_ulong, c_ushort, c_wchar_p, sizeof
 from typing import Optional
 
-cfgmgr = WinDLL("cfgmgr32.dll")
+_cfgmgr = WinDLL("cfgmgr32.dll")
 
-# DEVPKEY definitions
-location_paths_key = [
-    "location_paths",
-    0xA45C254E,
-    0xDF1C,
-    0x4EFD,
-    [0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0],
-    37,
-]
-
-bus_number_key = [
-    "bus_number",
-    0xA45C254E,
-    0xDF1C,
-    0x4EFD,
-    [0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0],
-    23,
-]
-
-device_address_key = [
-    "device_address",
-    0xA45C254E,
-    0xDF1C,
-    0x4EFD,
-    [0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0],
-    30,
-]
-
-pcie_link_speed_key = [
-    "current_link_speed",
-    0x3AB22E31,
-    0x8264,
-    0x4B4E,
-    [0x9A, 0xF5, 0xA8, 0xD2, 0xD8, 0xE3, 0x3E, 0x62],
-    9,
-]
-
-pcie_link_width_key = [
-    "current_link_width",
-    0x3AB22E31,
-    0x8264,
-    0x4B4E,
-    [0x9A, 0xF5, 0xA8, 0xD2, 0xD8, 0xE3, 0x3E, 0x62],
-    10,
-]
+# ---- ctypes structs (built once) ----
 
 
 class GUID(Structure):
-    """
-    Source: https://github.com/tpn/winsdk-10/blob/master/Include/10.0.10240.0/shared/guiddef.h#L22-L26
-    """
-
     _fields_ = [
         ("Data1", c_ulong),
         ("Data2", c_ushort),
@@ -74,241 +28,142 @@ class GUID(Structure):
 
 
 class DEVPROPKEY(Structure):
-    """
-    Source: https://github.com/tpn/winsdk-10/blob/master/Include/10.0.10240.0/um/devpropdef.h#L118-L124
-    """
-
     _fields_ = [("fmtid", GUID), ("pid", c_ulong)]
 
 
-def get_device_instance(pnp_device_id: str) -> c_ulong:
-    """
-    Get the device node instance (dnDevInst) from a PNP Device ID.
+def _key(data1, data2, data3, data4_bytes, pid) -> DEVPROPKEY:
+    return DEVPROPKEY(
+        fmtid=GUID(Data1=data1, Data2=data2, Data3=data3, Data4=bytes(data4_bytes)),
+        pid=pid,
+    )
 
-    Args:
-        pnp_device_id: The PNP Device ID string (e.g., "PCI\\VEN_8086&DEV_9A09&...")
 
-    Returns:
-        Device node instance handle, or None if not found
-    """
+# ---- DEVPROPKEY constants (module-level, built once) ----
+# Source: DEVPKEY_Device_LocationPaths, DEVPKEY_Device_BusNumber,
+#         DEVPKEY_Device_Address, DEVPKEY_PCIExpress_CurrentLinkSpeed/Width
+
+_LOCATION_PATHS = _key(0xA45C254E, 0xDF1C, 0x4EFD, [0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0], 37)
+_BUS_NUMBER = _key(0xA45C254E, 0xDF1C, 0x4EFD, [0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0], 23)
+_DEVICE_ADDRESS = _key(0xA45C254E, 0xDF1C, 0x4EFD, [0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0], 30)
+_PCIE_LINK_SPEED = _key(0x3AB22E31, 0x8264, 0x4B4E, [0x9A, 0xF5, 0xA8, 0xD2, 0xD8, 0xE3, 0x3E, 0x62], 9)
+_PCIE_LINK_WIDTH = _key(0x3AB22E31, 0x8264, 0x4B4E, [0x9A, 0xF5, 0xA8, 0xD2, 0xD8, 0xE3, 0x3E, 0x62], 10)
+
+# CR_SUCCESS = 0, CR_BUFFER_SMALL = 0x1A, CR_NO_SUCH_DEVNODE = 0x02
+_CR_SUCCESS = 0
+_CR_BUFFER_SMALL = 0x1A
+
+
+# ---- core: locate devnode + get property (two-call pattern) ----
+
+def _locate_devnode(pnp_device_id: str) -> Optional[c_ulong]:
+    """Get the device node instance handle from a PNP Device ID string."""
     dev_node = c_ulong()
-
-    result = cfgmgr.CM_Locate_DevNodeW(
+    result = _cfgmgr.CM_Locate_DevNodeW(
         byref(dev_node),
         c_wchar_p(pnp_device_id),
         c_ulong(0),  # CM_LOCATE_DEVNODE_NORMAL
     )
+    return dev_node if result == _CR_SUCCESS else None
 
-    if result != 0:  # CR_SUCCESS
+
+def _get_devnode_property(pnp_device_id: str, prop_key: DEVPROPKEY) -> Optional[bytes]:
+    """
+    Fetch a raw property buffer from CM_Get_DevNode_PropertyW.
+    Two-call pattern: query size, alloc, query data.
+    Returns raw bytes or None if the property doesn't exist / lookup fails.
+    """
+    dn = _locate_devnode(pnp_device_id)
+    if dn is None:
         return None
 
-    return dev_node
+    prop_type = c_ulong()
+    buf_size = c_ulong(0)
 
-
-def CM_Get_DevNode_PropertyW(
-    dnDevInst=c_ulong(),
-    propKey=None,
-    propType=c_ulong(),
-    propBuff=None,
-    propBuffSize=c_ulong(),
-):
-    if propKey is None:
-        return None
-
-    status = cfgmgr.CM_Get_DevNode_PropertyW(
-        dnDevInst,
-        byref(propKey),
-        byref(propType),
-        propBuff,
-        byref(propBuffSize),
-        c_ulong(0),
+    # First call: get required buffer size.
+    status = _cfgmgr.CM_Get_DevNode_PropertyW(
+        dn, byref(prop_key), byref(prop_type), None, byref(buf_size), c_ulong(0)
     )
+    if status == _CR_SUCCESS:
+        # Property exists with zero-size payload (rare). Return empty.
+        return b""
+    if status != _CR_BUFFER_SMALL:
+        return None  # CR_NO_SUCH_DEVNODE or other failure
 
-    if status == 0x02:  # Ran out of memory
-        return None
-
-    """
-        Buffer is just barely not big enough - try again with a larger buffer
-    """
-    if status == 0x1A or propBuff is None:
-        return CM_Get_DevNode_PropertyW(
-            dnDevInst,
-            propKey,
-            propType,
-            propBuff=c_buffer(b"", sizeof(c_ulong) * propBuffSize.value),
-            propBuffSize=propBuffSize,
-        )
-
-    return (propType, propBuff, propBuffSize)
-
-
-def decode_location_paths(raw_bytes: bytes) -> list[str]:
-    """
-    Decode the raw location paths bytes into a list of strings.
-
-    Args:
-        raw_bytes: The raw bytes returned from CM_Get_DevNode_PropertyW
-
-    Returns:
-        List of location path strings
-    """
-    text = raw_bytes.decode("utf-16-le", errors="ignore")
-
-    paths = [p for p in text.split("\x00") if p]
-
-    return paths
-
-
-def decode_uint32(raw_bytes: bytes) -> Optional[int]:
-    """
-    Decode a 32-bit unsigned integer from raw bytes.
-
-    Args:
-        raw_bytes: The raw bytes returned from CM_Get_DevNode_PropertyW
-
-    Returns:
-        Integer value, or None if decoding fails
-    """
-    try:
-        return int.from_bytes(raw_bytes[:4], byteorder="little")
-    except Exception:
-        return None
-
-
-def _fetch_property(pnp_device_id: str, key_def: list):  # type: ignore[type-arg]
-    """
-    Generic property fetcher using CM_Get_DevNode_PropertyW.
-
-    Args:
-        pnp_device_id: The PNP Device ID string
-        key_def: List containing [name, Data1, Data2, Data3, Data4_list, pid]
-
-    Returns:
-        Tuple of (propType, buffer, propBuffSize) or None
-    """
-    mGUID = GUID(
-        Data1=c_ulong(key_def[1]),
-        Data2=c_ushort(key_def[2]),
-        Data3=c_ushort(key_def[3]),
-        Data4=bytes(key_def[4]),
+    # Second call: fill the buffer.
+    buf = c_buffer(buf_size.value)
+    status = _cfgmgr.CM_Get_DevNode_PropertyW(
+        dn, byref(prop_key), byref(prop_type), buf, byref(buf_size), c_ulong(0)
     )
-
-    dpKey = DEVPROPKEY(fmtid=mGUID, pid=c_ulong(key_def[5]))
-
-    dnDevInst = get_device_instance(pnp_device_id)
-
-    if dnDevInst is None:
+    if status != _CR_SUCCESS:
         return None
+    return buf.raw
 
-    return CM_Get_DevNode_PropertyW(dnDevInst, dpKey)
 
+# ---- decoders ----
+
+def _decode_string_list(raw: bytes) -> list[str]:
+    """Decode a REG_MULTI_SZ-style buffer (UTF-16-LE, NUL-separated strings)."""
+    text = raw.decode("utf-16-le", errors="ignore")
+    return [p for p in text.split("\x00") if p]
+
+
+def _decode_uint32(raw: bytes) -> Optional[int]:
+    """Decode a 32-bit unsigned integer from little-endian bytes."""
+    if len(raw) < 4:
+        return None
+    return int.from_bytes(raw[:4], byteorder="little")
+
+
+# ---- public API ----
 
 def get_location_paths(pnp_device_id: str) -> Optional[list[str]]:
-    """
-    Get the location paths for a PNP device.
-
-    Args:
-        pnp_device_id: The PNP Device ID string
-
-    Returns:
-        List of location path strings, or None if not found
-    """
-    result = _fetch_property(pnp_device_id, location_paths_key)
-
-    if result is None:
+    """Get the location paths for a PNP device. Returns list of raw path
+    strings (e.g. ['ACPI(_SB_)#ACPI(PCI0)#...', 'PCIROOT(0)#PCI(1C05)#...'])
+    or None if the property doesn't exist. Caller formats via
+    core.windows.common.format_acpi_path / format_pci_path."""
+    raw = _get_devnode_property(pnp_device_id, _LOCATION_PATHS)
+    if raw is None:
         return None
+    return _decode_string_list(raw)
 
-    raw_bytes = result[1].raw
-    return decode_location_paths(raw_bytes)
+
+def fetch_pcie_info(pnp_device_id: str) -> Optional[tuple[Optional[int], Optional[int]]]:
+    """Fetch PCIe link speed (gen) and width for a PNP device.
+    Returns (speed, width) where either may be None if that property is
+    absent. Returns None only if both lookups fail."""
+    speed_raw = _get_devnode_property(pnp_device_id, _PCIE_LINK_SPEED)
+    width_raw = _get_devnode_property(pnp_device_id, _PCIE_LINK_WIDTH)
+    speed = _decode_uint32(speed_raw) if speed_raw is not None else None
+    width = _decode_uint32(width_raw) if width_raw is not None else None
+    if speed is None and width is None:
+        return None
+    return (speed, width)
 
 
 def get_bus_number(pnp_device_id: str) -> Optional[str]:
-    """
-    Get the bus number for a PNP device.
-
-    Args:
-        pnp_device_id: The PNP Device ID string
-
-    Returns:
-        Bus number as string, or None if not found
-    """
-    result = _fetch_property(pnp_device_id, bus_number_key)
-
-    if result is None:
+    """Get the bus number for a PNP device as a string, or None."""
+    raw = _get_devnode_property(pnp_device_id, _BUS_NUMBER)
+    if raw is None:
         return None
-
-    raw_bytes = result[1].raw
-    value = decode_uint32(raw_bytes)
-    return str(value) if value is not None else None
+    val = _decode_uint32(raw)
+    return str(val) if val is not None else None
 
 
 def get_device_address(pnp_device_id: str) -> Optional[str]:
-    """
-    Get the device address for a PNP device.
-
-    Args:
-        pnp_device_id: The PNP Device ID string
-
-    Returns:
-        Device address as string, or None if not found
-    """
-    result = _fetch_property(pnp_device_id, device_address_key)
-
-    if result is None:
+    """Get the device address for a PNP device as a string, or None."""
+    raw = _get_devnode_property(pnp_device_id, _DEVICE_ADDRESS)
+    if raw is None:
         return None
-
-    raw_bytes = result[1].raw
-    value = decode_uint32(raw_bytes)
-    return str(value) if value is not None else None
-
-
-def get_pcie_link_speed(pnp_device_id: str) -> Optional[int]:
-    result = _fetch_property(pnp_device_id, pcie_link_speed_key)
-
-    if result is None:
-        return None
-    raw_bytes = result[1].raw
-    return decode_uint32(raw_bytes)
-
-
-def get_pcie_link_width(pnp_device_id: str) -> Optional[int]:
-    result = _fetch_property(pnp_device_id, pcie_link_width_key)
-    if result is None:
-        return None
-    raw_bytes = result[1].raw
-    return decode_uint32(raw_bytes)
+    val = _decode_uint32(raw)
+    return str(val) if val is not None else None
 
 
 def fetch_device_properties(
     pnp_device_id: str,
 ) -> tuple[Optional[list[str]], Optional[str], Optional[str]]:
-    """
-    Fetch location paths, bus number, and device address in one call.
-
-    Args:
-        pnp_device_id: The PNP Device ID string
-
-    Returns:
-        Tuple of (location_paths, bus_number, device_address)
-    """
+    """Fetch location paths, bus number, and device address in one call."""
     return (
         get_location_paths(pnp_device_id),
         get_bus_number(pnp_device_id),
         get_device_address(pnp_device_id),
     )
-
-
-def fetch_pcie_info(pnp_device_id: str) -> Optional[tuple[Optional[int], Optional[int]]]:
-    """
-    Fetch PCIe link speed and width for a PNP device.
-
-    Args:
-        pnp_device_id: The PNP Device ID string
-    """
-    speed = get_pcie_link_speed(pnp_device_id)
-    width = get_pcie_link_width(pnp_device_id)
-
-    if speed is None and width is None:
-        return None
-
-    return (speed, width)

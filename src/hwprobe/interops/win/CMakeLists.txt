@@ -12,9 +12,8 @@ endif ()
 # Static runtime to avoid dependency issues when loaded by Python.
 set(_STATIC_RUNTIME_OPTS -static-libgcc -static-libstdc++ -static)
 
-# ---- gpu_info.dll : GPU enumeration (DXGI + SetupAPI) ----
+# ---- gpu_info.dll : GPU enumeration (DXGI + SetupAPI + registry VRAM) ----
 add_library(gpu_info SHARED
-        src/win_helpers.cpp
         src/gpu_info.cpp
 )
 
@@ -28,7 +27,6 @@ target_link_libraries(gpu_info
         PRIVATE
         dxgi
         setupapi
-        cfgmgr32
         advapi32
 )
 
