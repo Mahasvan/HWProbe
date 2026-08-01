@@ -8,6 +8,7 @@ All Win32 calls go through display_info.dll (C++). Python only does:
 """
 
 from hwprobe.core.common.edid import parse_edid
+from hwprobe.core.windows.common import format_acpi_path, format_pci_path
 from hwprobe.core.windows.win_enum import DISPLAY_CON_TYPE
 from hwprobe.interops.win.bindings.display_info import (
     get_display_connectors,
@@ -17,6 +18,7 @@ from hwprobe.interops.win.bindings.display_info import (
 )
 from hwprobe.models.display_models import DisplayInfo, DisplayModuleInfo, ResolutionInfo
 from hwprobe.models.status_models import StatusType
+from hwprobe.util.location_paths import get_location_paths
 
 
 def _enrich_from_edid(module: DisplayModuleInfo, edid_bytes: bytes) -> DisplayModuleInfo:
@@ -58,12 +60,18 @@ def fetch_display_info() -> DisplayInfo:
 
     for dev in get_monitor_devices():
         module = DisplayModuleInfo()
-        module.acpi_path = dev.pnp_device_id
         module.resolution = ResolutionInfo(
             width=dev.width,
             height=dev.height,
             refresh_rate=float(dev.refresh_rate),
         )
+
+        # Location paths from PNP device ID (same as graphics.py and network.py)
+        loc = get_location_paths(dev.pnp_device_id)
+        if loc is not None:
+            pci, acpi = loc[:2]
+            module.pci_path = format_pci_path(pci)
+            module.acpi_path = format_acpi_path(acpi)
 
         # GPU association via DXGI
         module.gpu_name = get_gpu_for_display(dev.device_id)
@@ -73,13 +81,12 @@ def fetch_display_info() -> DisplayInfo:
         if connector:
             module.interface = DISPLAY_CON_TYPE.get(connector.output_technology)
 
-        # EDID — prefer display path for matching, fall back to PNP ID
-        edid_key = (
-            connector.display_path
-            if connector and connector.display_path
-            else dev.pnp_device_id.split("\\")[1] if "\\" in dev.pnp_device_id else dev.pnp_device_id
-        )
-        edid_bytes = get_edid(edid_key)
+        # EDID — try display path first, fall back to PNP ID segment
+        edid_bytes = None
+        if connector and connector.display_path:
+            edid_bytes = get_edid(connector.display_path)
+        if not edid_bytes and "\\" in dev.pnp_device_id:
+            edid_bytes = get_edid(dev.pnp_device_id.split("\\")[1])
         if edid_bytes:
             module = _enrich_from_edid(module, edid_bytes)
 

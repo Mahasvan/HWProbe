@@ -51,13 +51,26 @@ def _load_display_module():
     _binding.get_display_connectors = lambda: []
     _binding.get_gpu_for_display = lambda name: None
     _binding.get_edid = lambda pnp: None
-    sys.modules.setdefault("hwprobe.interops.win.bindings.display_info", _binding)
+    sys.modules["hwprobe.interops.win.bindings.display_info"] = _binding
 
     # Stub win_enum — display.py imports DISPLAY_CON_TYPE from it, but
     # importing the real module triggers core.windows.__init__.
     _win_enum = types.ModuleType("hwprobe.core.windows.win_enum")
     _win_enum.DISPLAY_CON_TYPE = {4: "DVI", 5: "HDMI", 10: "DisplayPort", 11: "eDP"}
-    sys.modules.setdefault("hwprobe.core.windows.win_enum", _win_enum)
+    sys.modules["hwprobe.core.windows.win_enum"] = _win_enum
+
+    # Stub common (format_acpi_path / format_pci_path) and location_paths —
+    # both load DLLs at import time on Windows. Use plain stubs; tests that
+    # care about the formatted output mock get_location_paths on the display
+    # module directly and check that acpi_path/pci_path are not None.
+    _common = types.ModuleType("hwprobe.core.windows.common")
+    _common.format_acpi_path = lambda s: s
+    _common.format_pci_path = lambda s: s
+    sys.modules["hwprobe.core.windows.common"] = _common
+
+    _loc = types.ModuleType("hwprobe.util.location_paths")
+    _loc.get_location_paths = lambda pnp: None
+    sys.modules["hwprobe.util.location_paths"] = _loc
 
     mod_name = "hwprobe.core.windows.display"
     if mod_name in sys.modules:
@@ -191,6 +204,7 @@ class TestFetchDisplayInfo:
         ])
         monkeypatch.setattr(display, "get_gpu_for_display", lambda name: "GPU-0")
         monkeypatch.setattr(display, "get_edid", lambda key: _build_edid())
+        monkeypatch.setattr(display, "get_location_paths", lambda pnp: ("PCIROOT(0)#PCI(1D00)", "ACPI(_SB_)#ACPI(PCI0)#ACPI(NIC0)"))
 
         result = display.fetch_display_info()
 
@@ -199,7 +213,9 @@ class TestFetchDisplayInfo:
         assert mod.name == "TEST-MONITOR"
         assert mod.gpu_name == "GPU-0"
         assert mod.interface == "DisplayPort"
-        assert mod.acpi_path == r"MONITOR\ABC123\{GUID}"
+        assert mod.acpi_path is not None
+        assert mod.pci_path is not None
+        assert mod.acpi_path != r"MONITOR\ABC123\{GUID}"  # not the raw PNP ID
         assert mod.resolution.width == 2560
         assert mod.resolution.height == 1440
         assert mod.resolution.refresh_rate == 144.0
@@ -214,6 +230,7 @@ class TestFetchDisplayInfo:
         monkeypatch.setattr(display, "get_display_connectors", lambda: [])
         monkeypatch.setattr(display, "get_gpu_for_display", lambda name: None)
         monkeypatch.setattr(display, "get_edid", lambda key: None)
+        monkeypatch.setattr(display, "get_location_paths", lambda pnp: None)
 
         result = display.fetch_display_info()
 
@@ -222,7 +239,7 @@ class TestFetchDisplayInfo:
         assert mod.name is None
         assert mod.gpu_name is None
         assert mod.resolution.width == 1920
-        assert mod.acpi_path == r"MONITOR\XYZ\{GUID}"
+        assert mod.acpi_path is None  # no location paths found
 
     def test_multiple_monitors(self, monkeypatch):
         monkeypatch.setattr(display, "get_monitor_devices", lambda: [
@@ -232,11 +249,32 @@ class TestFetchDisplayInfo:
         monkeypatch.setattr(display, "get_display_connectors", lambda: [])
         monkeypatch.setattr(display, "get_gpu_for_display", lambda name: "GPU-0")
         monkeypatch.setattr(display, "get_edid", lambda key: None)
+        monkeypatch.setattr(display, "get_location_paths", lambda pnp: None)
 
         result = display.fetch_display_info()
 
         assert len(result.modules) == 2
-        assert result.modules[0].acpi_path == r"MONITOR\AAA\{1}"
-        assert result.modules[1].acpi_path == r"MONITOR\BBB\{2}"
+        assert result.modules[0].acpi_path is None
+        assert result.modules[1].acpi_path is None
         assert result.modules[0].resolution.width == 2560
         assert result.modules[1].resolution.width == 1920
+
+    def test_location_paths_populated(self, monkeypatch):
+        """Verify acpi_path and pci_path come from get_location_paths, not the raw PNP ID."""
+        monkeypatch.setattr(display, "get_monitor_devices", lambda: [_mock_monitor()])
+        monkeypatch.setattr(display, "get_display_connectors", lambda: [])
+        monkeypatch.setattr(display, "get_gpu_for_display", lambda name: None)
+        monkeypatch.setattr(display, "get_edid", lambda key: None)
+
+        def mock_loc(pnp):
+            return ("PCIROOT(0)#PCI(1D00)#PCI(0000)", "ACPI(_SB_)#ACPI(PCI0)#ACPI(DD01)")
+
+        monkeypatch.setattr(display, "get_location_paths", mock_loc)
+
+        result = display.fetch_display_info()
+        mod = result.modules[0]
+
+        assert mod.acpi_path is not None
+        assert mod.pci_path is not None
+        assert "MONITOR" not in (mod.acpi_path or "")
+        assert mod.acpi_path != r"MONITOR\ABC123\{GUID}"
