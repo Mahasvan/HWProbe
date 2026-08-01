@@ -25,8 +25,7 @@ def _get_monitor_resolution_from_system_profiler(monitor_info: dict) -> Optional
 
 
 def _enrich_data_from_edid(monitor_info: DisplayModuleInfo, edid_string: str) -> DisplayModuleInfo:
-    if edid_string.lower().startswith("0x"):
-        edid_string = edid_string[2:]
+    edid_string = edid_string.lower().removeprefix("0x")
     edid_bytes = bytes.fromhex(edid_string)
     data: DisplayModuleInfo = parse_edid(edid_bytes)
     for field in data.model_dump().keys():

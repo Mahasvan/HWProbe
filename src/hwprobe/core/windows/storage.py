@@ -48,8 +48,6 @@ def fetch_wmi_storage_info() -> StorageInfo:
         manufacturer = props.get("Manufacturer")
         model = props.get("Model")
 
-        print(manufacturer)
-
         disk.model = (
             model.strip() if model else friendly_name.strip() if friendly_name else None
         )

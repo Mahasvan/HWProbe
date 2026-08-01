@@ -78,19 +78,16 @@ def get_arm_ram_info() -> MemoryInfo:
 
 def get_ram_size_from_system_profiler() -> List[StorageSize]:
     sizes = []
-    try:
-        value = subprocess.check_output(["system_profiler", "SPMemoryDataType", "-xml"])
-        pl = plistlib.loads(value, fmt=plistlib.FMT_XML)
-        for entry in pl:
-            items = entry["_items"]
-            for item in items:
-                sticks = item["_items"]
-                for stick in sticks:
-                    size = stick["dimm_size"]
-                    if size:
-                        sizes.append(int(size.removesuffix(" GB")))
-    except Exception:
-        raise
+    value = subprocess.check_output(["system_profiler", "SPMemoryDataType", "-xml"])
+    pl = plistlib.loads(value, fmt=plistlib.FMT_XML)
+    for entry in pl:
+        items = entry.get("_items")
+        for item in items:
+            sticks = item.get("_items")
+            for stick in sticks:
+                size = stick.get("dimm_size")
+                if size:
+                    sizes.append(int(size.removesuffix(" GB")))
     return [Gigabyte(capacity=x) for x in sizes]
 
 

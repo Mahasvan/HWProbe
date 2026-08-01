@@ -27,7 +27,7 @@ def _vram_amd(device) -> Optional[int]:
                 vram_mb = int(vram_bits / 1024 / 1024)
                 return vram_mb
         return None
-    except:
+    except Exception:
         return None
 
 
@@ -101,7 +101,7 @@ def _populate_lspci_info(gpu: GPUInfo, device: str) -> GPUInfo:
         # We gather all data here and parse whatever data we have. Subsystem data may not be returned.
     except Exception as e:
         # lspci may not be available in some distros
-        raise e
+        raise
 
     data = {}
     for line in lspci_output.splitlines():

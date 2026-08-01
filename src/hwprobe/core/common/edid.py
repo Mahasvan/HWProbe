@@ -83,15 +83,14 @@ def parse_edid(edid_data: bytes) -> DisplayModuleInfo:
 
     for block_start in range(0x36, 0x6d, 18):
         block = edid_data[block_start:block_start + 18]
-        zeros = 0x00.to_bytes(1, byteorder='little') * 2
-        if block[:2] == zeros:
+        if block[:2] == b"\x00\x00":
             tag = block[3]
             if tag in DESCRIPTOR_TAG_ENUM:
                 # Refer to DESCRIPTOR_TAG_ENUM for valid block type codes
                 if tag == 0xFF:
                     # todo: test if this works
                     module.serial_number = block[5:].decode("ascii").strip()
-                if tag == 0xFC:
+                elif tag == 0xFC:
                     module.name = block[5:].decode("ascii").strip()
 
         else:

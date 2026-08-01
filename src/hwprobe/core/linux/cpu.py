@@ -55,7 +55,7 @@ def _cpu_threads(raw_cpu_info: str) -> Optional[int]:
     try:
         count = len(re.findall(r"^processor\s+:", raw_cpu_info, re.MULTILINE))
         return count if count > 0 else None
-    except:
+    except Exception:
         return None
 
 

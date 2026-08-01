@@ -53,7 +53,7 @@ def fetch_cpu_info() -> CPUInfo:
 
     try:
         bitness_64 = subprocess.check_output(["sysctl", "hw.cpu64bit_capable"]).decode()
-        bitness_64 = True if bitness_64.split(": ")[1].strip() == "1" else False
+        bitness_64 = bitness_64.split(": ")[1].strip() == "1"
 
         if bitness_64:
             cpu_info.bitness = 64
@@ -125,10 +125,10 @@ def fetch_cpu_info() -> CPUInfo:
     if "arm" in arch.lower():
         try:
             sme_presence = subprocess.check_output(["sysctl", "hw.optional.arm.FEAT_SME"]).decode()
-            sme_presence = True if sme_presence.split(": ")[1].strip() == "1" else False
+            sme_presence = sme_presence.split(": ")[1].strip() == "1"
 
             sme2_presence = subprocess.check_output(["sysctl", "hw.optional.arm.FEAT_SME2"]).decode()
-            sme2_presence = True if sme2_presence.split(": ")[1].strip() == "1" else False
+            sme2_presence = sme2_presence.split(": ")[1].strip() == "1"
 
             if sme_presence or sme2_presence:
                 cpu_info.arch_version = "9"

@@ -80,10 +80,14 @@ def _get_bsd_interface_apple_silicon(item: dict, driver: str = "AppleBCMWLANCore
     Tries the AppleBCMWLANCore path first, then falls back to the
     AppleWLANDriver (Wi-Fi 7 / Skywalk STA) path.
     """
-    if driver == "AppleBCMWLANCore":
-        return _traverse_ioreg(item, _STEPS_BCM_WLAN)
-    elif driver == "AppleWLANDriver":
-        _traverse_ioreg(item, _STEPS_WLAN_DRIVER)
+    mapping = {
+        "AppleBCMWLANCore": _STEPS_BCM_WLAN,
+        "AppleWLANDriver": _STEPS_WLAN_DRIVER,
+        # Add to this if more drivers are supported
+    }
+
+    if driver in mapping:
+        return _traverse_ioreg(item, mapping[driver])
 
     return (
             _traverse_ioreg(item, _STEPS_BCM_WLAN)
@@ -101,12 +105,12 @@ def _fetch_airport_details() -> Dict[str, NICInfo]:
 
     res = {}
 
-    for item in plist:
-        io_name_pattern = re.compile(r"pci([0-9a-fA-F]{4}),([0-9a-fA-F]{4})")
+    io_name_pattern = re.compile(r"pci([0-9a-fA-F]{4}),([0-9a-fA-F]{4})")
 
+    for item in plist:
         driver = item.get("IORegistryEntryName")
 
-        if not driver: return res
+        if not driver: continue
 
         if driver == "AirPort_BrcmNIC":
             # Intel Macs, usually

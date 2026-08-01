@@ -15,7 +15,7 @@ def fetch_baseboard_info() -> BaseboardInfo:
     result = FetchSMBIOSData(byref(info))
 
     if result != STATUS_OK:
-        baseboard_info.status.type = StatusType.FAILURE
+        baseboard_info.status.type = StatusType.FAILED
         baseboard_info.status.messages.append("Failed to fetch SMBIOS hardware info for Baseboard")
         return baseboard_info
 
