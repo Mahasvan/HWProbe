@@ -2,7 +2,7 @@ import os
 import re
 from typing import Optional
 
-from hwprobe.core.common.edid import parse_edid, INTERFACE_ENUM
+from hwprobe.core.common.edid import INTERFACE_ENUM, parse_edid
 from hwprobe.core.linux.common import pci_path_linux
 from hwprobe.models.display_models import DisplayInfo, DisplayModuleInfo
 from hwprobe.models.status_models import StatusType
@@ -10,16 +10,16 @@ from hwprobe.models.status_models import StatusType
 _PCI_BDF_PATTERN = re.compile(r"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]$")
 
 DRM_CONNECTOR_TYPE = {
-    "eDP":    INTERFACE_ENUM[5],  # DisplayPort
-    "DP":     INTERFACE_ENUM[5],  # DisplayPort
+    "eDP": INTERFACE_ENUM[5],  # DisplayPort
+    "DP": INTERFACE_ENUM[5],  # DisplayPort
     "HDMI-A": INTERFACE_ENUM[2],  # HDMI
     "HDMI-B": INTERFACE_ENUM[3],  # HDMI (B)
-    "DVI-D":  INTERFACE_ENUM[1],  # DVI
-    "DVI-I":  INTERFACE_ENUM[1],  # DVI
-    "DVI-A":  INTERFACE_ENUM[1],  # DVI
-    "VGA":    "Analog",
-    "LVDS":   "LVDS",
-    "DSI":    "DSI",
+    "DVI-D": INTERFACE_ENUM[1],  # DVI
+    "DVI-I": INTERFACE_ENUM[1],  # DVI
+    "DVI-A": INTERFACE_ENUM[1],  # DVI
+    "VGA": "Analog",
+    "LVDS": "LVDS",
+    "DSI": "DSI",
 }
 
 
@@ -41,7 +41,8 @@ def _parse_connector_type(device_path: str) -> Optional[str]:
 
 def _fetch_individual_monitor_info(device_path: str) -> Optional[DisplayModuleInfo]:
     edid_path = os.path.join(device_path, "edid")
-    if not os.path.exists(edid_path): return None
+    if not os.path.exists(edid_path):
+        return None
     parent_path = os.path.join(device_path, "device")
 
     # todo: populate parent graphics card info
@@ -49,7 +50,8 @@ def _fetch_individual_monitor_info(device_path: str) -> Optional[DisplayModuleIn
 
     with open(edid_path, "rb") as f:
         edid_data = f.read()
-    if len(edid_data) == 0: return None
+    if len(edid_data) == 0:
+        return None
 
     monitor_data = parse_edid(edid_data)
 
@@ -63,7 +65,7 @@ def _fetch_individual_monitor_info(device_path: str) -> Optional[DisplayModuleIn
 
     acpi_file = os.path.join(device_path, "firmware_node", "path")
     if os.path.exists(acpi_file):
-        with open(acpi_file, "r") as f:
+        with open(acpi_file) as f:
             monitor_data.acpi_path = f.read().strip()
 
     return monitor_data
@@ -91,6 +93,6 @@ def fetch_display_info():
                     display_info.modules.append(response)
             except Exception as e:
                 display_info.status.type = StatusType.PARTIAL
-                display_info.status.messages.append(f"Display Info ({child}): {str(e)}")
+                display_info.status.messages.append(f"Display Info ({child}): {e!s}")
 
     return display_info

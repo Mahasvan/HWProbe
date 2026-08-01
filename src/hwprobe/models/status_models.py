@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -28,8 +27,9 @@ class Status(BaseModel):
     Describes the status of an individual component.
     If the status is ``PARTIAL`` or ``FAILED``, there may be messages that describe the error(s).
     """
+
     type: StatusType = Field(default_factory=lambda: StatusType.SUCCESS)
-    messages: List[str] = Field(default_factory=list)
+    messages: list[str] = Field(default_factory=list)
 
     def make_partial(self, message: str = None) -> None:
         """
@@ -39,7 +39,8 @@ class Status(BaseModel):
         :meta private:
         """
         self.type = StatusType.PARTIAL
-        if message: self.messages.append(message)
+        if message:
+            self.messages.append(message)
 
 
 """

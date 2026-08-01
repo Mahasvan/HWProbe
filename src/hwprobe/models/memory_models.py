@@ -1,8 +1,9 @@
-from typing import List, Optional
+from typing import Optional
+
+from pydantic import BaseModel, Field
 
 from hwprobe.models.component_model import ComponentInfo
 from hwprobe.models.size_models import StorageSize
-from pydantic import BaseModel, Field
 
 
 class MemoryModuleSlot(BaseModel):
@@ -29,4 +30,4 @@ class MemoryModuleInfo(BaseModel):
 
 
 class MemoryInfo(ComponentInfo):
-    modules: List[MemoryModuleInfo] = Field(default_factory=list)
+    modules: list[MemoryModuleInfo] = Field(default_factory=list)

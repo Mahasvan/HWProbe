@@ -37,8 +37,6 @@ def format_pci_path(raw_path: str) -> str:
             device = full_val >> 8
             function = full_val & 0xFF
             prefix = pci_match.group(1)
-            formatted_parts.append(
-                f"{prefix[0].upper() + prefix[1:].lower()}(0x{device:X},0x{function:X})"
-            )
+            formatted_parts.append(f"{prefix[0].upper() + prefix[1:].lower()}(0x{device:X},0x{function:X})")
 
     return "/".join(formatted_parts)

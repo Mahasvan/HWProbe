@@ -1,8 +1,9 @@
-from typing import List, Optional
+from typing import Optional
+
+from pydantic import BaseModel, Field
 
 from hwprobe.models.component_model import ComponentInfo
 from hwprobe.models.size_models import StorageSize
-from pydantic import BaseModel, Field
 
 
 class DiskInfo(BaseModel):
@@ -32,4 +33,4 @@ class DiskInfo(BaseModel):
 
 
 class StorageInfo(ComponentInfo):
-    modules: List[DiskInfo] = Field(default_factory=list)
+    modules: list[DiskInfo] = Field(default_factory=list)

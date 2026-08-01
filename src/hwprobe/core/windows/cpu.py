@@ -2,7 +2,6 @@ import ctypes
 import os
 import winreg
 from ctypes import wintypes
-from typing import List
 
 from hwprobe.core.windows.win_enum import FEATURE_ID_MAP
 from hwprobe.models.cpu_models import CPUInfo
@@ -26,13 +25,13 @@ def is_processor_feature_present(feature_id: int) -> bool:
 def get_arm_version() -> str:
     """
     We use instructions that were introduced in different ARM versions to determine the ARM version.
-    
+
     Introduced in ARMv9:
     - SVE2 - FEAT_SSVE_FP8DOT2 (78), FEAT_SSVE_FP8DOT4 (79), and FEAT_SSVE_FP8FMA (80)
-    
+
     Introduced in ARMv8:
     - Full AArch64 Instructions - FEAT_SME_FA64 (88)
-    
+
     Otherwise
     - we can assume it's ARMv7 or lower.
     """
@@ -44,11 +43,11 @@ def get_arm_version() -> str:
         return "7 or lower"
 
 
-def get_features() -> List[str]:
+def get_features() -> list[str]:
     """
     We use the Win32 API function IsProcessorFeaturePresent to check for SSE features.
     https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocessorfeaturepresent
-    
+
     Feature IDs:
     - SSE - 6
     - SSE2 - 10
@@ -70,12 +69,7 @@ def parse_registry():
     model_key = "ProcessorNameString"
     vendor_key = "VendorIdentifier"
 
-    with winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            key_path,
-            0,
-            winreg.KEY_READ
-    ) as key:
+    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path, 0, winreg.KEY_READ) as key:
         model_name, _ = winreg.QueryValueEx(key, model_key)
         vendor, _ = winreg.QueryValueEx(key, vendor_key)
         return model_name, vendor
@@ -125,14 +119,9 @@ def get_core_count() -> int:
     count = buffer_size.value // ctypes.sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION)
     buffer = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION * count)()
 
-    ctypes.windll.kernel32.GetLogicalProcessorInformation(
-        buffer,
-        ctypes.byref(buffer_size)
-    )
+    ctypes.windll.kernel32.GetLogicalProcessorInformation(buffer, ctypes.byref(buffer_size))
 
-    physical_cores = sum(
-        1 for info in buffer if info.Relationship == RelationProcessorCore
-    )
+    physical_cores = sum(1 for info in buffer if info.Relationship == RelationProcessorCore)
 
     return physical_cores
 

@@ -1,10 +1,11 @@
 import ctypes
 
 from hwprobe.core.windows.common import format_acpi_path, format_pci_path
+
 # todo: refactor to new bindings
 from hwprobe.interops.win.legacy.constants import STATUS_OK
 from hwprobe.interops.win.legacy.signatures import GetNetworkHardwareInfo
-from hwprobe.models.network_models import NICInfo, NetworkInfo
+from hwprobe.models.network_models import NetworkInfo, NICInfo
 from hwprobe.models.status_models import Status, StatusType
 from hwprobe.util.location_paths import get_location_paths
 
@@ -21,9 +22,7 @@ def fetch_network_info_fast() -> NetworkInfo:
     # the method couldn't execute successfully
     if res != STATUS_OK:
         network_info.status.type = StatusType.FAILED
-        network_info.status.messages.append(
-            f"Network HW info query failed with status code: {res}"
-        )
+        network_info.status.messages.append(f"Network HW info query failed with status code: {res}")
         return network_info
 
     decoded = raw_data.value.decode("utf-8", errors="ignore").strip()
@@ -47,9 +46,7 @@ def fetch_network_info_fast() -> NetworkInfo:
 
         if not pnp_device_id or not manufacturer or not name:
             network_info.status.type = StatusType.PARTIAL
-            network_info.status.messages.append(
-                "Missing PNPDeviceID for network interface; skipping"
-            )
+            network_info.status.messages.append("Missing PNPDeviceID for network interface; skipping")
             continue
 
         if "VEN_" in pnp_device_id and "DEV_" in pnp_device_id:
@@ -60,9 +57,7 @@ def fetch_network_info_fast() -> NetworkInfo:
             module.device_id = pnp_device_id.split("PID_")[1][:4]
         else:
             network_info.status.type = StatusType.PARTIAL
-            network_info.status.messages.append(
-                f"Could not parse Vendor/Device ID from PNPDeviceID: {pnp_device_id}"
-            )
+            network_info.status.messages.append(f"Could not parse Vendor/Device ID from PNPDeviceID: {pnp_device_id}")
 
         loc = get_location_paths(pnp_device_id)
 

@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path('..', 'src').resolve()))
+sys.path.insert(0, str(Path("..", "src").resolve()))
 
 # Mock platform-specific dependencies so autodoc works off-host
 autodoc_mock_imports = []
@@ -23,12 +23,7 @@ if sys.platform != "win32":
     ]
 
 if sys.platform != "darwin":
-    autodoc_mock_imports += [
-        "objc",
-        "CoreFoundation",
-        "Foundation",
-        "PyObjCTools"
-    ]
+    autodoc_mock_imports += ["objc", "CoreFoundation", "Foundation", "PyObjCTools"]
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -41,9 +36,9 @@ if sys.platform != "darwin":
 
 import hwprobe
 
-project = 'HWProbe'
-copyright = '2025, Mahasvan Mohan'
-author = 'Mahasvan Mohan'
+project = "HWProbe"
+copyright = "2025, Mahasvan Mohan"
+author = "Mahasvan Mohan"
 release = hwprobe.__version__
 
 autodoc_class_signature = "separated"
@@ -55,25 +50,25 @@ autodoc_pydantic_settings_show_json = False
 autoclass_content = "class"
 
 autodoc_default_options = {
-    'member-order': 'bysource',
-    'special-members': '__init__',
-    'undoc-members': True,
-    'exclude-members': '__weakref__, __init___'
+    "member-order": "bysource",
+    "special-members": "__init__",
+    "undoc-members": True,
+    "exclude-members": "__weakref__, __init___",
 }
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinxcontrib.autodoc_pydantic',
+    "sphinx.ext.autodoc",
+    "sphinxcontrib.autodoc_pydantic",
 ]
 
-templates_path = ['_templates']
+templates_path = ["_templates"]
 exclude_patterns = []
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'alabaster'
-html_static_path = ['_static']
+html_theme = "alabaster"
+html_static_path = ["_static"]

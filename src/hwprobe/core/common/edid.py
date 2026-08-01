@@ -1,13 +1,6 @@
 from hwprobe.models.display_models import DisplayModuleInfo, ResolutionInfo
 
-BIT_DEPTH_ENUM = {
-    1: 6,
-    2: 8,
-    3: 10,
-    4: 12,
-    5: 14,
-    6: 16
-}
+BIT_DEPTH_ENUM = {1: 6, 2: 8, 3: 10, 4: 12, 5: 14, 6: 16}
 
 INTERFACE_ENUM = {
     0: "Undefined",
@@ -15,7 +8,7 @@ INTERFACE_ENUM = {
     2: "HDMI",  # Standard HDMI-A
     3: "HDMI (B)",
     4: "MDDI",
-    5: "DisplayPort"
+    5: "DisplayPort",
 }
 
 DESCRIPTOR_TAG_ENUM = {
@@ -72,8 +65,8 @@ def parse_edid(edid_data: bytes) -> DisplayModuleInfo:
     if input_type >> 7 == 1:  # MSB is 1 => Digital output
         if edid_version >= (1, 4):
             module.resolution.bit_depth = BIT_DEPTH_ENUM.get(
-                _get_bits(input_type.to_bytes(1, byteorder="little"), 1, 4),
-                0)
+                _get_bits(input_type.to_bytes(1, byteorder="little"), 1, 4), 0
+            )
             module.interface = INTERFACE_ENUM.get(input_type & 7, "Unknown")
     else:
         module.interface = "Analog"
@@ -81,21 +74,21 @@ def parse_edid(edid_data: bytes) -> DisplayModuleInfo:
     resolution = (0, 0, 0)  # Width, Height, Refresh Rate
     # We will use this tuple to find the max resolution and refresh rate, and update it in `module.resolution`.
 
-    for block_start in range(0x36, 0x6d, 18):
-        block = edid_data[block_start:block_start + 18]
-        zeros = 0x00.to_bytes(1, byteorder='little') * 2
-        if block[:2] == zeros:
+    for block_start in range(0x36, 0x6D, 18):
+        block = edid_data[block_start : block_start + 18]
+        if block[:2] == b"\x00\x00":
             tag = block[3]
             if tag in DESCRIPTOR_TAG_ENUM:
                 # Refer to DESCRIPTOR_TAG_ENUM for valid block type codes
                 if tag == 0xFF:
                     # todo: test if this works
                     module.serial_number = block[5:].decode("ascii").strip()
-                if tag == 0xFC:
+                elif tag == 0xFC:
                     module.name = block[5:].decode("ascii").strip()
 
         else:
-            if not module.resolution: continue
+            if not module.resolution:
+                continue
 
             pixel_clock_hz = (block[0] | (block[1] << 8)) * 10_000
 
@@ -106,11 +99,7 @@ def parse_edid(edid_data: bytes) -> DisplayModuleInfo:
             v_blank = ((block[7] & 0x0F) << 8) | block[6]
             refresh_rate = pixel_clock_hz / ((horiz + h_blank) * (vert + v_blank))
 
-            resolution = max(
-                resolution,
-                (horiz, vert, round(refresh_rate, 2)),
-                key=lambda x: (x[0] * x[1], x[2])
-            )
+            resolution = max(resolution, (horiz, vert, round(refresh_rate, 2)), key=lambda x: (x[0] * x[1], x[2]))
 
     if resolution != (0, 0, 0):
         if not module.resolution:
@@ -124,5 +113,6 @@ def parse_edid(edid_data: bytes) -> DisplayModuleInfo:
     #     print(f"{byte:02X}", end=" ")
 
     return module
+
 
 # todo: parse extension blocks

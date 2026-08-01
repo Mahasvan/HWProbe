@@ -1,8 +1,7 @@
 import subprocess
-from typing import Tuple
 
 
-def fetch_gpu_details_nvidia(device: str) -> Tuple[str, int, int, int]:
+def fetch_gpu_details_nvidia(device: str) -> tuple[str, int, int, int]:
     """
     :param device: format: <domain>:<bus>:<slot>.<function>
     :return: GPU name, PCI Width, PCI Gen, Total VRAM in MB
@@ -11,12 +10,7 @@ def fetch_gpu_details_nvidia(device: str) -> Tuple[str, int, int, int]:
     # Fields: Name, PCIe Width, PCIe Gen, Memory Total
     query_fields = "name,pcie.link.width.current,pcie.link.gen.current,memory.total"
 
-    command = [
-        "nvidia-smi",
-        f"--id={device}",
-        f"--query-gpu={query_fields}",
-        "--format=csv,noheader,nounits"
-    ]
+    command = ["nvidia-smi", f"--id={device}", f"--query-gpu={query_fields}", "--format=csv,noheader,nounits"]
 
     # Run the command
     result = subprocess.run(command, capture_output=True, text=True)
@@ -27,7 +21,7 @@ def fetch_gpu_details_nvidia(device: str) -> Tuple[str, int, int, int]:
 
     # Parse output (Expected: "Name, Width, Gen, Memory")
     output = result.stdout.strip()
-    parts = output.split(',')
+    parts = output.split(",")
 
     # Validate we got exactly 4 fields back
     if len(parts) != 4:

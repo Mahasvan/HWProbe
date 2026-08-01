@@ -10,7 +10,8 @@ from hwprobe.models.status_models import Status
 def _enrich_with_sysfs_info(nic: NICInfo, status: Status) -> None:
     """Helper to read hardware details directly from Linux sysfs."""
     interface_name = nic.interface
-    if not interface_name: return
+    if not interface_name:
+        return
 
     # todo: pci.ids file may be locally stored in Linux distros.
     # When a scraper-parser is made, make use of this, to get device name.
@@ -22,20 +23,20 @@ def _enrich_with_sysfs_info(nic: NICInfo, status: Status) -> None:
         raise ValueError(f"Interface is virtual: {interface_name}")
 
     try:
-        with open(f"{base_path}/vendor", "r") as f:
+        with open(f"{base_path}/vendor") as f:
             nic.vendor_id = f.read().strip()
             # todo: Manufacturer
     except FileNotFoundError:
         status.make_partial(f"Vendor ID not found for interface {interface_name}")
 
     try:
-        with open(f"{base_path}/device", "r") as f:
+        with open(f"{base_path}/device") as f:
             nic.device_id = f.read().strip()
     except FileNotFoundError:
         status.make_partial(f"Device ID not found for interface {interface_name}")
 
     try:
-        with open(f"{base_path}/firmware_node/path", "r") as f:
+        with open(f"{base_path}/firmware_node/path") as f:
             nic.acpi_path = f.read().strip()
     except FileNotFoundError:
         status.make_partial(f"Path not found for interface {interface_name}")
@@ -58,6 +59,8 @@ def _fetch_ip_data() -> NetworkInfo:
     for row in data:
         nic = NICInfo()
         ifname = row.get("ifname")
+        if not ifname:
+            continue
 
         nic.interface = ifname
         nic.type = row.get("link_type")

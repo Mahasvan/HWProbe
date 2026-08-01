@@ -1,18 +1,18 @@
 import ctypes
 import struct
-from ctypes import py_object, addressof
+from ctypes import addressof, py_object
 
-import hwprobe.core.windows.display as display
 import pytest
+
+from hwprobe.core.windows import display
 from hwprobe.interops.win.legacy.constants import (
-    STATUS_OK,
-    STATUS_NOK,
-    STATUS_INVALID_ARG,
     STATUS_FAILURE,
+    STATUS_INVALID_ARG,
+    STATUS_NOK,
+    STATUS_OK,
 )
 from hwprobe.models.display_models import DisplayInfo
 from hwprobe.models.status_models import StatusType
-
 
 # ============================================================
 # Helpers
@@ -36,9 +36,9 @@ def build_minimal_edid(name=b"TEST-MONITOR", width_cm=60, height_cm=34):
     edid[21] = width_cm
     edid[22] = height_cm
     off = 54
-    edid[off: off + 4] = b"\x00\x00\x00\xfc"
+    edid[off : off + 4] = b"\x00\x00\x00\xfc"
     edid[off + 4] = 0x00
-    edid[off + 5: off + 5 + len(name)] = name
+    edid[off + 5 : off + 5 + len(name)] = name
     edid[off + 5 + len(name)] = 0x0A
     return bytes(edid), vendor
 
@@ -49,7 +49,6 @@ def build_minimal_edid(name=b"TEST-MONITOR", width_cm=60, height_cm=34):
 
 
 class TestAspectRatios:
-
     @pytest.mark.parametrize(
         "width,height,real,friendly",
         [
@@ -86,7 +85,6 @@ class TestAspectRatios:
 
 
 class TestEDIDParsing:
-
     def test_minimal_edid(self):
         edid, vendor = build_minimal_edid()
         parsed = display.parse_edid(edid)
@@ -113,21 +111,15 @@ class TestEDIDParsing:
         def mockfail_SetupDiGetClassDevsA(cGuidPtr, enumerator, hwndParent, flags):
             return -1  # simulate failure
 
-        monkeypatch.setattr(
-            display, "SetupDiGetClassDevsA", mockfail_SetupDiGetClassDevsA
-        )
+        monkeypatch.setattr(display, "SetupDiGetClassDevsA", mockfail_SetupDiGetClassDevsA)
 
         assert display.get_edid_by_hwid(None) is None
 
     def test_device_interfaces_enum_fail(self, monkeypatch):
-        def mockfail_SetupDiEnumDeviceInterfaces(
-                hDev, devData, cGuidPtr, memberIdx, devIntData
-        ):
+        def mockfail_SetupDiEnumDeviceInterfaces(hDev, devData, cGuidPtr, memberIdx, devIntData):
             return False
 
-        monkeypatch.setattr(
-            display, "SetupDiEnumDeviceInterfaces", mockfail_SetupDiEnumDeviceInterfaces
-        )
+        monkeypatch.setattr(display, "SetupDiEnumDeviceInterfaces", mockfail_SetupDiEnumDeviceInterfaces)
 
         assert display.get_edid_by_hwid(None) is None
 
@@ -165,15 +157,12 @@ def fake_win32(monkeypatch):
 
 
 class TestMonitorEnumProc:
-
     def test_happy_path(self, fake_win32, monkeypatch):
         monitors = DisplayInfo()
         monitors_ptr = py_object(monitors)
         lparam = addressof(monitors_ptr)
 
-        monkeypatch.setattr(
-            display, "find_monitor_gpu", lambda name: ("GPU-0", STATUS_OK)
-        )
+        monkeypatch.setattr(display, "find_monitor_gpu", lambda name: ("GPU-0", STATUS_OK))
         monkeypatch.setattr(
             display,
             "get_edid_by_hwid",
@@ -207,9 +196,7 @@ class TestMonitorEnumProc:
         monitors_ptr = py_object(monitors)
         lparam = addressof(monitors_ptr)
 
-        monkeypatch.setattr(
-            display, "find_monitor_gpu", lambda name: (None, STATUS_NOK)
-        )
+        monkeypatch.setattr(display, "find_monitor_gpu", lambda name: (None, STATUS_NOK))
         monkeypatch.setattr(display, "get_edid_by_hwid", lambda hwid: None)
 
         ret = display.monitor_enum_proc(1, 0, None, lparam)
@@ -235,7 +222,6 @@ class TestMonitorEnumProc:
 
 
 class TestDisplayInfoFetch:
-
     def test_fetch_display_info_internal_real(self):
         monitors = display.fetch_display_info_internal()
 
@@ -263,9 +249,7 @@ class TestDisplayInfoFetch:
         def mockfail_EnumDisplayMonitors(hdc, lprcClip, lpfnEnum, dwData):
             return False
 
-        monkeypatch.setattr(
-            display, "EnumDisplayMonitors", mockfail_EnumDisplayMonitors
-        )
+        monkeypatch.setattr(display, "EnumDisplayMonitors", mockfail_EnumDisplayMonitors)
 
         assert display.fetch_display_info_internal().status.type == StatusType.FAILED
 
@@ -279,9 +263,7 @@ class TestDisplayInfoFetch:
             (-1, "Unknown"),
         ],
     )
-    def test_fetch_display_info_internal_orientations(
-            self, orientation, expected, monkeypatch
-    ):
+    def test_fetch_display_info_internal_orientations(self, orientation, expected, monkeypatch):
         def fake_EnumDisplaySettingsA(device, mode, dm_ptr):
             dm = deref(dm_ptr, display.DEVMODEA)
             dm.dmPelsWidth = 2560
@@ -310,10 +292,7 @@ class TestDisplayInfoFetch:
         data = display.fetch_display_info_internal()
 
         assert data.status.type == StatusType.FAILED
-        assert (
-                data.status.messages[0]
-                == "Failed to fetch Display device information, PNPDeviceID is empty!"
-        )
+        assert data.status.messages[0] == "Failed to fetch Display device information, PNPDeviceID is empty!"
 
 
 class TestGPU:
@@ -326,22 +305,20 @@ class TestGPU:
             (b"", ctypes.create_string_buffer(256), 256, STATUS_INVALID_ARG),
             (b"\\\\.\\DISPLAY1", None, 256, STATUS_INVALID_ARG),
             (
-                    b"\\\\.\\DISPLAY1",
-                    ctypes.create_string_buffer(256),
-                    0,
-                    STATUS_INVALID_ARG,
+                b"\\\\.\\DISPLAY1",
+                ctypes.create_string_buffer(256),
+                0,
+                STATUS_INVALID_ARG,
             ),
             (
-                    b"\\\\.\\DISPLAY420",
-                    ctypes.create_string_buffer(256),
-                    256,
-                    STATUS_FAILURE,
+                b"\\\\.\\DISPLAY420",
+                ctypes.create_string_buffer(256),
+                256,
+                STATUS_FAILURE,
             ),
         ],
     )
-    def test_fetch_display_info_gpu_display(
-            self, enc_name, out_buf, buf_size, exp_status, monkeypatch
-    ):
+    def test_fetch_display_info_gpu_display(self, enc_name, out_buf, buf_size, exp_status, monkeypatch):
         def mock_find_monitor_gpu(device_name):
             res = display.GetGPUForDisplay(enc_name, out_buf, buf_size)
             result = (None, res)
@@ -368,9 +345,7 @@ class TestGPU:
             (STATUS_FAILURE, STATUS_FAILURE),
         ],
     )
-    def test_fetch_display_info_gpu_display_failures(
-            self, set_status, exp_status, monkeypatch
-    ):
+    def test_fetch_display_info_gpu_display_failures(self, set_status, exp_status, monkeypatch):
         def mockfail_GetGPUForDisplay(enc_name, out_buf, buf_size):
             return set_status  # Simulate failure
 

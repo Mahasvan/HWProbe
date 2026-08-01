@@ -4,12 +4,12 @@ import subprocess
 from unittest.mock import mock_open
 
 from hwprobe.core.linux.graphics import (
-    _vram_amd,
-    _pcie_gen,
     _check_gpu_class,
+    _pcie_gen,
     _populate_amd_info,
-    _populate_nvidia_info,
     _populate_lspci_info,
+    _populate_nvidia_info,
+    _vram_amd,
     fetch_graphics_info,
 )
 from hwprobe.models.gpu_models import GPUInfo
@@ -75,7 +75,7 @@ class TestVramAmd:
         monkeypatch.setattr("glob.glob", lambda x: [vram_path])
 
         def mock_open_func(file, *args, **kwargs):
-            raise IOError("Read error")
+            raise OSError("Read error")
 
         monkeypatch.setattr(builtins, "open", mock_open_func)
 
@@ -212,7 +212,7 @@ class TestPcieGen:
         monkeypatch.setattr(os.path, "exists", lambda x: x == path)
 
         def mock_open_func(file, *args, **kwargs):
-            raise IOError("Read error")
+            raise OSError("Read error")
 
         monkeypatch.setattr(builtins, "open", mock_open_func)
 
@@ -314,9 +314,7 @@ class TestPopulateNvidiaInfo:
 
         def mock_run(command, *args, **kwargs):
             if command[0] == "nvidia-smi":
-                return subprocess.CompletedProcess(
-                    command, 0, stdout="GeForce RTX 3080, 16, 4, 10240\n"
-                )
+                return subprocess.CompletedProcess(command, 0, stdout="GeForce RTX 3080, 16, 4, 10240\n")
             return subprocess.CompletedProcess(command, 1)
 
         monkeypatch.setattr(subprocess, "run", mock_run)
@@ -378,10 +376,7 @@ class TestPopulateLspciInfo:
 
         def mock_run(command, *args, **kwargs):
             if command[0] == "lspci":
-                output = (
-                    "Vendor:\tIntel Corporation\n"
-                    "Device:\tUHD Graphics 620\n"
-                )
+                output = "Vendor:\tIntel Corporation\nDevice:\tUHD Graphics 620\n"
                 return subprocess.CompletedProcess(command, 0, stdout=output)
             return subprocess.CompletedProcess(command, 1)
 
@@ -432,7 +427,7 @@ class TestFetchGraphicsInfo:
             "device": "0x5917",
             "current_link_width": "0",
             "current_link_speed": "8.0 GT/s",
-            "firmware_node/path": "\\_SB.PCI0.GFX0"
+            "firmware_node/path": "\\_SB.PCI0.GFX0",
         }
 
         def custom_open(path, *args, **kwargs):
@@ -444,16 +439,11 @@ class TestFetchGraphicsInfo:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", custom_open)
-        monkeypatch.setattr("hwprobe.core.linux.graphics.pci_path_linux", lambda x: f"PciRoot(0x0)/Pci(0x2,0x0)")
+        monkeypatch.setattr("hwprobe.core.linux.graphics.pci_path_linux", lambda x: "PciRoot(0x0)/Pci(0x2,0x0)")
 
         def mock_run(command, *args, **kwargs):
             if command[0] == "lspci":
-                output = (
-                    "Vendor:\tIntel Corporation\n"
-                    "Device:\tUHD Graphics 620\n"
-                    "SVendor:\tLenovo\n"
-                    "SDevice:\tThinkPad\n"
-                )
+                output = "Vendor:\tIntel Corporation\nDevice:\tUHD Graphics 620\nSVendor:\tLenovo\nSDevice:\tThinkPad\n"
                 return subprocess.CompletedProcess(command, 0, stdout=output)
             return subprocess.CompletedProcess(command, 1)
 
@@ -482,7 +472,7 @@ class TestFetchGraphicsInfo:
             "device": "0x1c03",
             "current_link_width": "16",
             "current_link_speed": "8.0 GT/s",
-            "firmware_node/path": "\\_SB.PCI0.PEG0.PEGP"
+            "firmware_node/path": "\\_SB.PCI0.PEG0.PEGP",
         }
 
         def custom_open(path, *args, **kwargs):
@@ -524,7 +514,7 @@ class TestFetchGraphicsInfo:
             "device": "0x731f",
             "current_link_width": "16",
             "current_link_speed": "16.0 GT/s",
-            "firmware_node/path": "\\_SB.PCI0.PEG0.PEGP"
+            "firmware_node/path": "\\_SB.PCI0.PEG0.PEGP",
         }
 
         def custom_open(path, *args, **kwargs):
@@ -540,8 +530,7 @@ class TestFetchGraphicsInfo:
         monkeypatch.setattr(builtins, "open", custom_open)
         monkeypatch.setattr("hwprobe.core.linux.graphics.pci_path_linux", lambda x: "PciRoot(0x0)/Pci(0x3,0x0)")
         monkeypatch.setattr(
-            "glob.glob",
-            lambda x: ["/sys/bus/pci/devices/0000:03:00.0/drm/card0/device/mem_info_vram_total"]
+            "glob.glob", lambda x: ["/sys/bus/pci/devices/0000:03:00.0/drm/card0/device/mem_info_vram_total"]
         )
 
         def mock_run(command, *args, **kwargs):
@@ -591,10 +580,10 @@ class TestFetchGraphicsInfo:
             if filename == "class":
                 return mock_open(read_data="0x030000")()
             if filename == "vendor":
-                raise IOError("Permission denied")
+                raise OSError("Permission denied")
             if filename == "device":
                 return mock_open(read_data="0x1234")()
-            raise IOError("File not found")
+            raise OSError("File not found")
 
         monkeypatch.setattr(builtins, "open", custom_open)
 
@@ -651,7 +640,7 @@ class TestFetchGraphicsInfo:
             "device": "0x5917",
             "current_link_width": "0",
             "current_link_speed": "8.0 GT/s",
-            "firmware_node/path": "\\_SB.PCI0.GFX0"
+            "firmware_node/path": "\\_SB.PCI0.GFX0",
         }
 
         def custom_open(path, *args, **kwargs):
@@ -688,7 +677,7 @@ class TestFetchGraphicsInfo:
             "device": "0x1c03",
             "current_link_width": "16",
             "current_link_speed": "8.0 GT/s",
-            "firmware_node/path": "\\_SB.PCI0.PEG0.PEGP"
+            "firmware_node/path": "\\_SB.PCI0.PEG0.PEGP",
         }
 
         def custom_open(path, *args, **kwargs):
@@ -728,7 +717,7 @@ class TestFetchGraphicsInfo:
             "device": "0x5917",
             "current_link_width": "0",
             "current_link_speed": "8.0 GT/s",
-            "firmware_node/path": "\\_SB.PCI0.GFX0"
+            "firmware_node/path": "\\_SB.PCI0.GFX0",
         }
 
         def custom_open(path, *args, **kwargs):
@@ -766,7 +755,7 @@ class TestFetchGraphicsInfo:
             "vendor": "0x8086",
             "device": "0x5917",
             "current_link_width": "0",
-            "firmware_node/path": "\\_SB.PCI0.GFX0"
+            "firmware_node/path": "\\_SB.PCI0.GFX0",
         }
 
         def custom_open(path, *args, **kwargs):
@@ -795,7 +784,7 @@ class TestFetchGraphicsInfo:
 
         def custom_open(path, *args, **kwargs):
             if "class" in path:
-                raise IOError("Permission denied")
+                raise OSError("Permission denied")
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", custom_open)

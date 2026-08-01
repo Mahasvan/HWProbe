@@ -1,11 +1,11 @@
-import hwprobe.core.windows.network as network
 import pytest
+
+from hwprobe.core.windows import network
 from hwprobe.interops.win.legacy.constants import (
     STATUS_FAILURE,
 )
-from hwprobe.models.network_models import NICInfo, NetworkInfo
+from hwprobe.models.network_models import NetworkInfo, NICInfo
 from hwprobe.models.status_models import StatusType
-
 
 # ============================================================
 # Helpers
@@ -37,9 +37,7 @@ class TestBasicParsing:
 
         assert network_info.status.type == StatusType.PARTIAL
         assert len(network_info.modules) == 2
-        assert (
-                network_info.modules[0].name == "Intel(R) Ethernet Connection (10) I219-V"
-        )
+        assert network_info.modules[0].name == "Intel(R) Ethernet Connection (10) I219-V"
         assert network_info.modules[1].manufacturer == "Realtek"
 
     def test_empty_response_returns_failed_status(self, monkeypatch):
@@ -79,9 +77,7 @@ class TestBasicParsing:
 
     def test_bad_vendor_device_id_format(self, monkeypatch):
         """Test handling of bad Vendor/Device ID format in PNPDeviceID"""
-        mock_output = (
-            "Manufacturer=Intel|PNPDeviceID=PCI\\INVALID_FORMAT|Name=Intel NIC\n"
-        )
+        mock_output = "Manufacturer=Intel|PNPDeviceID=PCI\\INVALID_FORMAT|Name=Intel NIC\n"
 
         def mock_func(buf, size):
             buf.value = mock_output.encode("utf-8")
@@ -95,10 +91,7 @@ class TestBasicParsing:
         assert network_info.modules[0].vendor_id is None
         assert network_info.modules[0].device_id is None
         assert network_info.status.type == StatusType.PARTIAL
-        assert any(
-            "Could not parse Vendor/Device ID" in msg
-            for msg in network_info.status.messages
-        )
+        assert any("Could not parse Vendor/Device ID" in msg for msg in network_info.status.messages)
 
     def test_missing_manufacturer_field(self, monkeypatch):
         """Test handling of missing Manufacturer field"""
@@ -147,9 +140,7 @@ class TestVendorDeviceParsing:
             ("USB\\VID_0525&PID_A4A5", "0525", "A4A5"),
         ],
     )
-    def test_parse_vendor_device_ids(
-            self, pnp_id, expected_vendor_id, expected_device_id, monkeypatch
-    ):
+    def test_parse_vendor_device_ids(self, pnp_id, expected_vendor_id, expected_device_id, monkeypatch):
         """Test parsing various vendor/device ID combinations"""
         mock_output = f"Manufacturer=Test|PNPDeviceID={pnp_id}|Name=Test Device\n"
 
@@ -243,9 +234,7 @@ class TestModelStructure:
 
     def test_nic_model_fields(self, monkeypatch):
         """Test that NICInfo model fields are correctly populated"""
-        mock_output = (
-            "Manufacturer=Intel|PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Test NIC\n"
-        )
+        mock_output = "Manufacturer=Intel|PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Test NIC\n"
 
         def mock_func(buf, size):
             buf.value = mock_output.encode("utf-8")
@@ -264,9 +253,7 @@ class TestModelStructure:
 
     def test_network_info_model_structure(self, monkeypatch):
         """Test that NetworkInfo model has correct structure"""
-        mock_output = (
-            "Manufacturer=Intel|PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Test NIC\n"
-        )
+        mock_output = "Manufacturer=Intel|PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Test NIC\n"
 
         def mock_func(buf, size):
             buf.value = mock_output.encode("utf-8")
@@ -310,9 +297,7 @@ class TestFunctionCallAndErrors:
         for i, mfg in enumerate(manufacturers):
             vendor = f"VEN_{0x8086 + i:04X}" if i == 0 else f"VEN_{0x10EC + i:04X}"
             device = f"DEV_{0x15B8 + i:04X}"
-            lines.append(
-                f"Manufacturer={mfg}|PNPDeviceID=PCI\\{vendor}&{device}|Name={mfg} NIC {i + 1}"
-            )
+            lines.append(f"Manufacturer={mfg}|PNPDeviceID=PCI\\{vendor}&{device}|Name={mfg} NIC {i + 1}")
         mock_output = "\n".join(lines) + "\n"
 
         def mock_func(buf, size):
@@ -368,28 +353,26 @@ class TestFunctionCallAndErrors:
         "pci_path, acpi_path, exp_pci_path, exp_acpi_path",
         [
             (
-                    "PCIROOT(0)#PCI(1D00)#PCI(0000)#PCI(0000)#PCI(0000)",
-                    "ACPI(_SB_)#ACPI(PCI0)#ACPI(SAT0)#ACPI(NIC0)",
-                    "PciRoot(0x0)/Pci(0x1D,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)",
-                    "\\_SB_.PCI0.SAT0.NIC0",
+                "PCIROOT(0)#PCI(1D00)#PCI(0000)#PCI(0000)#PCI(0000)",
+                "ACPI(_SB_)#ACPI(PCI0)#ACPI(SAT0)#ACPI(NIC0)",
+                "PciRoot(0x0)/Pci(0x1D,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)",
+                "\\_SB_.PCI0.SAT0.NIC0",
             ),
             (
-                    "PCIROOT(0)#PCI(1C00)#PCI(0000)#PCI(0000)#PCI(0000)",
-                    "ACPI(_SB_)#ACPI(PCI0)#ACPI(NIC1)",
-                    "PciRoot(0x0)/Pci(0x1C,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)",
-                    "\\_SB_.PCI0.NIC1",
+                "PCIROOT(0)#PCI(1C00)#PCI(0000)#PCI(0000)#PCI(0000)",
+                "ACPI(_SB_)#ACPI(PCI0)#ACPI(NIC1)",
+                "PciRoot(0x0)/Pci(0x1C,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)",
+                "\\_SB_.PCI0.NIC1",
             ),
             (
-                    "PCIROOT(0)#PCI(1400)#PCI(0000)#PCI(0000)#PCI(0000)",
-                    "ACPI(_SB_)#ACPI(PCI0)#ACPI(SAT1)#ACPI(NIC2)",
-                    "PciRoot(0x0)/Pci(0x14,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)",
-                    "\\_SB_.PCI0.SAT1.NIC2",
+                "PCIROOT(0)#PCI(1400)#PCI(0000)#PCI(0000)#PCI(0000)",
+                "ACPI(_SB_)#ACPI(PCI0)#ACPI(SAT1)#ACPI(NIC2)",
+                "PciRoot(0x0)/Pci(0x14,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)/Pci(0x0,0x0)",
+                "\\_SB_.PCI0.SAT1.NIC2",
             ),
         ],
     )
-    def test_format_paths(
-            self, pci_path, acpi_path, exp_pci_path, exp_acpi_path, monkeypatch
-    ):
+    def test_format_paths(self, pci_path, acpi_path, exp_pci_path, exp_acpi_path, monkeypatch):
         """Test that format_{pci|acpi}_path returns correct PCI and ACPI path"""
 
         def mock_get_location_paths(pnp_device_id):

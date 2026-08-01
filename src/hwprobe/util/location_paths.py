@@ -1,15 +1,15 @@
 from ctypes import (
     Structure,
     WinDLL,
-    c_char,
-    c_ulong,
     byref,
     c_buffer,
+    c_char,
+    c_ulong,
     c_ushort,
     c_wchar_p,
     sizeof,
 )
-from typing import Tuple
+from typing import Optional
 
 cfgmgr = WinDLL("cfgmgr32.dll")
 
@@ -106,11 +106,11 @@ def get_device_instance(pnp_device_id: str) -> c_ulong:
 
 
 def CM_Get_DevNode_PropertyW(
-        dnDevInst=c_ulong(),
-        propKey=None,
-        propType=c_ulong(),
-        propBuff=None,
-        propBuffSize=c_ulong(),
+    dnDevInst=c_ulong(),
+    propKey=None,
+    propType=c_ulong(),
+    propBuff=None,
+    propBuffSize=c_ulong(),
 ):
     if propKey is None:
         return None
@@ -159,7 +159,7 @@ def decode_location_paths(raw_bytes: bytes) -> list[str]:
     return paths
 
 
-def decode_uint32(raw_bytes: bytes) -> int | None:
+def decode_uint32(raw_bytes: bytes) -> Optional[int]:
     """
     Decode a 32-bit unsigned integer from raw bytes.
 
@@ -171,11 +171,11 @@ def decode_uint32(raw_bytes: bytes) -> int | None:
     """
     try:
         return int.from_bytes(raw_bytes[:4], byteorder="little")
-    except:
+    except Exception:
         return None
 
 
-def _fetch_property(pnp_device_id: str, key_def: list):
+def _fetch_property(pnp_device_id: str, key_def: list):  # type: ignore[type-arg]
     """
     Generic property fetcher using CM_Get_DevNode_PropertyW.
 
@@ -203,7 +203,7 @@ def _fetch_property(pnp_device_id: str, key_def: list):
     return CM_Get_DevNode_PropertyW(dnDevInst, dpKey)
 
 
-def get_location_paths(pnp_device_id: str) -> list[str] | None:
+def get_location_paths(pnp_device_id: str) -> Optional[list[str]]:
     """
     Get the location paths for a PNP device.
 
@@ -222,7 +222,7 @@ def get_location_paths(pnp_device_id: str) -> list[str] | None:
     return decode_location_paths(raw_bytes)
 
 
-def get_bus_number(pnp_device_id: str) -> str | None:
+def get_bus_number(pnp_device_id: str) -> Optional[str]:
     """
     Get the bus number for a PNP device.
 
@@ -242,7 +242,7 @@ def get_bus_number(pnp_device_id: str) -> str | None:
     return str(value) if value is not None else None
 
 
-def get_device_address(pnp_device_id: str) -> str | None:
+def get_device_address(pnp_device_id: str) -> Optional[str]:
     """
     Get the device address for a PNP device.
 
@@ -262,7 +262,7 @@ def get_device_address(pnp_device_id: str) -> str | None:
     return str(value) if value is not None else None
 
 
-def get_pcie_link_speed(pnp_device_id: str) -> int | None:
+def get_pcie_link_speed(pnp_device_id: str) -> Optional[int]:
     result = _fetch_property(pnp_device_id, pcie_link_speed_key)
 
     if result is None:
@@ -271,7 +271,7 @@ def get_pcie_link_speed(pnp_device_id: str) -> int | None:
     return decode_uint32(raw_bytes)
 
 
-def get_pcie_link_width(pnp_device_id: str) -> int | None:
+def get_pcie_link_width(pnp_device_id: str) -> Optional[int]:
     result = _fetch_property(pnp_device_id, pcie_link_width_key)
     if result is None:
         return None
@@ -280,8 +280,8 @@ def get_pcie_link_width(pnp_device_id: str) -> int | None:
 
 
 def fetch_device_properties(
-        pnp_device_id: str,
-) -> tuple[list[str] | None, str | None, str | None]:
+    pnp_device_id: str,
+) -> tuple[Optional[list[str]], Optional[str], Optional[str]]:
     """
     Fetch location paths, bus number, and device address in one call.
 
@@ -298,7 +298,7 @@ def fetch_device_properties(
     )
 
 
-def fetch_pcie_info(pnp_device_id: str) -> Tuple[str] | None:
+def fetch_pcie_info(pnp_device_id: str) -> Optional[tuple[Optional[int], Optional[int]]]:
     """
     Fetch PCIe link speed and width for a PNP device.
 

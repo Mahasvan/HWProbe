@@ -1,7 +1,7 @@
 import ctypes
-from typing import Tuple
 
 from hwprobe.core.windows.win_enum import ECC_MEMORY_TYPE, MEMORY_TYPE
+
 # todo: refactor to new bindings
 from hwprobe.interops.win.legacy.constants import ECC_MULTI_BIT, ECC_SINGLE_BIT
 from hwprobe.interops.win.legacy.signatures import GetWmiInfo
@@ -14,7 +14,7 @@ from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
 
 
-def check_ecc() -> Tuple[bool, str]:
+def check_ecc() -> tuple[bool, str]:
     """
     Checks if the system supports ECC memory by querying Win32_PhysicalMemoryArray.
 
@@ -42,11 +42,7 @@ def check_ecc() -> Tuple[bool, str]:
         return False, "Unknown"
 
     first_line = raw_data.split("\n")[0]
-    parsed_data = {
-        x.split("=", 1)[0]: x.split("=", 1)[1]
-        for x in first_line.split("|")
-        if "=" in x
-    }
+    parsed_data = {x.split("=", 1)[0]: x.split("=", 1)[1] for x in first_line.split("|") if "=" in x}
     ecc_type = parsed_data.get("MemoryErrorCorrection", "Unknown")
 
     supported = False
@@ -56,9 +52,7 @@ def check_ecc() -> Tuple[bool, str]:
         if ecc_type == ECC_SINGLE_BIT or ecc_type == ECC_MULTI_BIT:
             supported = True
 
-    return supported, (
-        ECC_MEMORY_TYPE[ecc_type] if ecc_type in ECC_MEMORY_TYPE else "Unknown"
-    )
+    return supported, (ECC_MEMORY_TYPE[ecc_type] if ecc_type in ECC_MEMORY_TYPE else "Unknown")
 
 
 def fetch_wmi_memory_info() -> MemoryInfo:
@@ -99,9 +93,7 @@ def fetch_wmi_memory_info() -> MemoryInfo:
         module = MemoryModuleInfo()
         unparsed = line.split("|")
 
-        parsed_data = {
-            x.split("=", 1)[0]: x.split("=", 1)[1] for x in unparsed if "=" in x
-        }
+        parsed_data = {x.split("=", 1)[0]: x.split("=", 1)[1] for x in unparsed if "=" in x}
 
         bank_label = parsed_data["BankLabel"]
         capacity = parsed_data["Capacity"]

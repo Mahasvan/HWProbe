@@ -1,16 +1,15 @@
 import os
-from typing import Optional, List
+from typing import Optional
 
-from hwprobe.core.linux.dmi_decode import get_string_entry, MEMORY_TYPE
-from hwprobe.models.memory_models import MemoryInfo, MemoryModuleSlot, MemoryModuleInfo
-from hwprobe.models.size_models import Megabyte, Kilobyte, StorageSize
+from hwprobe.core.linux.dmi_decode import MEMORY_TYPE, get_string_entry
+from hwprobe.models.memory_models import MemoryInfo, MemoryModuleInfo, MemoryModuleSlot
+from hwprobe.models.size_models import Kilobyte, Megabyte, StorageSize
 from hwprobe.models.status_models import StatusType
-
 
 # Thank you to [Quist](https://github.com/nadiaholmquist) for helping with our understanding of this.
 
 
-def _part_no(strings: List[bytes], value: bytes) -> Optional[str]:
+def _part_no(strings: list[bytes], value: bytes) -> Optional[str]:
     """
     Obtains the value at offset 1Ah, which indicates at which index, pre-sanitization,
     in the `strings` list the real string value is stored.
@@ -29,11 +28,8 @@ def _dimm_type(value: bytes) -> Optional[str]:
     return MEMORY_TYPE.get(value[0x12])
 
 
-def _dimm_slot(strings: List[bytes], value: bytes) -> Optional[MemoryModuleSlot]:
-    return MemoryModuleSlot(
-        channel=get_string_entry(strings, value[0x10]),
-        bank=get_string_entry(strings, value[0x11])
-    )
+def _dimm_slot(strings: list[bytes], value: bytes) -> Optional[MemoryModuleSlot]:
+    return MemoryModuleSlot(channel=get_string_entry(strings, value[0x10]), bank=get_string_entry(strings, value[0x11]))
 
 
 def _dimm_capacity(value: bytes) -> Optional[StorageSize]:
@@ -136,7 +132,7 @@ def fetch_memory_info() -> MemoryInfo:
 
         try:
             length_field = value[0x1]
-            strings = value[length_field:len(value)].split(b'\0')
+            strings = value[length_field : len(value)].split(b"\0")
 
             module.part_number = _part_no(strings, value)
 

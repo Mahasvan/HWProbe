@@ -16,16 +16,11 @@ import pathlib
 import sys
 from dataclasses import dataclass
 from typing import Optional
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from hwprobe.models.status_models import StatusType
 
-_MODULE_PATH = (
-    pathlib.Path(__file__).resolve().parents[3]
-    / "src" / "hwprobe" / "core" / "windows" / "graphics.py"
-)
+_MODULE_PATH = pathlib.Path(__file__).resolve().parents[3] / "src" / "hwprobe" / "core" / "windows" / "graphics.py"
 
 
 def _load_graphics_module():
@@ -102,7 +97,6 @@ def _run(gpu_list):
 
 
 class TestHappyPath:
-
     def test_single_gpu_success(self):
         info = _run([_gpu()])
 
@@ -130,22 +124,26 @@ class TestHappyPath:
         assert gpu.pcie_width == 16
 
     def test_acpi_and_pci_paths_populated(self):
-        info = _run([_gpu(
-            acpi_path=r"\_SB.PCI0.PEG0.PEGP",
-            pci_path="PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)",
-        )])
+        info = _run(
+            [
+                _gpu(
+                    acpi_path=r"\_SB.PCI0.PEG0.PEGP",
+                    pci_path="PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)",
+                )
+            ]
+        )
         gpu = info.modules[0]
         assert gpu.acpi_path == r"\_SB.PCI0.PEG0.PEGP"
         assert gpu.pci_path == "PciRoot(0x0)/Pci(0x1,0x0)/Pci(0x0,0x0)"
 
     def test_return_type_is_graphics_info(self):
         from hwprobe.models.gpu_models import GraphicsInfo
+
         info = _run([_gpu()])
         assert isinstance(info, GraphicsInfo)
 
 
 class TestMultipleGPUs:
-
     def test_igpu_plus_dgpu(self):
         igpu = _gpu(
             name="Intel UHD Graphics 630",
@@ -180,7 +178,6 @@ class TestMultipleGPUs:
 
 
 class TestZeroAndMissingFields:
-
     def test_zero_vram_results_in_none(self):
         info = _run([_gpu(vram_mb=0)])
         assert info.modules[0].vram is None
@@ -203,12 +200,9 @@ class TestZeroAndMissingFields:
 
 
 class TestFailurePaths:
-
     def test_runtime_error_returns_failed(self):
         mock_module = MagicMock()
-        mock_module.get_gpu_info.side_effect = RuntimeError(
-            "get_gpu_info() failed (C library returned -1)"
-        )
+        mock_module.get_gpu_info.side_effect = RuntimeError("get_gpu_info() failed (C library returned -1)")
 
         sys.modules.pop("hwprobe.interops.win.bindings.gpu_info", None)
         sys.modules.pop("hwprobe.core.windows.graphics", None)
@@ -230,7 +224,6 @@ class TestFailurePaths:
 
 
 class TestVendorIdFormatting:
-
     def test_vendor_id_hex_format(self):
         info = _run([_gpu(vendor_id=0x10DE)])
         assert info.modules[0].vendor_id == "0x10DE"

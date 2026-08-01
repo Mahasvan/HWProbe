@@ -1,7 +1,8 @@
-from typing import List, Optional
+from typing import Optional
 
-from hwprobe.models.component_model import ComponentInfo, BaseModel
 from pydantic import Field
+
+from hwprobe.models.component_model import BaseModel, ComponentInfo
 
 
 # Also known as an audio endpoint
@@ -31,11 +32,11 @@ class AudioControllerInfo(BaseModel):
     manufacturer: Optional[str] = None
 
     #: The list of audio endpoints associated with this controller
-    endpoints: List[AudioDeviceInfo] = Field(default_factory=list)
+    endpoints: list[AudioDeviceInfo] = Field(default_factory=list)
 
 
 class AudioInfo(ComponentInfo):
     """This is the model that holds audio information."""
 
     #: The list of audio controllers / modules present on the system
-    modules: List[AudioControllerInfo] = Field(default_factory=list)
+    modules: list[AudioControllerInfo] = Field(default_factory=list)

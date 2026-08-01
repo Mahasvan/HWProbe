@@ -1,6 +1,4 @@
-import struct
 
-import pytest
 
 from hwprobe.core.common.edid import parse_edid
 
@@ -31,7 +29,7 @@ def _build_edid(
     edid = bytearray(128)
 
     # Header
-    edid[0x00:0x08] = b"\x00\xFF\xFF\xFF\xFF\xFF\xFF\x00"
+    edid[0x00:0x08] = b"\x00\xff\xff\xff\xff\xff\xff\x00"
 
     # Manufacturer ID
     edid[0x08] = manuf[0]
@@ -65,32 +63,32 @@ def _build_edid(
         block[5] = v_active & 0xFF
         block[6] = v_blank & 0xFF
         block[7] = ((v_active >> 8) & 0x0F) << 4 | ((v_blank >> 8) & 0x0F)
-        edid[desc_offset:desc_offset + 18] = block
+        edid[desc_offset : desc_offset + 18] = block
         desc_offset += 18
         descriptors_used += 1
 
     if name is not None:
         block = bytearray(18)
-        block[0:4] = b"\x00\x00\x00\xFC"
+        block[0:4] = b"\x00\x00\x00\xfc"
         block[4] = 0x00
         name_bytes = name.encode("ascii")[:13]
-        block[5:5 + len(name_bytes)] = name_bytes
+        block[5 : 5 + len(name_bytes)] = name_bytes
         # EDID spec: terminate with 0x0A, pad remainder with 0x20
         for i in range(5 + len(name_bytes), 18):
             block[i] = 0x0A if i == 5 + len(name_bytes) else 0x20
-        edid[desc_offset:desc_offset + 18] = block
+        edid[desc_offset : desc_offset + 18] = block
         desc_offset += 18
         descriptors_used += 1
 
     if serial is not None:
         block = bytearray(18)
-        block[0:4] = b"\x00\x00\x00\xFF"
+        block[0:4] = b"\x00\x00\x00\xff"
         block[4] = 0x00
         serial_bytes = serial.encode("ascii")[:13]
-        block[5:5 + len(serial_bytes)] = serial_bytes
+        block[5 : 5 + len(serial_bytes)] = serial_bytes
         for i in range(5 + len(serial_bytes), 18):
             block[i] = 0x0A if i == 5 + len(serial_bytes) else 0x20
-        edid[desc_offset:desc_offset + 18] = block
+        edid[desc_offset : desc_offset + 18] = block
         desc_offset += 18
         descriptors_used += 1
 
@@ -102,7 +100,6 @@ _MANUF_DEL = (0x10, 0xAC)
 
 
 class TestEdidVersionParsing:
-
     def test_v14_digital_has_bit_depth_and_interface(self):
         # 0b1_010_0101 = digital, 8-bit depth (010), DisplayPort (5)
         edid = _build_edid(version=1, revision=4, input_byte=0b10100101)
@@ -156,7 +153,6 @@ class TestEdidVersionParsing:
 
 
 class TestAnalogDisplay:
-
     def test_analog_interface_set(self):
         # bit 7 = 0 → analog
         edid = _build_edid(version=1, revision=3, input_byte=0b00000000)
@@ -188,7 +184,8 @@ class TestAnalogDisplay:
         # 1366x768@60Hz: pixel clock = 7622 (in 10kHz units),
         # h_active=1366, h_blank=434, v_active=768, v_blank=22
         edid = _build_edid(
-            version=1, revision=3,
+            version=1,
+            revision=3,
             input_byte=0b00000000,
             timing=(7622, 1366, 434, 768, 22),
         )
@@ -201,7 +198,6 @@ class TestAnalogDisplay:
 
 
 class TestCommonFieldsAcrossVersions:
-
     def test_year_parsed(self):
         edid = _build_edid(year_offset=25)
         result = parse_edid(edid)

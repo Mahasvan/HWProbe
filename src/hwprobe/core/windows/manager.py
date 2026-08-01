@@ -9,9 +9,7 @@ from hwprobe.core.windows.storage import fetch_storage_info
 from hwprobe.models.cpu_models import CPUInfo
 from hwprobe.models.display_models import DisplayInfo
 from hwprobe.models.gpu_models import GraphicsInfo
-from hwprobe.models.info_models import HardwareInfo
-from hwprobe.models.info_models import HardwareManagerInterface
-from hwprobe.models.info_models import WindowsHardwareInfo
+from hwprobe.models.info_models import HardwareInfo, HardwareManagerInterface, WindowsHardwareInfo
 from hwprobe.models.memory_models import MemoryInfo
 from hwprobe.models.network_models import NetworkInfo
 from hwprobe.models.storage_models import StorageInfo

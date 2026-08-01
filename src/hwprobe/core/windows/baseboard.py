@@ -15,14 +15,14 @@ def fetch_baseboard_info() -> BaseboardInfo:
     result = FetchSMBIOSData(byref(info))
 
     if result != STATUS_OK:
-        baseboard_info.status.type = StatusType.FAILURE
+        baseboard_info.status.type = StatusType.FAILED
         baseboard_info.status.messages.append("Failed to fetch SMBIOS hardware info for Baseboard")
         return baseboard_info
 
-    manufacturer = info.motherboardManufacturer.decode(errors='ignore').rstrip('\x00')
-    model = info.motherboardModel.decode(errors='ignore').rstrip('\x00')
-    chassis_type = info.chassisType.decode(errors='ignore').rstrip('\x00')
-    cpu_socket = info.cpuSocket.decode(errors='ignore').rstrip('\x00')
+    manufacturer = info.motherboardManufacturer.decode(errors="ignore").rstrip("\x00")
+    model = info.motherboardModel.decode(errors="ignore").rstrip("\x00")
+    chassis_type = info.chassisType.decode(errors="ignore").rstrip("\x00")
+    cpu_socket = info.cpuSocket.decode(errors="ignore").rstrip("\x00")
 
     baseboard_info.manufacturer = manufacturer if manufacturer else None
     baseboard_info.model = model if model else None

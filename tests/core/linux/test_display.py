@@ -6,8 +6,8 @@ import pytest
 
 from hwprobe.core.linux.display import (
     _extract_pci_bdf_from_sysfs_path,
-    _parse_connector_type,
     _fetch_individual_monitor_info,
+    _parse_connector_type,
     fetch_display_info,
 )
 from hwprobe.models.display_models import DisplayModuleInfo
@@ -46,7 +46,8 @@ class TestFetchIndividualMonitorInfo:
     def test_returns_none_when_edid_empty(self, monkeypatch):
         self._patch_exists(monkeypatch, {self.EDID_PATH})
         monkeypatch.setattr(
-            builtins, "open",
+            builtins,
+            "open",
             lambda *a, **kw: mock_open(read_data=b"")(),
         )
         assert _fetch_individual_monitor_info(self.DEVICE_PATH) is None
@@ -54,7 +55,8 @@ class TestFetchIndividualMonitorInfo:
     def test_pci_path_resolved_from_gpu_endpoint(self, monkeypatch):
         self._patch_exists(monkeypatch, {self.EDID_PATH})
         monkeypatch.setattr(
-            builtins, "open",
+            builtins,
+            "open",
             lambda *a, **kw: mock_open(read_data=b"\x01\x02")(),
         )
         monkeypatch.setattr(
@@ -62,7 +64,8 @@ class TestFetchIndividualMonitorInfo:
             lambda _: DisplayModuleInfo(name="Internal Display"),
         )
         monkeypatch.setattr(
-            os.path, "realpath",
+            os.path,
+            "realpath",
             lambda _: "/sys/devices/pci0000:00/0000:00:02.0/0000:06:00.0/drm/card0",
         )
 
@@ -81,7 +84,8 @@ class TestFetchIndividualMonitorInfo:
     def test_no_pci_path_for_non_pci_parent(self, monkeypatch):
         self._patch_exists(monkeypatch, {self.EDID_PATH})
         monkeypatch.setattr(
-            builtins, "open",
+            builtins,
+            "open",
             lambda *a, **kw: mock_open(read_data=b"\x01\x02")(),
         )
         monkeypatch.setattr(
@@ -89,7 +93,8 @@ class TestFetchIndividualMonitorInfo:
             lambda _: DisplayModuleInfo(name="Panel"),
         )
         monkeypatch.setattr(
-            os.path, "realpath",
+            os.path,
+            "realpath",
             lambda _: "/sys/devices/platform/simple-framebuffer/drm/card0",
         )
 
@@ -123,7 +128,8 @@ class TestFetchIndividualMonitorInfo:
             lambda _: DisplayModuleInfo(name="Display"),
         )
         monkeypatch.setattr(
-            os.path, "realpath",
+            os.path,
+            "realpath",
             lambda _: "/sys/devices/pci0000:00/0000:00:02.0/drm/card0",
         )
         monkeypatch.setattr(
@@ -141,7 +147,8 @@ class TestFetchDisplayInfo:
     def test_collects_monitors_from_drm(self, monkeypatch):
         monkeypatch.setattr(os.path, "isdir", lambda p: p == "/sys/class/drm")
         monkeypatch.setattr(
-            os, "listdir",
+            os,
+            "listdir",
             lambda path: {
                 "/sys/class/drm": ["card0", "renderD128", "version"],
                 "/sys/class/drm/card0": ["card0-eDP-1", "card0-HDMI-A-1", "device"],
@@ -161,7 +168,8 @@ class TestFetchDisplayInfo:
     def test_skips_monitors_returning_none(self, monkeypatch):
         monkeypatch.setattr(os.path, "isdir", lambda p: p == "/sys/class/drm")
         monkeypatch.setattr(
-            os, "listdir",
+            os,
+            "listdir",
             lambda path: {
                 "/sys/class/drm": ["card0"],
                 "/sys/class/drm/card0": ["card0-eDP-1"],
@@ -188,7 +196,8 @@ class TestFetchDisplayInfo:
     def test_partial_when_monitor_raises(self, monkeypatch):
         monkeypatch.setattr(os.path, "isdir", lambda p: p == "/sys/class/drm")
         monkeypatch.setattr(
-            os, "listdir",
+            os,
+            "listdir",
             lambda path: {
                 "/sys/class/drm": ["card0"],
                 "/sys/class/drm/card0": ["card0-eDP-1", "card0-HDMI-A-1"],
@@ -204,7 +213,8 @@ class TestFetchDisplayInfo:
             return DisplayModuleInfo(name="Monitor B")
 
         monkeypatch.setattr(
-            "hwprobe.core.linux.display._fetch_individual_monitor_info", _mock_fetch,
+            "hwprobe.core.linux.display._fetch_individual_monitor_info",
+            _mock_fetch,
         )
 
         info = fetch_display_info()
@@ -216,20 +226,22 @@ class TestFetchDisplayInfo:
 
 
 class TestParseConnectorType:
-
-    @pytest.mark.parametrize("dirname,expected", [
-        ("card0-eDP-1", "DisplayPort"),
-        ("card0-DP-1", "DisplayPort"),
-        ("card0-DP-2", "DisplayPort"),
-        ("card1-HDMI-A-1", "HDMI"),
-        ("card0-HDMI-B-1", "HDMI (B)"),
-        ("card0-DVI-D-1", "DVI"),
-        ("card0-DVI-I-1", "DVI"),
-        ("card0-DVI-A-1", "DVI"),
-        ("card0-VGA-1", "Analog"),
-        ("card0-LVDS-1", "LVDS"),
-        ("card0-DSI-1", "DSI"),
-    ])
+    @pytest.mark.parametrize(
+        "dirname,expected",
+        [
+            ("card0-eDP-1", "DisplayPort"),
+            ("card0-DP-1", "DisplayPort"),
+            ("card0-DP-2", "DisplayPort"),
+            ("card1-HDMI-A-1", "HDMI"),
+            ("card0-HDMI-B-1", "HDMI (B)"),
+            ("card0-DVI-D-1", "DVI"),
+            ("card0-DVI-I-1", "DVI"),
+            ("card0-DVI-A-1", "DVI"),
+            ("card0-VGA-1", "Analog"),
+            ("card0-LVDS-1", "LVDS"),
+            ("card0-DSI-1", "DSI"),
+        ],
+    )
     def test_known_connectors(self, dirname, expected):
         path = f"/sys/class/drm/card0/{dirname}"
         assert _parse_connector_type(path) == expected
@@ -248,7 +260,8 @@ class TestParseConnectorType:
 
         monkeypatch.setattr(os.path, "exists", lambda p: p == edid_path)
         monkeypatch.setattr(
-            builtins, "open",
+            builtins,
+            "open",
             lambda *a, **kw: mock_open(read_data=b"\x01\x02")(),
         )
         monkeypatch.setattr(
@@ -256,7 +269,8 @@ class TestParseConnectorType:
             lambda _: DisplayModuleInfo(name="Test", interface="DisplayPort"),
         )
         monkeypatch.setattr(
-            os.path, "realpath",
+            os.path,
+            "realpath",
             lambda _: "/sys/devices/platform/drm/card0",
         )
 

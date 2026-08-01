@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import re
 import subprocess
-from typing import Optional, List
+from typing import Optional
 
 from hwprobe.models.cpu_models import CPUInfo
 from hwprobe.models.status_models import StatusType
@@ -8,13 +10,13 @@ from hwprobe.models.status_models import StatusType
 
 def _arm_cpu_cores() -> Optional[int]:
     try:
-        result = subprocess.run(["lscpu", "-p"], capture_output=True, text=True).stdout
+        result = subprocess.run(["lscpu", "-p"], capture_output=True, text=True, check=True).stdout
         lines = [x for x in result.splitlines() if not x.startswith("#")]
         # Format: CPU,Core,Socket,Node,,L1d,L1i,L2,L3
         core_ids = [x.split(",")[1] for x in lines]
         # The number of distinct Core IDs is the number of cores
         return len(set(core_ids))
-    except Exception as e:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
 
@@ -55,20 +57,18 @@ def _cpu_threads(raw_cpu_info: str) -> Optional[int]:
     try:
         count = len(re.findall(r"^processor\s+:", raw_cpu_info, re.MULTILINE))
         return count if count > 0 else None
-    except:
+    except Exception:
         return None
 
 
-def _x86_flags(cpu_lines: str) -> Optional[List[str]]:
+def _x86_flags(cpu_lines: str) -> Optional[list[str]]:
     flags_match = re.search(r"flags\s+:\s+(.+)", cpu_lines)
     if not flags_match:
         return None
 
     flags = flags_match.group(1)
     flags = [x.lower().strip() for x in flags.split(" ")]
-    flags = [
-        flag.replace("_", ".").upper() for flag in flags if flag
-    ]
+    flags = [flag.replace("_", ".").upper() for flag in flags if flag]
     return flags
 
 
@@ -156,11 +156,11 @@ def fetch_cpu_info() -> CPUInfo:
 
     # todo: Check if any of the regexes may suffer from string having two `\t`s
     try:
-        with open('/proc/cpuinfo') as f:
+        with open("/proc/cpuinfo") as f:
             raw_cpu_info = f.read()
     except Exception as e:
         cpu_info.status.type = StatusType.FAILED
-        cpu_info.status.messages.append(f"Could not open /proc/cpuinfo: {str(e)}")
+        cpu_info.status.messages.append(f"Could not open /proc/cpuinfo: {e!s}")
         return cpu_info
 
     if not raw_cpu_info:
@@ -168,7 +168,7 @@ def fetch_cpu_info() -> CPUInfo:
         cpu_info.status.messages.append("/proc/cpuinfo has no content")
         return cpu_info
 
-    architecture = subprocess.run(['uname', '-m'], capture_output=True, text=True)
+    architecture = subprocess.run(["uname", "-m"], capture_output=True, text=True, check=True)
 
     if ("aarch64" in architecture.stdout) or ("arm" in architecture.stdout):
         return fetch_arm_cpu_info(raw_cpu_info)

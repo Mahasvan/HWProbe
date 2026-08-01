@@ -1,8 +1,6 @@
-from typing import List
-
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
-from hwprobe.models.storage_models import StorageInfo, DiskInfo
+from hwprobe.models.storage_models import DiskInfo, StorageInfo
 
 STORAGE_MAP = {
     "Solid State": "Solid State Drive (SSD)",
@@ -19,8 +17,9 @@ def fetch_storage_info() -> StorageInfo:
     storage_info = StorageInfo()
 
     try:
-        from hwprobe.interops.mac.bindings.storage_info import get_storage_info, StorageDeviceProperties
-        disk_list: List[StorageDeviceProperties] = get_storage_info()
+        from hwprobe.interops.mac.bindings.storage_info import StorageDeviceProperties, get_storage_info
+
+        disk_list: list[StorageDeviceProperties] = get_storage_info()
 
     except FileNotFoundError as e:
         storage_info.status.type = StatusType.FAILED

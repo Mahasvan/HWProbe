@@ -3,15 +3,15 @@ import subprocess
 
 from hwprobe.core.linux.cpu import (
     _arm_cpu_cores,
-    _x86_cpu_cores,
     _arm_cpu_model,
-    _x86_cpu_model,
     _arm_version,
     _cpu_threads,
+    _x86_cpu_cores,
+    _x86_cpu_model,
     _x86_flags,
     fetch_arm_cpu_info,
-    fetch_x86_cpu_info,
     fetch_cpu_info,
+    fetch_x86_cpu_info,
 )
 from hwprobe.models.status_models import StatusType
 
@@ -20,13 +20,7 @@ class TestArmCpuCores:
     """Tests for _arm_cpu_cores function."""
 
     def test_arm_cpu_cores_success(self, monkeypatch):
-        output = (
-            "# comment\n"
-            "0,0,0,0\n"
-            "1,0,0,0\n"
-            "2,1,0,0\n"
-            "3,1,0,0\n"
-        )
+        output = "# comment\n0,0,0,0\n1,0,0,0\n2,1,0,0\n3,1,0,0\n"
 
         def mock_run(*args, **kwargs):
             return subprocess.CompletedProcess(args, 0, stdout=output)
@@ -37,10 +31,7 @@ class TestArmCpuCores:
         assert cores == 2
 
     def test_arm_cpu_cores_single_core(self, monkeypatch):
-        output = (
-            "# comment\n"
-            "0,0,0,0\n"
-        )
+        output = "# comment\n0,0,0,0\n"
 
         def mock_run(*args, **kwargs):
             return subprocess.CompletedProcess(args, 0, stdout=output)
@@ -52,7 +43,7 @@ class TestArmCpuCores:
 
     def test_arm_cpu_cores_failure(self, monkeypatch):
         def mock_run(*args, **kwargs):
-            raise RuntimeError("lscpu failed")
+            raise subprocess.CalledProcessError(1, "lscpu")
 
         monkeypatch.setattr(subprocess, "run", mock_run)
 
@@ -67,11 +58,7 @@ class TestX86CpuCores:
         assert _x86_cpu_cores(cpu_lines) == 4
 
     def test_x86_cpu_cores_with_other_info(self):
-        cpu_lines = (
-            "model name\t: Intel CPU\n"
-            "cpu cores\t: 6\n"
-            "flags\t\t: sse\n"
-        )
+        cpu_lines = "model name\t: Intel CPU\ncpu cores\t: 6\nflags\t\t: sse\n"
         assert _x86_cpu_cores(cpu_lines) == 6
 
     def test_x86_cpu_cores_missing(self):
@@ -95,10 +82,7 @@ class TestArmCpuModel:
         assert _arm_cpu_model(raw) == "Raspberry Pi 4 Model B Rev 1.5"
 
     def test_arm_cpu_model_hardware_priority(self):
-        raw = (
-            "Hardware\t: BCM2711\n"
-            "Model\t: Raspberry Pi 4\n"
-        )
+        raw = "Hardware\t: BCM2711\nModel\t: Raspberry Pi 4\n"
         # Hardware takes priority over Model
         assert _arm_cpu_model(raw) == "BCM2711"
 
@@ -147,15 +131,7 @@ class TestCpuThreads:
         assert _cpu_threads(raw) == 1
 
     def test_cpu_threads_multiple(self):
-        raw = (
-            "processor\t: 0\n"
-            "other info\n"
-            "processor\t: 1\n"
-            "other info\n"
-            "processor\t: 2\n"
-            "other info\n"
-            "processor\t: 3\n"
-        )
+        raw = "processor\t: 0\nother info\nprocessor\t: 1\nother info\nprocessor\t: 2\nother info\nprocessor\t: 3\n"
         assert _cpu_threads(raw) == 4
 
     def test_cpu_threads_empty(self):
@@ -198,12 +174,7 @@ class TestFetchArmCpuInfo:
     """Tests for fetch_arm_cpu_info function."""
 
     def test_fetch_arm_cpu_info_success(self, monkeypatch):
-        raw = (
-            "processor\t: 0\n"
-            "processor\t: 1\n"
-            "CPU architecture: 8\n"
-            "Hardware\t: BCM2711\n"
-        )
+        raw = "processor\t: 0\nprocessor\t: 1\nCPU architecture: 8\nHardware\t: BCM2711\n"
 
         monkeypatch.setattr(
             "hwprobe.core.linux.cpu._arm_cpu_cores",
@@ -220,11 +191,7 @@ class TestFetchArmCpuInfo:
         assert cpu.status.messages == []
 
     def test_fetch_arm_cpu_info_model_fallback(self, monkeypatch):
-        raw = (
-            "processor\t: 0\n"
-            "CPU architecture: 7\n"
-            "Model\t: Raspberry Pi 4\n"
-        )
+        raw = "processor\t: 0\nCPU architecture: 7\nModel\t: Raspberry Pi 4\n"
 
         monkeypatch.setattr("hwprobe.core.linux.cpu._arm_cpu_cores", lambda: 4)
 
@@ -233,10 +200,7 @@ class TestFetchArmCpuInfo:
         assert cpu.name == "Raspberry Pi 4"
 
     def test_fetch_arm_cpu_info_missing_name(self, monkeypatch):
-        raw = (
-            "processor\t: 0\n"
-            "CPU architecture: 8\n"
-        )
+        raw = "processor\t: 0\nCPU architecture: 8\n"
 
         monkeypatch.setattr("hwprobe.core.linux.cpu._arm_cpu_cores", lambda: 4)
 
@@ -246,10 +210,7 @@ class TestFetchArmCpuInfo:
         assert "Could not find model name" in cpu.status.messages
 
     def test_fetch_arm_cpu_info_missing_arch_version(self, monkeypatch):
-        raw = (
-            "processor\t: 0\n"
-            "Hardware\t: BCM2711\n"
-        )
+        raw = "processor\t: 0\nHardware\t: BCM2711\n"
 
         monkeypatch.setattr("hwprobe.core.linux.cpu._arm_cpu_cores", lambda: 4)
 
@@ -259,10 +220,7 @@ class TestFetchArmCpuInfo:
         assert "Could not find architecture" in cpu.status.messages
 
     def test_fetch_arm_cpu_info_missing_threads(self, monkeypatch):
-        raw = (
-            "Hardware\t: BCM2711\n"
-            "CPU architecture: 8\n"
-        )
+        raw = "Hardware\t: BCM2711\nCPU architecture: 8\n"
 
         monkeypatch.setattr("hwprobe.core.linux.cpu._arm_cpu_cores", lambda: 4)
 
@@ -272,11 +230,7 @@ class TestFetchArmCpuInfo:
         assert "Could not find CPU threads" in cpu.status.messages
 
     def test_fetch_arm_cpu_info_missing_cores(self, monkeypatch):
-        raw = (
-            "processor\t: 0\n"
-            "Hardware\t: BCM2711\n"
-            "CPU architecture: 8\n"
-        )
+        raw = "processor\t: 0\nHardware\t: BCM2711\nCPU architecture: 8\n"
 
         monkeypatch.setattr("hwprobe.core.linux.cpu._arm_cpu_cores", lambda: None)
 
@@ -329,47 +283,28 @@ class TestFetchX86CpuInfo:
         assert cpu.status.messages == []
 
     def test_fetch_x86_cpu_info_amd_vendor(self):
-        raw = (
-            "model name\t: AMD Ryzen 5 3600 6-Core Processor\n"
-            "flags\t\t: sse lm\n"
-            "cpu cores\t: 6\n"
-            "\n"
-        )
+        raw = "model name\t: AMD Ryzen 5 3600 6-Core Processor\nflags\t\t: sse lm\ncpu cores\t: 6\n\n"
 
         cpu = fetch_x86_cpu_info(raw)
 
         assert cpu.vendor == "amd"
 
     def test_fetch_x86_cpu_info_unknown_vendor(self):
-        raw = (
-            "model name\t: Generic CPU\n"
-            "flags\t\t: sse lm\n"
-            "cpu cores\t: 4\n"
-            "\n"
-        )
+        raw = "model name\t: Generic CPU\nflags\t\t: sse lm\ncpu cores\t: 4\n\n"
 
         cpu = fetch_x86_cpu_info(raw)
 
         assert cpu.vendor == "unknown"
 
     def test_fetch_x86_cpu_info_32bit(self):
-        raw = (
-            "model name\t: Intel CPU\n"
-            "flags\t\t: sse sse2\n"
-            "cpu cores\t: 2\n"
-            "\n"
-        )
+        raw = "model name\t: Intel CPU\nflags\t\t: sse sse2\ncpu cores\t: 2\n\n"
 
         cpu = fetch_x86_cpu_info(raw)
 
         assert cpu.bitness == 32
 
     def test_fetch_x86_cpu_info_missing_name(self):
-        raw = (
-            "flags\t\t: sse lm\n"
-            "cpu cores\t: 4\n"
-            "\n"
-        )
+        raw = "flags\t\t: sse lm\ncpu cores\t: 4\n\n"
 
         cpu = fetch_x86_cpu_info(raw)
 
@@ -377,11 +312,7 @@ class TestFetchX86CpuInfo:
         assert "Could not find CPU name and vendor" in cpu.status.messages
 
     def test_fetch_x86_cpu_info_missing_flags(self):
-        raw = (
-            "model name\t: Intel CPU\n"
-            "cpu cores\t: 4\n"
-            "\n"
-        )
+        raw = "model name\t: Intel CPU\ncpu cores\t: 4\n\n"
 
         cpu = fetch_x86_cpu_info(raw)
 
@@ -391,11 +322,7 @@ class TestFetchX86CpuInfo:
         assert cpu.bitness == 32  # Default when flags missing
 
     def test_fetch_x86_cpu_info_missing_cores(self):
-        raw = (
-            "model name\t: Intel CPU\n"
-            "flags\t\t: sse lm\n"
-            "\n"
-        )
+        raw = "model name\t: Intel CPU\nflags\t\t: sse lm\n\n"
 
         cpu = fetch_x86_cpu_info(raw)
 
@@ -450,6 +377,7 @@ class TestFetchCpuInfo:
 
         def mock_open(*args, **kwargs):
             from io import StringIO
+
             return StringIO(raw)
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -468,6 +396,7 @@ class TestFetchCpuInfo:
 
         def mock_open(*args, **kwargs):
             from io import StringIO
+
             return StringIO(raw)
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -488,6 +417,7 @@ class TestFetchCpuInfo:
 
         def mock_open(*args, **kwargs):
             from io import StringIO
+
             return StringIO(raw)
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -515,6 +445,7 @@ class TestFetchCpuInfo:
     def test_fetch_cpu_info_empty_file(self, monkeypatch):
         def mock_open(*args, **kwargs):
             from io import StringIO
+
             return StringIO("")
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -533,6 +464,7 @@ class TestLinuxCPURealWorld:
 
         def mock_open(*args, **kwargs):
             from io import StringIO
+
             return StringIO(raw)
 
         monkeypatch.setattr(builtins, "open", mock_open)
@@ -557,6 +489,7 @@ class TestLinuxCPURealWorld:
 
         def mock_open(*args, **kwargs):
             from io import StringIO
+
             return StringIO(raw)
 
         monkeypatch.setattr(builtins, "open", mock_open)

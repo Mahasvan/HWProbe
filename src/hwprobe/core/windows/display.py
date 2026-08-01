@@ -16,43 +16,44 @@ from ctypes import wintypes
 from typing import Optional
 
 from hwprobe.core.windows.win_enum import DISPLAY_CON_TYPE
+
 # todo: refactor to new bindings
 from hwprobe.interops.win.legacy.constants import (
-    STATUS_OK,
-    GUID_DEVINTERFACE_MONITOR,
-    DIGCF_PRESENT,
-    DIGCF_DEVICEINTERFACE,
     DICS_FLAG_GLOBAL,
+    DIGCF_DEVICEINTERFACE,
+    DIGCF_PRESENT,
     DIREG_DEV,
-    KEY_READ,
-    ENUM_CURRENT_SETTINGS,
-    DMDO_DEFAULT,
     DMDO_90,
     DMDO_180,
     DMDO_270,
+    DMDO_DEFAULT,
+    ENUM_CURRENT_SETTINGS,
+    GUID_DEVINTERFACE_MONITOR,
+    KEY_READ,
+    STATUS_OK,
 )
 from hwprobe.interops.win.legacy.signatures import (
+    EnumDisplayDevicesA,
+    EnumDisplayMonitors,
+    EnumDisplaySettingsA,
+    GetDisplayPathInfo,
     GetGPUForDisplay,
-    SetupDiGetClassDevsA,
+    GetMonitorInfoA,
+    RegCloseKey,
+    RegQueryValueExA,
+    SetupDiDestroyDeviceInfoList,
     SetupDiEnumDeviceInterfaces,
+    SetupDiGetClassDevsA,
     SetupDiGetDeviceInterfaceDetailA,
     SetupDiOpenDevRegKey,
-    RegQueryValueExA,
-    RegCloseKey,
-    SetupDiDestroyDeviceInfoList,
-    GetMonitorInfoA,
-    EnumDisplaySettingsA,
-    EnumDisplayDevicesA,
-    GetDisplayPathInfo,
-    EnumDisplayMonitors,
 )
 from hwprobe.interops.win.legacy.structs import (
-    SP_DEVICE_INTERFACE_DATA,
-    SP_DEVINFO_DATA,
-    MONITORINFOEXA,
     DEVMODEA,
     DISPLAY_DEVICEA,
     MONITORENUMPROC,
+    MONITORINFOEXA,
+    SP_DEVICE_INTERFACE_DATA,
+    SP_DEVINFO_DATA,
 )
 from hwprobe.models.display_models import DisplayInfo, DisplayModuleInfo
 from hwprobe.models.status_models import Status, StatusType
@@ -213,9 +214,9 @@ def _decode_manufacturer_code(vendor_id: int) -> str:
     Returns:
         Three-letter manufacturer code (e.g., "SAM" for Samsung, "DEL" for Dell)
     """
-    char1 = chr(((vendor_id >> 10) & 0x1F) + ord('A') - 1)
-    char2 = chr(((vendor_id >> 5) & 0x1F) + ord('A') - 1)
-    char3 = chr((vendor_id & 0x1F) + ord('A') - 1)
+    char1 = chr(((vendor_id >> 10) & 0x1F) + ord("A") - 1)
+    char2 = chr(((vendor_id >> 5) & 0x1F) + ord("A") - 1)
+    char3 = chr((vendor_id & 0x1F) + ord("A") - 1)
     return f"{char1}{char2}{char3}"
 
 
@@ -233,7 +234,7 @@ def _calculate_diagonal_inches(width_cm: int, height_cm: int) -> float:
     if width_cm <= 0 or height_cm <= 0:
         return 0.0
 
-    diagonal_cm = (width_cm ** 2 + height_cm ** 2) ** 0.5
+    diagonal_cm = (width_cm**2 + height_cm**2) ** 0.5
     return round(diagonal_cm / 2.54)
 
 
@@ -262,8 +263,8 @@ def parse_edid(edid: bytes) -> Optional[dict]:
         return None
 
     # Parse vendor and product IDs
-    vendor_id = struct.unpack(">H", edid[_EDID_VENDOR_OFFSET:_EDID_VENDOR_OFFSET + 2])[0]
-    product_id = struct.unpack("<H", edid[_EDID_PRODUCT_OFFSET:_EDID_PRODUCT_OFFSET + 2])[0]
+    vendor_id = struct.unpack(">H", edid[_EDID_VENDOR_OFFSET : _EDID_VENDOR_OFFSET + 2])[0]
+    product_id = struct.unpack("<H", edid[_EDID_PRODUCT_OFFSET : _EDID_PRODUCT_OFFSET + 2])[0]
 
     serial = None
     name = None
@@ -272,7 +273,7 @@ def parse_edid(edid: bytes) -> Optional[dict]:
     # First descriptor (at 0x36) is reserved for Preferred Timing Mode, so we start at 0x48
     for i in range(_EDID_DESCRIPTOR_COUNT):
         offset = _EDID_DESCRIPTOR_BASE_OFFSET + (i * _EDID_DESCRIPTOR_SIZE)
-        descriptor = edid[offset:offset + _EDID_DESCRIPTOR_SIZE]
+        descriptor = edid[offset : offset + _EDID_DESCRIPTOR_SIZE]
 
         if serial is None:
             serial = _extract_descriptor_text(descriptor, _EDID_SERIAL_MARKER)
@@ -431,11 +432,11 @@ def _enumerate_and_find_edid(device_info_set, hwid_upper: str) -> Optional[dict]
 
         # Enumerate next interface
         if not SetupDiEnumDeviceInterfaces(
-                device_info_set,
-                None,
-                ctypes.byref(GUID_DEVINTERFACE_MONITOR),
-                interface_index,
-                ctypes.byref(interface_data),
+            device_info_set,
+            None,
+            ctypes.byref(GUID_DEVINTERFACE_MONITOR),
+            interface_index,
+            ctypes.byref(interface_data),
         ):
             break
 
@@ -483,12 +484,12 @@ def _try_get_edid_for_interface(device_info_set, interface_data, hwid_upper: str
 
     # Get interface detail and device info
     if not SetupDiGetDeviceInterfaceDetailA(
-            device_info_set,
-            ctypes.byref(interface_data),
-            detail_buffer,
-            required_size,
-            None,
-            ctypes.byref(device_data),
+        device_info_set,
+        ctypes.byref(interface_data),
+        detail_buffer,
+        required_size,
+        None,
+        ctypes.byref(device_data),
     ):
         return None
 
@@ -546,10 +547,7 @@ def _get_connection_type(connector_info: Optional[dict]) -> Optional[str]:
         return None
 
 
-def _fetch_edid_for_monitor(
-        connector_info: Optional[dict],
-        pnp_device_id: str
-) -> tuple[Optional[dict], Optional[str]]:
+def _fetch_edid_for_monitor(connector_info: Optional[dict], pnp_device_id: str) -> tuple[Optional[dict], Optional[str]]:
     """
     Fetch EDID data for a monitor, preferring display path over PNP ID.
 
@@ -581,13 +579,13 @@ def _fetch_edid_for_monitor(
 
 
 def _build_monitor_info(
-        device_id: str,
-        hardware_id: str,
-        device_path: Optional[str],
-        display_mode: DEVMODEA,
-        edid: Optional[dict],
-        gpu_name: Optional[str],
-        connection_type: Optional[str],
+    device_id: str,
+    hardware_id: str,
+    device_path: Optional[str],
+    display_mode: DEVMODEA,
+    edid: Optional[dict],
+    gpu_name: Optional[str],
+    connection_type: Optional[str],
 ) -> DisplayModuleInfo:
     """
     Construct a DisplayModuleInfo object from collected data.
@@ -617,10 +615,7 @@ def _build_monitor_info(
     monitor.resolution.width = display_mode.dmPelsWidth
     monitor.resolution.height = display_mode.dmPelsHeight
     monitor.resolution.refresh_rate = display_mode.dmDisplayFrequency
-    monitor.resolution.aspect_ratio = get_aspect_ratio(
-        display_mode.dmPelsWidth,
-        display_mode.dmPelsHeight
-    )
+    monitor.resolution.aspect_ratio = get_aspect_ratio(display_mode.dmPelsWidth, display_mode.dmPelsHeight)
 
     # Orientation
     monitor.orientation = _get_orientation_name(display_mode.dmDisplayOrientation)

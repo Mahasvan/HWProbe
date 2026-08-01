@@ -47,8 +47,10 @@ SYSCTL_SME2_ABSENT = "hw.optional.arm.FEAT_SME2: 0\n"
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-def _mock_check_output(sysctl_cpu, arch="arm64", bitness=SYSCTL_BITNESS_64,
-                       sme=SYSCTL_SME_ABSENT, sme2=SYSCTL_SME2_ABSENT):
+
+def _mock_check_output(
+    sysctl_cpu, arch="arm64", bitness=SYSCTL_BITNESS_64, sme=SYSCTL_SME_ABSENT, sme2=SYSCTL_SME2_ABSENT
+):
     """Build a side_effect for subprocess.check_output that returns
     the right value depending on the command argument."""
 
@@ -70,8 +72,8 @@ def _mock_check_output(sysctl_cpu, arch="arm64", bitness=SYSCTL_BITNESS_64,
 
 # ── Apple Silicon happy path ─────────────────────────────────────────────────
 
-class TestAppleSiliconCPU:
 
+class TestAppleSiliconCPU:
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_apple_m3_basic_info(self, mock_co):
         mock_co.side_effect = _mock_check_output(SYSCTL_APPLE_M3)
@@ -86,25 +88,19 @@ class TestAppleSiliconCPU:
 
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_apple_silicon_arm_v9_detected(self, mock_co):
-        mock_co.side_effect = _mock_check_output(
-            SYSCTL_APPLE_M3, sme=SYSCTL_SME_PRESENT
-        )
+        mock_co.side_effect = _mock_check_output(SYSCTL_APPLE_M3, sme=SYSCTL_SME_PRESENT)
         info = fetch_cpu_info()
         assert info.arch_version == "9"
 
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_apple_silicon_arm_v8_detected(self, mock_co):
-        mock_co.side_effect = _mock_check_output(
-            SYSCTL_APPLE_M3, sme=SYSCTL_SME_ABSENT, sme2=SYSCTL_SME2_ABSENT
-        )
+        mock_co.side_effect = _mock_check_output(SYSCTL_APPLE_M3, sme=SYSCTL_SME_ABSENT, sme2=SYSCTL_SME2_ABSENT)
         info = fetch_cpu_info()
         assert info.arch_version == "8"
 
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_apple_silicon_sme2_alone_triggers_v9(self, mock_co):
-        mock_co.side_effect = _mock_check_output(
-            SYSCTL_APPLE_M3, sme=SYSCTL_SME_ABSENT, sme2=SYSCTL_SME2_PRESENT
-        )
+        mock_co.side_effect = _mock_check_output(SYSCTL_APPLE_M3, sme=SYSCTL_SME_ABSENT, sme2=SYSCTL_SME2_PRESENT)
         info = fetch_cpu_info()
         assert info.arch_version == "9"
 
@@ -118,8 +114,8 @@ class TestAppleSiliconCPU:
 
 # ── Intel happy path ─────────────────────────────────────────────────────────
 
-class TestIntelCPU:
 
+class TestIntelCPU:
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_intel_basic_info(self, mock_co):
         mock_co.side_effect = _mock_check_output(SYSCTL_INTEL, arch="x86_64")
@@ -158,17 +154,15 @@ class TestIntelCPU:
 
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_intel_32bit(self, mock_co):
-        mock_co.side_effect = _mock_check_output(
-            SYSCTL_INTEL, arch="i386", bitness=SYSCTL_BITNESS_32
-        )
+        mock_co.side_effect = _mock_check_output(SYSCTL_INTEL, arch="i386", bitness=SYSCTL_BITNESS_32)
         info = fetch_cpu_info()
         assert info.bitness == 32
 
 
 # ── AMD ──────────────────────────────────────────────────────────────────────
 
-class TestAMDCPU:
 
+class TestAMDCPU:
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_amd_vendor_detected(self, mock_co):
         mock_co.side_effect = _mock_check_output(SYSCTL_AMD, arch="x86_64")
@@ -180,8 +174,8 @@ class TestAMDCPU:
 
 # ── Error handling ───────────────────────────────────────────────────────────
 
-class TestErrorHandling:
 
+class TestErrorHandling:
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_sysctl_failure_returns_failed(self, mock_co):
         mock_co.side_effect = FileNotFoundError("sysctl not found")
@@ -236,6 +230,7 @@ class TestErrorHandling:
 
 # ── BUG: sysctl output with trailing empty line crashes split ────────────────
 
+
 class TestSysctlParsingEdgeCases:
     """Malformed sysctl lines (without ': ') should be skipped, not crash."""
 
@@ -258,16 +253,14 @@ class TestSysctlParsingEdgeCases:
 
 # ── BUG: KeyError when both vendor and brand_string are absent ───────────────
 
+
 class TestMissingBrandString:
     """When both vendor and brand_string are absent, vendor should remain None
     without crashing."""
 
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_missing_vendor_and_brand_string_no_crash(self, mock_co):
-        minimal_sysctl = (
-            "machdep.cpu.core_count: 4\n"
-            "machdep.cpu.thread_count: 4\n"
-        )
+        minimal_sysctl = "machdep.cpu.core_count: 4\nmachdep.cpu.thread_count: 4\n"
         mock_co.side_effect = _mock_check_output(minimal_sysctl, arch="x86_64")
         info = fetch_cpu_info()
         assert info.vendor is None
@@ -275,6 +268,7 @@ class TestMissingBrandString:
 
 
 # ── BUG: Inconsistent arch casing in ARM version detection ───────────────────
+
 
 class TestArchCasingConsistency:
     """ARM version detection should work regardless of uname casing."""
@@ -290,14 +284,11 @@ class TestArchCasingConsistency:
 
 # ── Missing cores/threads ───────────────────────────────────────────────────
 
-class TestMissingCoresThreads:
 
+class TestMissingCoresThreads:
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_missing_core_count_is_partial(self, mock_co):
-        sysctl = (
-            "machdep.cpu.brand_string: Apple M3\n"
-            "machdep.cpu.thread_count: 8\n"
-        )
+        sysctl = "machdep.cpu.brand_string: Apple M3\nmachdep.cpu.thread_count: 8\n"
         mock_co.side_effect = _mock_check_output(sysctl)
         info = fetch_cpu_info()
         assert info.cores is None
@@ -306,10 +297,7 @@ class TestMissingCoresThreads:
 
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_missing_thread_count_is_partial(self, mock_co):
-        sysctl = (
-            "machdep.cpu.brand_string: Apple M3\n"
-            "machdep.cpu.core_count: 8\n"
-        )
+        sysctl = "machdep.cpu.brand_string: Apple M3\nmachdep.cpu.core_count: 8\n"
         mock_co.side_effect = _mock_check_output(sysctl)
         info = fetch_cpu_info()
         assert info.cores == 8
@@ -319,11 +307,12 @@ class TestMissingCoresThreads:
 
 # ── Return type ──────────────────────────────────────────────────────────────
 
-class TestReturnType:
 
+class TestReturnType:
     @patch("hwprobe.core.mac.cpu.subprocess.check_output")
     def test_return_type_is_cpu_info(self, mock_co):
         from hwprobe.models.cpu_models import CPUInfo
+
         mock_co.side_effect = _mock_check_output(SYSCTL_APPLE_M3)
         info = fetch_cpu_info()
         assert isinstance(info, CPUInfo)
