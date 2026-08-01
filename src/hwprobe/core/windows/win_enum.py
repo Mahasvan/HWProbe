@@ -2,10 +2,9 @@ FEATURE_ID_MAP = {
     "SSE": 6,
     "SSE2": 10,
     "SSE3": 13,
-    "SSE4": 36,
+    "SSSE3": 36,
     "SSE4.1": 37,
     "SSE4.2": 38,
-    "SSE3.1": 36,
 }
 
 BUS_TYPE = {
