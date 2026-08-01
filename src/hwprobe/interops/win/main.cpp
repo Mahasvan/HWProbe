@@ -1,12 +1,14 @@
-// Standalone CLI test for both bindings in interops/win/:
+// Standalone CLI test for all bindings in interops/win/:
 //   gpu_info.dll    -> get_gpu_info (DXGI + SetupAPI)
 //   wmi.dll         -> get_wmi_data (COM + WbemLocator)
+//   display_info.dll -> get_display_connectors, get_gpu_for_display, get_edid
 //
 // Loads each DLL at runtime (same path the Python bindings use) so we exercise
 // the real ABI without needing matching import libs.
 
 #include "gpu_info.h"
 #include "wmi.h"
+#include "display_info.h"
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
@@ -102,8 +104,85 @@ static int test_wmi() {
     return 0;
 }
 
+typedef int (*get_monitor_devices_ptr)(MonitorDevice *, int);
+typedef int (*get_display_connectors_ptr)(ConnectorInfo *, int);
+typedef int (*get_gpu_for_display_ptr)(const char *, char *, int);
+typedef int (*get_edid_ptr)(const char *, unsigned char *, int);
+
+static int test_display() {
+    HMODULE hLib = _load("display_info.dll");
+    if (!hLib) {
+        printf("[display] could not load display_info.dll (GetLastError=%lu)\n", GetLastError());
+        return 1;
+    }
+
+    auto fnMonitors = reinterpret_cast<get_monitor_devices_ptr>(
+        GetProcAddress(hLib, "get_monitor_devices"));
+    auto fnConnectors = reinterpret_cast<get_display_connectors_ptr>(
+        GetProcAddress(hLib, "get_display_connectors"));
+    auto fnGpu = reinterpret_cast<get_gpu_for_display_ptr>(
+        GetProcAddress(hLib, "get_gpu_for_display"));
+    auto fnEdid = reinterpret_cast<get_edid_ptr>(
+        GetProcAddress(hLib, "get_edid"));
+
+    if (!fnMonitors || !fnConnectors || !fnGpu || !fnEdid) {
+        printf("[display] missing exports\n");
+        FreeLibrary(hLib);
+        return 1;
+    }
+
+    // Monitors
+    MonitorDevice monitors[8] = {};
+    int nm = fnMonitors(monitors, 8);
+    if (nm < 0) {
+        printf("[display] get_monitor_devices failed\n");
+        FreeLibrary(hLib);
+        return 1;
+    }
+
+    // Connectors (for matching)
+    ConnectorInfo connectors[8] = {};
+    int nc = fnConnectors(connectors, 8);
+
+    printf("[display] Found %d monitor(s):\n\n", nm);
+    for (int i = 0; i < nm; ++i) {
+        printf("Monitor %d:\n", i);
+        printf("  DeviceID:    %s\n", monitors[i].device_id);
+        printf("  PNPDeviceID: %s\n", monitors[i].pnp_device_id);
+        printf("  Resolution:  %dx%d @ %d Hz\n",
+               monitors[i].width, monitors[i].height, monitors[i].refresh_rate);
+
+        // GPU for this display
+        char gpuName[256] = {};
+        if (fnGpu(monitors[i].device_id, gpuName, sizeof(gpuName)) == 0) {
+            printf("  GPU:         %s\n", gpuName);
+        }
+
+        // Connector info
+        for (int j = 0; j < nc; ++j) {
+            if (strcmp(connectors[j].display_id, monitors[i].device_id) == 0) {
+                printf("  Connector:   %s (tech=%d)\n",
+                       connectors[j].display_path, connectors[j].output_technology);
+
+                // EDID via display path
+                unsigned char edidBuf[1024] = {};
+                int edidLen = fnEdid(connectors[j].display_path, edidBuf, sizeof(edidBuf));
+                if (edidLen > 0) {
+                    printf("  EDID:        %d bytes\n", edidLen);
+                }
+                break;
+            }
+        }
+        printf("\n");
+    }
+
+    FreeLibrary(hLib);
+    return 0;
+}
+
 int main() {
     int rc_gpu = test_gpu();
     int rc_wmi = test_wmi();
-    return (rc_gpu || rc_wmi) ? 1 : 0;
+    int rc_display = test_display();
+    return (rc_gpu || rc_wmi || rc_display) ? 1 : 0;
 }

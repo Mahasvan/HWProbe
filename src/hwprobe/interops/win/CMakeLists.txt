@@ -62,7 +62,33 @@ set_target_properties(wmi PROPERTIES
         PREFIX ""
 )
 
-# ---- Standalone test executable (loads both DLLs at runtime) ----
+# ---- display_info.dll : CCD connectors + DXGI GPU match + SetupAPI EDID ----
+add_library(display_info SHARED
+        src/display_info.cpp
+)
+
+target_link_options(display_info PRIVATE ${_STATIC_RUNTIME_OPTS})
+
+target_include_directories(display_info
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(display_info
+        PRIVATE
+        dxgi
+        setupapi
+        advapi32
+        user32
+)
+
+set_target_properties(display_info PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bindings
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bindings
+        OUTPUT_NAME "display_info"
+        PREFIX ""
+)
+
+# ---- Standalone test executable (loads all DLLs at runtime) ----
 add_executable(WinDeviceInfo main.cpp)
 
 target_include_directories(WinDeviceInfo

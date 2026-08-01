@@ -1,356 +1,242 @@
-import ctypes
+"""
+Tests for hwprobe.core.windows.display
+
+All Win32 calls go through display_info.dll, so tests just mock the four
+binding functions. No ctypes patching needed.
+Uses direct-load pattern to bypass core.windows.__init__ which chains
+into broken legacy imports.
+"""
+
+import importlib
+import importlib.util
+import pathlib
 import struct
-from ctypes import addressof, py_object
+import sys
+import types
+from dataclasses import dataclass
+from typing import Optional
 
 import pytest
 
-from hwprobe.core.windows import display
-from hwprobe.interops.win.legacy.constants import (
-    STATUS_FAILURE,
-    STATUS_INVALID_ARG,
-    STATUS_NOK,
-    STATUS_OK,
-)
-from hwprobe.models.display_models import DisplayInfo
+from hwprobe.models.display_models import DisplayInfo, DisplayModuleInfo, ResolutionInfo
 from hwprobe.models.status_models import StatusType
+
+_MODULE_PATH = pathlib.Path(__file__).resolve().parents[3] / "src" / "hwprobe" / "core" / "windows" / "display.py"
+
+
+@dataclass
+class MonitorDevice:
+    device_id: str
+    pnp_device_id: str
+    width: int
+    height: int
+    refresh_rate: int
+
+
+@dataclass
+class ConnectorInfo:
+    display_id: str
+    display_path: str
+    output_technology: int
+
+
+def _load_display_module():
+    """Load display.py directly without triggering core.windows.__init__."""
+    # Stub the display_info binding — it loads a DLL at import time.
+    # Use real dataclasses so tests can construct them.
+    _binding = types.ModuleType("hwprobe.interops.win.bindings.display_info")
+    _binding.MonitorDevice = MonitorDevice
+    _binding.ConnectorInfo = ConnectorInfo
+    _binding.get_monitor_devices = lambda: []
+    _binding.get_display_connectors = lambda: []
+    _binding.get_gpu_for_display = lambda name: None
+    _binding.get_edid = lambda pnp: None
+    sys.modules.setdefault("hwprobe.interops.win.bindings.display_info", _binding)
+
+    # Stub win_enum — display.py imports DISPLAY_CON_TYPE from it, but
+    # importing the real module triggers core.windows.__init__.
+    _win_enum = types.ModuleType("hwprobe.core.windows.win_enum")
+    _win_enum.DISPLAY_CON_TYPE = {4: "DVI", 5: "HDMI", 10: "DisplayPort", 11: "eDP"}
+    sys.modules.setdefault("hwprobe.core.windows.win_enum", _win_enum)
+
+    mod_name = "hwprobe.core.windows.display"
+    if mod_name in sys.modules:
+        return sys.modules[mod_name]
+    spec = importlib.util.spec_from_file_location(mod_name, _MODULE_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+display = _load_display_module()
+
 
 # ============================================================
 # Helpers
 # ============================================================
 
 
-def deref(ptr, ctype):
-    """Dereference a ctypes byref() argument safely."""
-    return ctypes.cast(ptr, ctypes.POINTER(ctype)).contents
-
-
-def build_minimal_edid(name=b"TEST-MONITOR", width_cm=60, height_cm=34):
-    """Build a minimal 128-byte EDID for testing."""
+def _build_edid(name=b"TEST-MONITOR", width_cm=60, height_cm=34, year=2023):
+    """Build a minimal 128-byte EDID matching the shared parser's expectations."""
     edid = bytearray(128)
-    # decoded: vendor = TST
-    vendor = (1 << 10) | (2 << 5) | 3
+    vendor = (1 << 10) | (2 << 5) | 3  # "ABC"
 
     edid[8:10] = struct.pack(">H", vendor)
     edid[10:12] = struct.pack("<H", 0x1234)
-    edid[12:16] = struct.pack("<I", 0xDEADBEEF)
+    edid[0x11] = year - 1990
+    edid[0x12] = 1  # version 1.4
+    edid[0x13] = 4
+    edid[0x14] = 0x80  # digital input
     edid[21] = width_cm
     edid[22] = height_cm
-    off = 54
-    edid[off : off + 4] = b"\x00\x00\x00\xfc"
-    edid[off + 4] = 0x00
-    edid[off + 5 : off + 5 + len(name)] = name
-    edid[off + 5 + len(name)] = 0x0A
-    return bytes(edid), vendor
+
+    # Name descriptor at 0x36 — tag at [0:4], pad at [4], text at [5:18]
+    edid[0x36:0x3B] = b"\x00\x00\x00\xfc\x00"
+    edid[0x3B:0x3B + len(name)] = name
+    edid[0x3B + len(name)] = 0x0A
+    for i in range(0x3B + len(name) + 1, 0x48):
+        edid[i] = 0x20
+
+    # Serial descriptor at 0x48
+    serial = b"SN12345"
+    edid[0x48:0x4D] = b"\x00\x00\x00\xff\x00"
+    edid[0x4D:0x4D + len(serial)] = serial
+    edid[0x4D + len(serial)] = 0x0A
+    for i in range(0x4D + len(serial) + 1, 0x5A):
+        edid[i] = 0x20
+
+    return bytes(edid)
+
+
+def _mock_monitor(device_id=r"\\.\DISPLAY1", pnp_id=r"MONITOR\ABC123\{GUID}", w=2560, h=1440, rr=144):
+    return MonitorDevice(device_id=device_id, pnp_device_id=pnp_id, width=w, height=h, refresh_rate=rr)
 
 
 # ============================================================
-# Aspect ratio tests
+# EDID enrichment tests
 # ============================================================
 
 
-class TestAspectRatios:
-    @pytest.mark.parametrize(
-        "width,height,real,friendly",
-        [
-            (3440, 1440, "43:18", "21:9"),
-            (1920, 1080, "16:9", "16:9"),
-            (1080, 1920, "9:16", "9:16"),
-            (5120, 1440, "32:9", "32:9"),
-            (1920, 1200, "8:5", "16:10"),
-            (1024, 768, "4:3", "4:3"),
-            (5120, 768, "20:3", None),
-        ],
-    )
-    def test_common_ratios(self, width, height, real, friendly):
-        ratio, r, f = display.get_aspect_ratio(width, height)
-        assert r == real
-        assert f == friendly
-        assert ratio > 0
+class TestEnrichFromEdid:
+    def test_fills_name_year_serial_manufacturer(self):
+        module = DisplayModuleInfo()
+        module = display._enrich_from_edid(module, _build_edid())
 
-    @pytest.mark.parametrize(
-        "width,height",
-        [(0, 1080), (1920, 0), (0, 0)],
-    )
-    def test_invalid_dimensions(self, width, height):
-        ratio, real, friendly = display.get_aspect_ratio(width, height)
+        assert module.name == "TEST-MONITOR"
+        assert module.year == 2023
+        assert module.serial_number == "SN12345"
+        assert module.manufacturer_code == "ABC"
 
-        assert ratio is None
-        assert real is None
-        assert friendly is None
+    def test_fills_bit_depth_into_existing_resolution(self):
+        module = DisplayModuleInfo()
+        module.resolution = ResolutionInfo(width=2560, height=1440, refresh_rate=144.0)
+        module = display._enrich_from_edid(module, _build_edid())
 
+        assert module.resolution.width == 2560  # not overwritten
+        assert module.resolution.height == 1440  # not overwritten
+        assert module.resolution.refresh_rate == 144.0  # not overwritten
+        assert module.resolution.bit_depth is not None  # filled from EDID
 
-# ============================================================
-# EDID parsing tests
-# ============================================================
+    def test_fills_resolution_when_none(self):
+        module = DisplayModuleInfo()
+        module = display._enrich_from_edid(module, _build_edid())
 
+        assert module.resolution is not None
 
-class TestEDIDParsing:
-    def test_minimal_edid(self):
-        edid, vendor = build_minimal_edid()
-        parsed = display.parse_edid(edid)
+    def test_does_not_overwrite_existing_fields(self):
+        module = DisplayModuleInfo(name="Custom Name", year=2020)
+        module = display._enrich_from_edid(module, _build_edid())
 
-        assert parsed["manufacturer_code"] == "ABC"
-        assert parsed["vendor_id"] == vendor
-        assert parsed["product_id"] == 0x1234
-        assert parsed["serial"] == 0xDEADBEEF
-        assert parsed["name"] == "TEST-MONITOR"
-        assert parsed["inches"] > 0
-
-    def test_missing_name_descriptor(self):
-        edid, _ = build_minimal_edid()
-        edid = bytearray(edid)
-        edid[54:58] = b"\x00\x00\x00\x00"
-        parsed = display.parse_edid(bytes(edid))
-
-        assert parsed["name"] is None or parsed["name"] == ""
-
-    def test_invalid_length(self):
-        assert display.parse_edid(b"short") is None
-
-    def test_invalid_hdev(self, monkeypatch):
-        def mockfail_SetupDiGetClassDevsA(cGuidPtr, enumerator, hwndParent, flags):
-            return -1  # simulate failure
-
-        monkeypatch.setattr(display, "SetupDiGetClassDevsA", mockfail_SetupDiGetClassDevsA)
-
-        assert display.get_edid_by_hwid(None) is None
-
-    def test_device_interfaces_enum_fail(self, monkeypatch):
-        def mockfail_SetupDiEnumDeviceInterfaces(hDev, devData, cGuidPtr, memberIdx, devIntData):
-            return False
-
-        monkeypatch.setattr(display, "SetupDiEnumDeviceInterfaces", mockfail_SetupDiEnumDeviceInterfaces)
-
-        assert display.get_edid_by_hwid(None) is None
+        assert module.name == "Custom Name"
+        assert module.year == 2020
+        assert module.serial_number == "SN12345"  # still fills None fields
 
 
 # ============================================================
-# monitor_enum_proc tests
+# fetch_display_info tests
 # ============================================================
 
 
-@pytest.fixture
-def fake_win32(monkeypatch):
-    """Mock Win32 API calls for monitor enumeration."""
+class TestFetchDisplayInfo:
+    def test_no_monitors_returns_failed(self, monkeypatch):
+        monkeypatch.setattr(display, "get_monitor_devices", lambda: [])
+        monkeypatch.setattr(display, "get_display_connectors", lambda: [])
 
-    def fake_GetMonitorInfoA(hmonitor, mi_ptr):
-        mi = deref(mi_ptr, display.MONITORINFOEXA)
-        mi.szDevice = b"\\\\.\\DISPLAY1"
-        return True
+        result = display.fetch_display_info()
+        assert result.status.type == StatusType.FAILED
 
-    def fake_EnumDisplaySettingsA(device, mode, dm_ptr):
-        dm = deref(dm_ptr, display.DEVMODEA)
-        dm.dmPelsWidth = 2560
-        dm.dmPelsHeight = 1440
-        dm.dmDisplayFrequency = 144
-        dm.dmDisplayOrientation = 0
-        return True
+    def test_connector_failure_sets_partial(self, monkeypatch):
+        monkeypatch.setattr(display, "get_monitor_devices", lambda: [_mock_monitor()])
+        monkeypatch.setattr(display, "get_gpu_for_display", lambda name: None)
+        monkeypatch.setattr(display, "get_edid", lambda key: None)
 
-    def fake_EnumDisplayDevicesA(device, idx, dd_ptr, flags):
-        dd = deref(dd_ptr, display.DISPLAY_DEVICEA)
-        dd.DeviceID = b"MONITOR\\AG326UD\\{SOME-GUID}"
-        return True
+        def fail_connectors():
+            raise RuntimeError("CCD API failed")
 
-    monkeypatch.setattr(display, "GetMonitorInfoA", fake_GetMonitorInfoA)
-    monkeypatch.setattr(display, "EnumDisplaySettingsA", fake_EnumDisplaySettingsA)
-    monkeypatch.setattr(display, "EnumDisplayDevicesA", fake_EnumDisplayDevicesA)
+        monkeypatch.setattr(display, "get_display_connectors", fail_connectors)
 
+        result = display.fetch_display_info()
+        assert result.status.type == StatusType.PARTIAL
+        assert any("connector" in m.lower() for m in result.status.messages)
 
-class TestMonitorEnumProc:
-    def test_happy_path(self, fake_win32, monkeypatch):
-        monitors = DisplayInfo()
-        monitors_ptr = py_object(monitors)
-        lparam = addressof(monitors_ptr)
+    def test_happy_path(self, monkeypatch):
+        monkeypatch.setattr(display, "get_monitor_devices", lambda: [_mock_monitor()])
+        monkeypatch.setattr(display, "get_display_connectors", lambda: [
+            ConnectorInfo(
+                display_id=r"\\.\DISPLAY1",
+                display_path=r"\\?\DISPLAY#ABC123",
+                output_technology=10,
+            ),
+        ])
+        monkeypatch.setattr(display, "get_gpu_for_display", lambda name: "GPU-0")
+        monkeypatch.setattr(display, "get_edid", lambda key: _build_edid())
 
-        monkeypatch.setattr(display, "find_monitor_gpu", lambda name: ("GPU-0", STATUS_OK))
-        monkeypatch.setattr(
-            display,
-            "get_edid_by_hwid",
-            lambda hwid: {
-                "name": "AG326UD",
-                "vendor_id": 0x1234,
-                "product_id": 0x5678,
-                "serial": "42",
-                "inches": 32,
-                "manufacturer_code": "TST",
-            },
-        )
+        result = display.fetch_display_info()
 
-        ret = display.monitor_enum_proc(1, 0, None, lparam)
-        assert ret is True
-        assert len(monitors.modules) == 1
-
-        mod = monitors.modules[0]
-        assert mod.name == "AG326UD"
+        assert len(result.modules) == 1
+        mod = result.modules[0]
+        assert mod.name == "TEST-MONITOR"
         assert mod.gpu_name == "GPU-0"
+        assert mod.interface == "DisplayPort"
+        assert mod.acpi_path == r"MONITOR\ABC123\{GUID}"
         assert mod.resolution.width == 2560
         assert mod.resolution.height == 1440
-        assert mod.resolution.refresh_rate == 144
-        assert int(mod.vendor_id, 16) == 0x1234
-        assert int(mod.product_id, 16) == 0x5678
-        assert mod.serial_number == "42"
-        assert mod.manufacturer_code == "TST"
+        assert mod.resolution.refresh_rate == 144.0
+        assert mod.serial_number == "SN12345"
+        assert mod.manufacturer_code == "ABC"
+        assert mod.year == 2023
 
-    def test_no_edid_found(self, fake_win32, monkeypatch):
-        monitors = DisplayInfo()
-        monitors_ptr = py_object(monitors)
-        lparam = addressof(monitors_ptr)
+    def test_no_edid_still_returns_module(self, monkeypatch):
+        monkeypatch.setattr(display, "get_monitor_devices", lambda: [
+            _mock_monitor(pnp_id=r"MONITOR\XYZ\{GUID}", w=1920, h=1080, rr=60),
+        ])
+        monkeypatch.setattr(display, "get_display_connectors", lambda: [])
+        monkeypatch.setattr(display, "get_gpu_for_display", lambda name: None)
+        monkeypatch.setattr(display, "get_edid", lambda key: None)
 
-        monkeypatch.setattr(display, "find_monitor_gpu", lambda name: (None, STATUS_NOK))
-        monkeypatch.setattr(display, "get_edid_by_hwid", lambda hwid: None)
+        result = display.fetch_display_info()
 
-        ret = display.monitor_enum_proc(1, 0, None, lparam)
-        assert ret is True
-        assert len(monitors.modules) == 1
-        assert monitors.modules[0].name is None
+        assert len(result.modules) == 1
+        mod = result.modules[0]
+        assert mod.name is None
+        assert mod.gpu_name is None
+        assert mod.resolution.width == 1920
+        assert mod.acpi_path == r"MONITOR\XYZ\{GUID}"
 
-    def test_enum_display_settings_fail(self, monkeypatch):
-        def fake_EnumDisplaySettingsA(device, mode, dm_ptr):
-            return False
+    def test_multiple_monitors(self, monkeypatch):
+        monkeypatch.setattr(display, "get_monitor_devices", lambda: [
+            _mock_monitor(device_id=r"\\.\DISPLAY1", pnp_id=r"MONITOR\AAA\{1}", w=2560, h=1440, rr=144),
+            _mock_monitor(device_id=r"\\.\DISPLAY2", pnp_id=r"MONITOR\BBB\{2}", w=1920, h=1080, rr=60),
+        ])
+        monkeypatch.setattr(display, "get_display_connectors", lambda: [])
+        monkeypatch.setattr(display, "get_gpu_for_display", lambda name: "GPU-0")
+        monkeypatch.setattr(display, "get_edid", lambda key: None)
 
-        monitors = DisplayInfo()
-        monitors_ptr = py_object(monitors)
-        lparam = addressof(monitors_ptr)
+        result = display.fetch_display_info()
 
-        monkeypatch.setattr(display, "EnumDisplaySettingsA", fake_EnumDisplaySettingsA)
-
-        ret = display.monitor_enum_proc(1, 0, None, lparam)
-
-        assert ret is True
-        assert monitors.status.type == StatusType.PARTIAL
-        assert monitors.modules == []
-
-
-class TestDisplayInfoFetch:
-    def test_fetch_display_info_internal_real(self):
-        monitors = display.fetch_display_info_internal()
-
-        assert monitors.status.type == StatusType.SUCCESS
-        assert len(monitors.modules) > 0
-
-        module = monitors.modules[0]
-        assert module.name is not None
-        assert module.gpu_name is not None
-        assert module.device_id is not None
-        assert module.acpi_path is not None
-        assert module.resolution.width > 0
-        assert module.resolution.height > 0
-        assert module.resolution.aspect_ratio > 0
-        assert module.resolution.aspect_ratio_real is not None
-        assert module.resolution.aspect_ratio_friendly is not None
-        assert module.orientation != "Unknown"
-        assert module.inches > 0
-        assert module.vendor_id is not None
-        assert module.product_id is not None
-        assert module.serial_number is not None
-        assert module.manufacturer_code is not None
-
-    def test_fetch_display_info_internal_failure(self, monkeypatch):
-        def mockfail_EnumDisplayMonitors(hdc, lprcClip, lpfnEnum, dwData):
-            return False
-
-        monkeypatch.setattr(display, "EnumDisplayMonitors", mockfail_EnumDisplayMonitors)
-
-        assert display.fetch_display_info_internal().status.type == StatusType.FAILED
-
-    @pytest.mark.parametrize(
-        "orientation, expected",
-        [
-            (0, "Landscape"),
-            (1, "Portrait"),
-            (2, "Landscape (flipped)"),
-            (3, "Portrait (flipped)"),
-            (-1, "Unknown"),
-        ],
-    )
-    def test_fetch_display_info_internal_orientations(self, orientation, expected, monkeypatch):
-        def fake_EnumDisplaySettingsA(device, mode, dm_ptr):
-            dm = deref(dm_ptr, display.DEVMODEA)
-            dm.dmPelsWidth = 2560
-            dm.dmPelsHeight = 1440
-            dm.dmDisplayFrequency = 144
-            dm.dmDisplayOrientation = orientation
-
-            return True
-
-        monkeypatch.setattr(display, "EnumDisplaySettingsA", fake_EnumDisplaySettingsA)
-
-        data = display.fetch_display_info_internal()
-
-        assert data.status.type == StatusType.SUCCESS
-        assert data.modules[0].orientation.lower() == expected.lower()
-
-    def test_fetch_display_info_internal_missing_pnp(self, monkeypatch):
-        def fake_EnumDisplayDevicesA(device, idx, dd_ptr, flags):
-            dd = deref(dd_ptr, display.DISPLAY_DEVICEA)
-            dd.DeviceID = b""
-
-            return True
-
-        monkeypatch.setattr(display, "EnumDisplayDevicesA", fake_EnumDisplayDevicesA)
-
-        data = display.fetch_display_info_internal()
-
-        assert data.status.type == StatusType.FAILED
-        assert data.status.messages[0] == "Failed to fetch Display device information, PNPDeviceID is empty!"
-
-
-class TestGPU:
-    """Coverage for GPU helper method: GetGPUForDisplay(...)"""
-
-    @pytest.mark.parametrize(
-        "enc_name, out_buf, buf_size, exp_status",
-        [
-            (b"\\\\.\\DISPLAY1", ctypes.create_string_buffer(256), 256, STATUS_OK),
-            (b"", ctypes.create_string_buffer(256), 256, STATUS_INVALID_ARG),
-            (b"\\\\.\\DISPLAY1", None, 256, STATUS_INVALID_ARG),
-            (
-                b"\\\\.\\DISPLAY1",
-                ctypes.create_string_buffer(256),
-                0,
-                STATUS_INVALID_ARG,
-            ),
-            (
-                b"\\\\.\\DISPLAY420",
-                ctypes.create_string_buffer(256),
-                256,
-                STATUS_FAILURE,
-            ),
-        ],
-    )
-    def test_fetch_display_info_gpu_display(self, enc_name, out_buf, buf_size, exp_status, monkeypatch):
-        def mock_find_monitor_gpu(device_name):
-            res = display.GetGPUForDisplay(enc_name, out_buf, buf_size)
-            result = (None, res)
-
-            if res != STATUS_OK:
-                return result
-
-            val = out_buf.value.decode("utf-8")
-
-            if val and len(val) > 0:
-                result = (val, res)
-
-            return result
-
-        monkeypatch.setattr(display, "find_monitor_gpu", mock_find_monitor_gpu)
-
-        assert display.find_monitor_gpu(enc_name.decode())[1] == exp_status
-
-    @pytest.mark.parametrize(
-        "set_status, exp_status",
-        [
-            (STATUS_NOK, STATUS_NOK),
-            (STATUS_INVALID_ARG, STATUS_INVALID_ARG),
-            (STATUS_FAILURE, STATUS_FAILURE),
-        ],
-    )
-    def test_fetch_display_info_gpu_display_failures(self, set_status, exp_status, monkeypatch):
-        def mockfail_GetGPUForDisplay(enc_name, out_buf, buf_size):
-            return set_status  # Simulate failure
-
-        monkeypatch.setattr(display, "GetGPUForDisplay", mockfail_GetGPUForDisplay)
-
-        data = display.find_monitor_gpu("Empty")
-
-        assert data[1] == exp_status
+        assert len(result.modules) == 2
+        assert result.modules[0].acpi_path == r"MONITOR\AAA\{1}"
+        assert result.modules[1].acpi_path == r"MONITOR\BBB\{2}"
+        assert result.modules[0].resolution.width == 2560
+        assert result.modules[1].resolution.width == 1920

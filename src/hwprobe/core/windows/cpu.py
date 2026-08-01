@@ -63,14 +63,13 @@ def get_features() -> list[str]:
 
 def fetch_cpu_info() -> CPUInfo:
     cpu_info = CPUInfo()
-    
+
     wmi_data = wmi.get_wmi_data("Win32_Processor", ["Name", "Manufacturer", "Architecture", "AddressWidth", "MaxClockSpeed", "NumberOfCores", "NumberOfLogicalProcessors"])
     if wmi_data:
         cpu_info.name = wmi_data[0]["Name"].strip()
         cpu_info.vendor = "AMD" if "amd" in wmi_data[0]["Manufacturer"].lower() else "Intel" if "intel" in wmi_data[0]["Manufacturer"].lower() else wmi_data[0]["Manufacturer"].strip()
-        cpu_info.architecture = CPU_ARCHITECTURES.get(wmi_data[0]["Architecture"], "Unknown")
+        cpu_info.architecture = CPU_ARCHITECTURES.get(int(wmi_data[0]["Architecture"]), "Unknown")
         cpu_info.bitness = int(wmi_data[0]["AddressWidth"])
-        cpu_info.max_clock_speed = float(wmi_data[0]["MaxClockSpeed"])
         cpu_info.cores = int(wmi_data[0]["NumberOfCores"])
         cpu_info.threads = int(wmi_data[0]["NumberOfLogicalProcessors"])
 
@@ -80,5 +79,5 @@ def fetch_cpu_info() -> CPUInfo:
     else:
         cpu_info.status.type = StatusType.FAILED
         cpu_info.status.messages.append("Unable to obtain CPU Info: WMI query returned no data.")
-            
+
     return cpu_info
