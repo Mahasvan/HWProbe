@@ -1,10 +1,7 @@
-import ctypes
+from typing import Optional
 
 from hwprobe.core.windows.win_enum import ECC_MEMORY_TYPE, MEMORY_TYPE
-
-# todo: refactor to new bindings
-from hwprobe.interops.win.legacy.constants import ECC_MULTI_BIT, ECC_SINGLE_BIT
-from hwprobe.interops.win.legacy.signatures import GetWmiInfo
+from hwprobe.interops.win.bindings import wmi
 from hwprobe.models.memory_models import (
     MemoryInfo,
     MemoryModuleInfo,
@@ -21,122 +18,74 @@ def check_ecc() -> tuple[bool, str]:
     More specifically, it only returns true if the "MemoryErrorCorrection" property is:
         5 - Single-bit ECC
         6 - Multi-bit ECC
-
-    Returns:
-        Tuple[bool, str]: A tuple where the first element indicates if ECC is supported,
-                          and the second element is the ECC type as a string.
     """
-    query = b"SELECT MemoryErrorCorrection FROM Win32_PhysicalMemoryArray"
-
-    # NOTE[kernel]:
-    #   I don't really know how to implement support for multiple memory arrays,
-    #   so we'll just check the first one for now.
-    buf_size = 256 * 1
-
-    buffer = ctypes.create_string_buffer(buf_size)
-    GetWmiInfo(query, b"ROOT\\CIMV2", buffer, buf_size)
-
-    raw_data = buffer.value.decode("utf-8", errors="ignore")
-
-    if not raw_data:
+    data = wmi.get_wmi_data("Win32_PhysicalMemoryArray", ["MemoryErrorCorrection"])
+    if not data:
         return False, "Unknown"
 
-    first_line = raw_data.split("\n")[0]
-    parsed_data = {x.split("=", 1)[0]: x.split("=", 1)[1] for x in first_line.split("|") if "=" in x}
-    ecc_type = parsed_data.get("MemoryErrorCorrection", "Unknown")
+    correction_type = data[0].get("MemoryErrorCorrection", "")
+    if not correction_type:
+        return False, "Unknown"
 
-    supported = False
+    try:
+        correction_type = int(correction_type)
+    except ValueError:
+        return False, "Unknown"
 
-    if ecc_type.isdigit():
-        ecc_type = int(ecc_type)
-        if ecc_type == ECC_SINGLE_BIT or ecc_type == ECC_MULTI_BIT:
-            supported = True
-
-    return supported, (ECC_MEMORY_TYPE[ecc_type] if ecc_type in ECC_MEMORY_TYPE else "Unknown")
+    return correction_type in (5, 6), ECC_MEMORY_TYPE.get(correction_type, "Unknown")
 
 
 def fetch_wmi_memory_info() -> MemoryInfo:
     memory_info = MemoryInfo()
-
-    # 256 bytes per property, 9 properties, 6 modules
-    buf_size = 256 * 9 * 8
-    buffer = ctypes.create_string_buffer(buf_size)
-
-    GetWmiInfo(
-        b"SELECT BankLabel, Capacity, Manufacturer, PartNumber, Speed, DeviceLocator, SMBIOSMemoryType, DataWidth, TotalWidth FROM Win32_PhysicalMemory",
-        b"ROOT\\CIMV2",
-        buffer,
-        buf_size,
+    records = wmi.get_wmi_data(
+        "Win32_PhysicalMemory",
+        [
+            "BankLabel",
+            "Capacity",
+            "Manufacturer",
+            "PartNumber",
+            "Speed",
+            "DeviceLocator",
+            "SMBIOSMemoryType",
+            "DataWidth",
+            "TotalWidth",
+        ],
     )
 
-    """
-    `raw_data` is in the following format:
-    BankLabel=...|Capacity=...|...
-    BankLabel=...|Capacity=...|...
-    ...
-    
-    Each module is separated by a newline; and for each module,
-    its properties are separated by a '|' character
-    """
-
-    raw_data = buffer.value.decode("utf-8", errors="ignore")
-
-    if not raw_data:
+    if not records:
         memory_info.status.type = StatusType.FAILED
         memory_info.status.messages.append("WMI query returned no data")
         return memory_info
 
-    for line in raw_data.split("\n"):
-        if not line or "|" not in line:
-            continue
-
+    for record in records:
         module = MemoryModuleInfo()
-        unparsed = line.split("|")
+        bank_label = record.get("BankLabel").strip()
+        capacity = int(record.get("Capacity"))
+        manufacturer = record.get("Manufacturer").strip()
+        part_number = record.get("PartNumber").strip()
+        speed = int(record.get("Speed"))
+        device_locator = record.get("DeviceLocator").strip()
+        smbios_mem_type = int(record.get("SMBIOSMemoryType"))
+        data_width = int(record.get("DataWidth"))
+        total_width = int(record.get("TotalWidth"))
 
-        parsed_data = {x.split("=", 1)[0]: x.split("=", 1)[1] for x in unparsed if "=" in x}
+        if capacity is not None:
+            module.capacity = Megabyte(capacity=capacity // (1024 * 1024))
 
-        bank_label = parsed_data["BankLabel"]
-        capacity = parsed_data["Capacity"]
-        manufacturer = parsed_data["Manufacturer"]
-        part_number = parsed_data["PartNumber"]
-        speed = parsed_data["Speed"]
-        device_locator = parsed_data["DeviceLocator"]
-        smbios_mem_type = parsed_data["SMBIOSMemoryType"]
-        data_width = parsed_data["DataWidth"]
-        total_width = parsed_data["TotalWidth"]
+        module.manufacturer = manufacturer
+        module.part_number = part_number
+        module.slot = MemoryModuleSlot(bank=bank_label, channel=device_locator)
 
-        capacity = int(capacity) if capacity.isdigit() else 0
+        # The speed is already reported as MHz.
+        module.frequency_mhz = speed
 
-        module.capacity = Megabyte(capacity=capacity // (1024 * 1024))
-        module.manufacturer = manufacturer.strip() if manufacturer else None
-        module.part_number = part_number.strip() if part_number else None
+        if smbios_mem_type is not None:
+            module.type = MEMORY_TYPE.get(smbios_mem_type, "Unknown")
 
-        slot = MemoryModuleSlot(
-            bank=bank_label.strip() if bank_label else None,
-            channel=device_locator.strip() if device_locator else None,
-        )
-        module.slot = slot
+        if data_width is not None and total_width is not None:
+            module.supports_ecc = total_width > data_width
 
-        # The speed is already reported as MHz
-        module.frequency_mhz = int(speed) if speed.isdigit() else None
-
-        if smbios_mem_type:
-            smbios_mem_type = smbios_mem_type.strip()
-            module.type = MEMORY_TYPE.get(int(smbios_mem_type), "Unknown")
-
-        if data_width and total_width:
-            if int(total_width) > int(data_width):
-                module.supports_ecc = True
-            else:
-                module.supports_ecc = False
-
-        # NOTE[kernel]:
-        #   I don't know if it's same to assume this,
-        #   but I believe Win32_PhysicalMemoryArray indicates
-        #   towards all memory modules in the system.
-        #
-        #   Apparently, this isn't supposed to be like this,
-        #   but I cannot find a better way to determine ECC support per module.
+        # WMI output takes precedence over data width comparison for ECC support.
         ecc_supported, ecc_type = check_ecc()
         module.supports_ecc = ecc_supported
         module.ecc_type = ecc_type
