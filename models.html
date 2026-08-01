@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Models &#8212; HWProbe 0.0.1b2 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/autodoc_pydantic.css" />
+    <script src="_static/documentation_options.js?v=5fb86801"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Supported Components" href="supported.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="models">
+<span id="id1"></span><h1>Models<a class="headerlink" href="#models" title="Link to this heading">¶</a></h1>
+<p>HWProbe exposes Pydantic models for each hardware subsystem plus shared helpers for capacity units and discovery status.</p>
+<section id="component-models">
+<h2>Component Models<a class="headerlink" href="#component-models" title="Link to this heading">¶</a></h2>
+<p>The Model for each component, such as CPU and GPU are subclasses of the <code class="docutils literal notranslate"><span class="pre">ComponentInfo</span></code> class.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="hwprobe.models.component_model.ComponentInfo">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ComponentInfo</span></span><a class="headerlink" href="#hwprobe.models.component_model.ComponentInfo" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute">
+<dt class="sig sig-object py" id="hwprobe.models.component_model.ComponentInfo.status">
+<span class="sig-name descname"><span class="pre">status</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#hwprobe.models.status_models.Status" title="hwprobe.models.status_models.Status"><span class="pre">Status</span></a></span><a class="headerlink" href="#hwprobe.models.component_model.ComponentInfo.status" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<p>All the following models include the <code class="docutils literal notranslate"><span class="pre">status</span></code> property, even though it is not shown
+explicitly.</p>
+<section id="cpu">
+<h3>CPU<a class="headerlink" href="#cpu" title="Link to this heading">¶</a></h3>
+<p>the information retrieved about the CPU is stored as the following class.</p>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.cpu_models.CPUInfo">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">CPUInfo</span></span><a class="headerlink" href="#hwprobe.models.cpu_models.CPUInfo" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hwprobe.models.component_model.ComponentInfo" title="hwprobe.models.component_model.ComponentInfo"><code class="xref py py-class docutils literal notranslate"><span class="pre">ComponentInfo</span></code></a></p>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.cpu_models.CPUInfo.name">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">name</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.cpu_models.CPUInfo.name" title="Link to this definition">¶</a></dt>
+<dd><p>This is the CPU’s name</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.cpu_models.CPUInfo.architecture">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">architecture</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.cpu_models.CPUInfo.architecture" title="Link to this definition">¶</a></dt>
+<dd><p>x86, ARM, etc.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.cpu_models.CPUInfo.bitness">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">bitness</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.cpu_models.CPUInfo.bitness" title="Link to this definition">¶</a></dt>
+<dd><p>Denotes whether the CPU is 32 or 64 bit.
+Independent of whether the OS is 32 or 64 bit.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.cpu_models.CPUInfo.arch_version">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">arch_version</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.cpu_models.CPUInfo.arch_version" title="Link to this definition">¶</a></dt>
+<dd><p>ARM Version. Will be <code class="docutils literal notranslate"><span class="pre">null</span></code> on x86 CPUs.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.cpu_models.CPUInfo.vendor">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">vendor</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.cpu_models.CPUInfo.vendor" title="Link to this definition">¶</a></dt>
+<dd><p>Manufacturer of the CPU. <code class="docutils literal notranslate"><span class="pre">Intel</span></code>, for example.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.cpu_models.CPUInfo.sse_flags">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">sse_flags</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="property"> <span class="pre">[Optional]</span></span><a class="headerlink" href="#hwprobe.models.cpu_models.CPUInfo.sse_flags" title="Link to this definition">¶</a></dt>
+<dd><p>SSE flags supported by the CPU.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.cpu_models.CPUInfo.cores">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">cores</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.cpu_models.CPUInfo.cores" title="Link to this definition">¶</a></dt>
+<dd><p>The number of physical cores present on the CPU</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.cpu_models.CPUInfo.threads">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">threads</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.cpu_models.CPUInfo.threads" title="Link to this definition">¶</a></dt>
+<dd><p>The number of logical threads supported by the CPU</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.cpu_models.CPUInfo.status">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">status</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#hwprobe.models.status_models.Status" title="hwprobe.models.status_models.Status"><span class="pre">Status</span></a></span><span class="property"> <span class="pre">[Optional]</span></span><a class="headerlink" href="#hwprobe.models.cpu_models.CPUInfo.status" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<hr class="docutils" />
+<section id="gpu">
+<h3>GPU<a class="headerlink" href="#gpu" title="Link to this heading">¶</a></h3>
+<p>Since there may be multiple GPUs present, the output for <code class="xref py py-meth docutils literal notranslate"><span class="pre">fetch_graphics_info()</span></code>
+is a <code class="docutils literal notranslate"><span class="pre">GraphicsInfo</span></code> object, with the <code class="docutils literal notranslate"><span class="pre">modules</span></code> property containing a list of <code class="docutils literal notranslate"><span class="pre">GPUInfo</span></code> objects.</p>
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GraphicsInfo">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">GraphicsInfo</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GraphicsInfo" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hwprobe.models.component_model.ComponentInfo" title="hwprobe.models.component_model.ComponentInfo"><code class="xref py py-class docutils literal notranslate"><span class="pre">ComponentInfo</span></code></a></p>
+<p>Contains list of <code class="docutils literal notranslate"><span class="pre">GPUInfo</span></code> objects.</p>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GraphicsInfo.modules">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">modules</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#hwprobe.models.gpu_models.GPUInfo" title="hwprobe.models.gpu_models.GPUInfo"><span class="pre">GPUInfo</span></a><span class="p"><span class="pre">]</span></span></span><span class="property"> <span class="pre">[Optional]</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GraphicsInfo.modules" title="Link to this definition">¶</a></dt>
+<dd><p>List of GPU modules present in the system.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GraphicsInfo.status">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">status</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#hwprobe.models.status_models.Status" title="hwprobe.models.status_models.Status"><span class="pre">Status</span></a></span><span class="property"> <span class="pre">[Optional]</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GraphicsInfo.status" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">GPUInfo</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo" title="Link to this definition">¶</a></dt>
+<dd><p>Information for one GPU is stored here</p>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.name">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">name</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.name" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.vendor_id">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">vendor_id</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.vendor_id" title="Link to this definition">¶</a></dt>
+<dd><p>This is the hexadecimal number that identifies the manufacturer of the GPU.
+Format: <code class="docutils literal notranslate"><span class="pre">0x10DE</span></code> - Nvidia</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.device_id">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">device_id</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.device_id" title="Link to this definition">¶</a></dt>
+<dd><p>This is the hexadecimal number that identifies the GPU model.
+Format: <code class="docutils literal notranslate"><span class="pre">0xPQRS</span></code></p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.manufacturer">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">manufacturer</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.manufacturer" title="Link to this definition">¶</a></dt>
+<dd><p>GPU vendor. <code class="docutils literal notranslate"><span class="pre">NVIDIA</span></code>, for example.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.subsystem_manufacturer">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">subsystem_manufacturer</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.subsystem_manufacturer" title="Link to this definition">¶</a></dt>
+<dd><p>The manufacturer of the GPU. For example, it may be <code class="docutils literal notranslate"><span class="pre">Lenovo</span></code> on a Thinkpad.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.subsystem_model">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">subsystem_model</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.subsystem_model" title="Link to this definition">¶</a></dt>
+<dd><p>The model name given by the subsystem manufacturer.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.acpi_path">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">acpi_path</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.acpi_path" title="Link to this definition">¶</a></dt>
+<dd><p>ACPI device path, e.g. <code class="docutils literal notranslate"><span class="pre">\\_SB.PC00.RP05.PXSX</span></code>.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.pci_path">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">pci_path</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.pci_path" title="Link to this definition">¶</a></dt>
+<dd><p>PCI path from the firmware tree, e.g. <code class="docutils literal notranslate"><span class="pre">PciRoot(0x0)/Pci(0x1C,0x5)/Pci(0x0,0x0)</span></code>.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.pcie_width">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">pcie_width</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.pcie_width" title="Link to this definition">¶</a></dt>
+<dd><p>Number of lanes that the GPU occupies on the PCIe bus.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.pcie_gen">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">pcie_gen</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.pcie_gen" title="Link to this definition">¶</a></dt>
+<dd><p>PCIe generation supported by the GPU.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.vram">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">vram</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#hwprobe.models.size_models.StorageSize" title="hwprobe.models.size_models.StorageSize"><span class="pre">StorageSize</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.vram" title="Link to this definition">¶</a></dt>
+<dd><p>Total VRAM available on the GPU.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.GPUInfo.apple_gpu_info">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">apple_gpu_info</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#hwprobe.models.gpu_models.AppleExtendedGPUInfo" title="hwprobe.models.gpu_models.AppleExtendedGPUInfo"><span class="pre">AppleExtendedGPUInfo</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.GPUInfo.apple_gpu_info" title="Link to this definition">¶</a></dt>
+<dd><p>Only for Apple Silicon GPUs. <code class="docutils literal notranslate"><span class="pre">null</span></code> on all other platforms and GPUs.</p>
+</dd></dl>
+
+</dd></dl>
+
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.AppleExtendedGPUInfo">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">AppleExtendedGPUInfo</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.AppleExtendedGPUInfo" title="Link to this definition">¶</a></dt>
+<dd><p>Contains extra information about Apple Silicon GPUs.</p>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.AppleExtendedGPUInfo.gpu_core_count">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">gpu_core_count</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.AppleExtendedGPUInfo.gpu_core_count" title="Link to this definition">¶</a></dt>
+<dd><p>Number of GPU cores.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.AppleExtendedGPUInfo.performance_shader_count">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">performance_shader_count</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.AppleExtendedGPUInfo.performance_shader_count" title="Link to this definition">¶</a></dt>
+<dd><p>Number of GPU Performance Shaders</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.gpu_models.AppleExtendedGPUInfo.gpu_gen">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">gpu_gen</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.gpu_models.AppleExtendedGPUInfo.gpu_gen" title="Link to this definition">¶</a></dt>
+<dd><p>GPU Generation</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<hr class="docutils" />
+<section id="memory">
+<h3>Memory<a class="headerlink" href="#memory" title="Link to this heading">¶</a></h3>
+<p>When <code class="xref py py-meth docutils literal notranslate"><span class="pre">fetch_memory_info()</span></code> is queried,
+a <a class="reference internal" href="#hwprobe.models.memory_models.MemoryInfo" title="hwprobe.models.memory_models.MemoryInfo"><code class="xref py py-class docutils literal notranslate"><span class="pre">MemoryInfo</span></code></a> object is returned.</p>
+<p>Similar to GPUs, the details of all RAM devices are stored as a list of
+<a class="reference internal" href="#hwprobe.models.memory_models.MemoryModuleInfo" title="hwprobe.models.memory_models.MemoryModuleInfo"><code class="xref py py-class docutils literal notranslate"><span class="pre">MemoryModuleInfo</span></code></a> objects,
+in the <code class="docutils literal notranslate"><span class="pre">modules</span></code> property.</p>
+<p>The RAM slot is stored in the <code class="docutils literal notranslate"><span class="pre">slot</span></code> property, as a
+<a class="reference internal" href="#hwprobe.models.memory_models.MemoryModuleSlot" title="hwprobe.models.memory_models.MemoryModuleSlot"><code class="xref py py-class docutils literal notranslate"><span class="pre">MemoryModuleSlot</span></code></a> object.</p>
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryInfo">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">MemoryInfo</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryInfo" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryInfo.modules">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">modules</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#hwprobe.models.memory_models.MemoryModuleInfo" title="hwprobe.models.memory_models.MemoryModuleInfo"><span class="pre">MemoryModuleInfo</span></a><span class="p"><span class="pre">]</span></span></span><span class="property"> <span class="pre">[Optional]</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryInfo.modules" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleInfo">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">MemoryModuleInfo</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleInfo" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleInfo.manufacturer">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">manufacturer</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleInfo.manufacturer" title="Link to this definition">¶</a></dt>
+<dd><p>Hynix/Micron, etc.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleInfo.part_number">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">part_number</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleInfo.part_number" title="Link to this definition">¶</a></dt>
+<dd><p>Manufacturer-assigned part number</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleInfo.type">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleInfo.type" title="Link to this definition">¶</a></dt>
+<dd><p>DDR4/DDR5/etc.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleInfo.capacity">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">capacity</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#hwprobe.models.size_models.StorageSize" title="hwprobe.models.size_models.StorageSize"><span class="pre">StorageSize</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleInfo.capacity" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleInfo.frequency_mhz">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">frequency_mhz</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleInfo.frequency_mhz" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleInfo.slot">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">slot</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#hwprobe.models.memory_models.MemoryModuleSlot" title="hwprobe.models.memory_models.MemoryModuleSlot"><span class="pre">MemoryModuleSlot</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleInfo.slot" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleInfo.supports_ecc">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">supports_ecc</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleInfo.supports_ecc" title="Link to this definition">¶</a></dt>
+<dd><p>Error-Correcting Code (ECC) support.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleInfo.ecc_type">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ecc_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleInfo.ecc_type" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleSlot">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">MemoryModuleSlot</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleSlot" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleSlot.channel">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">channel</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">''</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleSlot.channel" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.memory_models.MemoryModuleSlot.bank">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">bank</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">''</span></span><a class="headerlink" href="#hwprobe.models.memory_models.MemoryModuleSlot.bank" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<hr class="docutils" />
+<section id="storage">
+<h3>Storage<a class="headerlink" href="#storage" title="Link to this heading">¶</a></h3>
+<p>When <code class="xref py py-meth docutils literal notranslate"><span class="pre">fetch_memory_info()</span></code>
+is queried, a <a class="reference internal" href="#hwprobe.models.storage_models.StorageInfo" title="hwprobe.models.storage_models.StorageInfo"><code class="xref py py-class docutils literal notranslate"><span class="pre">StorageInfo</span></code></a> object is returned.</p>
+<p>Like GPU and RAM devices, Storage devices are stored as a list of
+<a class="reference internal" href="#hwprobe.models.storage_models.DiskInfo" title="hwprobe.models.storage_models.DiskInfo"><code class="xref py py-class docutils literal notranslate"><span class="pre">DiskInfo</span></code></a> objects in the <code class="docutils literal notranslate"><span class="pre">modules</span></code> property.</p>
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.StorageInfo">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">StorageInfo</span></span><a class="headerlink" href="#hwprobe.models.storage_models.StorageInfo" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.StorageInfo.modules">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">modules</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#hwprobe.models.storage_models.DiskInfo" title="hwprobe.models.storage_models.DiskInfo"><span class="pre">DiskInfo</span></a><span class="p"><span class="pre">]</span></span></span><span class="property"> <span class="pre">[Optional]</span></span><a class="headerlink" href="#hwprobe.models.storage_models.StorageInfo.modules" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.DiskInfo">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">DiskInfo</span></span><a class="headerlink" href="#hwprobe.models.storage_models.DiskInfo" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.DiskInfo.model">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">model</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.storage_models.DiskInfo.model" title="Link to this definition">¶</a></dt>
+<dd><p>Device Name</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.DiskInfo.manufacturer">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">manufacturer</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.storage_models.DiskInfo.manufacturer" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.DiskInfo.identifier">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">identifier</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.storage_models.DiskInfo.identifier" title="Link to this definition">¶</a></dt>
+<dd><p>Unique identifier assigned by the OS - <code class="docutils literal notranslate"><span class="pre">disk0</span></code>/<code class="docutils literal notranslate"><span class="pre">sda</span></code>, etc.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.DiskInfo.location">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">location</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.storage_models.DiskInfo.location" title="Link to this definition">¶</a></dt>
+<dd><p>Internal/External</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.DiskInfo.connector">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">connector</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.storage_models.DiskInfo.connector" title="Link to this definition">¶</a></dt>
+<dd><p>PCIe/SCSI/etc.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.DiskInfo.type">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.storage_models.DiskInfo.type" title="Link to this definition">¶</a></dt>
+<dd><p>HDD/SSD/eMMC/SD/etc.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.DiskInfo.vendor_id">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">vendor_id</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.storage_models.DiskInfo.vendor_id" title="Link to this definition">¶</a></dt>
+<dd><p>Note: For eMMC Storage devices in Linux, this ID is the JEDEC Standard Manufacturer’s Identification Code.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.DiskInfo.device_id">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">device_id</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.storage_models.DiskInfo.device_id" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.storage_models.DiskInfo.size">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">size</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#hwprobe.models.size_models.StorageSize" title="hwprobe.models.size_models.StorageSize"><span class="pre">StorageSize</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#hwprobe.models.storage_models.DiskInfo.size" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+<section id="status-models">
+<h2>Status Models<a class="headerlink" href="#status-models" title="Link to this heading">¶</a></h2>
+<p>Every component’s <a class="reference internal" href="#hwprobe.models.component_model.ComponentInfo" title="hwprobe.models.component_model.ComponentInfo"><code class="xref py py-class docutils literal notranslate"><span class="pre">ComponentInfo</span></code></a> subclass has
+a <a class="reference internal" href="#hwprobe.models.component_model.ComponentInfo.status" title="hwprobe.models.component_model.ComponentInfo.status"><code class="xref py py-attr docutils literal notranslate"><span class="pre">status</span></code></a> property,
+which contains information on the errors encountered while retrieving data.</p>
+<p>This property will be of the <a class="reference internal" href="#hwprobe.models.status_models.Status" title="hwprobe.models.status_models.Status"><code class="xref py py-class docutils literal notranslate"><span class="pre">Status</span></code></a> class.</p>
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.status_models.Status">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Status</span></span><a class="headerlink" href="#hwprobe.models.status_models.Status" title="Link to this definition">¶</a></dt>
+<dd><p>Describes the status of an individual component.
+If the status is <code class="docutils literal notranslate"><span class="pre">PARTIAL</span></code> or <code class="docutils literal notranslate"><span class="pre">FAILED</span></code>, there may be messages that describe the error(s).</p>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.status_models.Status.type">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#hwprobe.models.status_models.StatusType" title="hwprobe.models.status_models.StatusType"><span class="pre">StatusType</span></a></span><span class="property"> <span class="pre">[Optional]</span></span><a class="headerlink" href="#hwprobe.models.status_models.Status.type" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.status_models.Status.messages">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">messages</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="property"> <span class="pre">[Optional]</span></span><a class="headerlink" href="#hwprobe.models.status_models.Status.messages" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<hr class="docutils" />
+<p>The <code class="docutils literal notranslate"><span class="pre">type</span></code> property of the status indicates whether there were errors during the discovery process.</p>
+<p>This is an Enum, with three possible values.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="hwprobe.models.status_models.StatusType">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">StatusType</span></span><a class="headerlink" href="#hwprobe.models.status_models.StatusType" title="Link to this definition">¶</a></dt>
+<dd><p>Types of statuses possible.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="hwprobe.models.status_models.StatusType.SUCCESS">
+<span class="sig-name descname"><span class="pre">SUCCESS</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'success'</span></span><a class="headerlink" href="#hwprobe.models.status_models.StatusType.SUCCESS" title="Link to this definition">¶</a></dt>
+<dd><p>There were no errors encountered.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="hwprobe.models.status_models.StatusType.PARTIAL">
+<span class="sig-name descname"><span class="pre">PARTIAL</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'partial'</span></span><a class="headerlink" href="#hwprobe.models.status_models.StatusType.PARTIAL" title="Link to this definition">¶</a></dt>
+<dd><p>There were errors encountered, but only some parts of the data could not be retrieved.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="hwprobe.models.status_models.StatusType.FAILED">
+<span class="sig-name descname"><span class="pre">FAILED</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'failed'</span></span><a class="headerlink" href="#hwprobe.models.status_models.StatusType.FAILED" title="Link to this definition">¶</a></dt>
+<dd><p>Fatal error occurred, no data could be retrieved.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="size-models">
+<h2>Size Models<a class="headerlink" href="#size-models" title="Link to this heading">¶</a></h2>
+<p>Capacities, such as the size of a RAM module, or the storage capacity of a Storage Disk,
+is expressed as one of the subclasses of the
+<a class="reference internal" href="#hwprobe.models.size_models.StorageSize" title="hwprobe.models.size_models.StorageSize"><code class="xref py py-class docutils literal notranslate"><span class="pre">StorageSize</span></code></a> class.</p>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.StorageSize">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">StorageSize</span></span><a class="headerlink" href="#hwprobe.models.size_models.StorageSize" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.StorageSize.capacity">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">capacity</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"> <span class="pre">[Required]</span></span><a class="headerlink" href="#hwprobe.models.size_models.StorageSize.capacity" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.StorageSize.unit">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">unit</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><span class="property"> <span class="pre">[Required]</span></span><a class="headerlink" href="#hwprobe.models.size_models.StorageSize.unit" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<hr class="docutils" />
+<p>Every <code class="docutils literal notranslate"><span class="pre">size</span></code> parameter, that is of type <code class="docutils literal notranslate"><span class="pre">StorageSize</span></code>, will of be one of the following classes.</p>
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.Kilobyte">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Kilobyte</span></span><a class="headerlink" href="#hwprobe.models.size_models.Kilobyte" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.Kilobyte.capacity">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">capacity</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></span><a class="headerlink" href="#hwprobe.models.size_models.Kilobyte.capacity" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.Kilobyte.unit">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">unit</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'KB'</span></span><a class="headerlink" href="#hwprobe.models.size_models.Kilobyte.unit" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.Megabyte">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Megabyte</span></span><a class="headerlink" href="#hwprobe.models.size_models.Megabyte" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.Megabyte.capacity">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">capacity</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></span><a class="headerlink" href="#hwprobe.models.size_models.Megabyte.capacity" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.Megabyte.unit">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">unit</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'MB'</span></span><a class="headerlink" href="#hwprobe.models.size_models.Megabyte.unit" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<hr class="docutils" />
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.Gigabyte">
+<span class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Gigabyte</span></span><a class="headerlink" href="#hwprobe.models.size_models.Gigabyte" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.Gigabyte.capacity">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">capacity</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></span><a class="headerlink" href="#hwprobe.models.size_models.Gigabyte.capacity" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="hwprobe.models.size_models.Gigabyte.unit">
+<span class="property"><span class="pre">field</span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">unit</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'GB'</span></span><a class="headerlink" href="#hwprobe.models.size_models.Gigabyte.unit" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">HWProbe</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="querying_info.html">Querying Info</a></li>
+<li class="toctree-l1"><a class="reference internal" href="supported.html">Supported Components</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#component-models">Component Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#status-models">Status Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#size-models">Size Models</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="supported.html" title="previous chapter">Supported Components</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Mahasvan Mohan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/models.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

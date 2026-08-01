@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>HWProbe &#8212; HWProbe 0.0.1b2 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/autodoc_pydantic.css" />
+    <script src="_static/documentation_options.js?v=5fb86801"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Quickstart" href="quickstart.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="hwprobe">
+<h1>HWProbe<a class="headerlink" href="#hwprobe" title="Link to this heading">¶</a></h1>
+<p>HWProbe is a Python library that gathers info about system components, such as the
+CPU, memory, storage, and graphics, across Linux, macOS, and Windows.</p>
+<section id="features">
+<h2>Features<a class="headerlink" href="#features" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Consistent structure on all platforms, using <a class="reference external" href="https://docs.pydantic.dev/latest/concepts/models/">Pydantic models</a>.</p></li>
+<li><p>Usage stays the same everywhere, with no need for code changes across platforms.</p></li>
+<li><p>Supports data retrieval as Class objects, Python dictionaries, or JSON-parsable strings.</p></li>
+<li><p>For a list of supported hardware components, refer to <a class="reference internal" href="supported.html#supported"><span class="std std-ref">Supported Components</span></a>.</p></li>
+</ul>
+</section>
+<section id="install">
+<h2>Install<a class="headerlink" href="#install" title="Link to this heading">¶</a></h2>
+<p><strong>Prerequisites:</strong> Python 3.9 or newer.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>HWProbe
+</pre></div>
+</div>
+</section>
+<section id="quick-example">
+<h2>Quick Example<a class="headerlink" href="#quick-example" title="Link to this heading">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">hwprobe</span> <span class="kn">import</span> <span class="n">HardwareManager</span>
+
+<span class="n">manager</span> <span class="o">=</span> <span class="n">HardwareManager</span><span class="p">()</span>
+<span class="n">hardware</span> <span class="o">=</span> <span class="n">manager</span><span class="o">.</span><span class="n">fetch_hardware_info</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">hardware</span><span class="o">.</span><span class="n">model_dump_json</span><span class="p">(</span><span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="contents">
+<h2>Contents<a class="headerlink" href="#contents" title="Link to this heading">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#hardware-manager">Hardware Manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#fetch-everything">Fetch Everything</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#targeted-collection">Targeted Collection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#serialization">Serialization</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="querying_info.html">Querying Info</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="querying_info.html#accessing-retrieved-data">Accessing Retrieved Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="querying_info.html#working-with-collections">Working with Collections</a></li>
+<li class="toctree-l2"><a class="reference internal" href="querying_info.html#error-handling">Error Handling</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="supported.html">Supported Components</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="models.html#component-models">Component Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="models.html#status-models">Status Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="models.html#size-models">Size Models</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="#">HWProbe</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="querying_info.html">Querying Info</a></li>
+<li class="toctree-l1"><a class="reference internal" href="supported.html">Supported Components</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+      <li>Next: <a href="quickstart.html" title="next chapter">Quickstart</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Mahasvan Mohan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
