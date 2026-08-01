@@ -1,5 +1,5 @@
 """
-wmi.py  -  Python ctypes binding for the new WMI wrapper in device_info.dll.
+wmi.py  -  Python ctypes binding for the WMI wrapper in wmi.dll.
 
 Public API:
     from hwprobe.interops.win.bindings.wmi import get_wmi_data
@@ -25,11 +25,11 @@ WMI_FIELD_LEN = 512
 WMI_MAX_ROWS = 64
 
 _HERE = pathlib.Path(__file__).parent
-_LIB_PATH = _HERE / "device_info.dll"
+_LIB_PATH = _HERE / "wmi.dll"
 
 if not _LIB_PATH.exists():
     raise FileNotFoundError(
-        f"device_info.dll not found at {_LIB_PATH}.\n"
+        f"wmi.dll not found at {_LIB_PATH}.\n"
         f"Build the project first:  cmake -S { _HERE.parent } -B build && cmake --build build --config Release"
     )
 

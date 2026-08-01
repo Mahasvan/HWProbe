@@ -1,26 +1,81 @@
-// Standalone CLI test for the WMI binding. Loads device_info.dll at runtime
-// (same path the Python binding uses) so we exercise the real ABI.
+// Standalone CLI test for both bindings in interops/win/:
+//   gpu_info.dll    -> get_gpu_info (DXGI + SetupAPI)
+//   wmi.dll         -> get_wmi_data (COM + WbemLocator)
+//
+// Loads each DLL at runtime (same path the Python bindings use) so we exercise
+// the real ABI without needing matching import libs.
 
+#include "gpu_info.h"
 #include "wmi.h"
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
 
+typedef int (*get_gpu_info_ptr)(WinGPUProperties *, int);
 typedef int (*get_wmi_data_ptr)(const char *, const char *const *, int,
                                 const char *, WmiRow *, int);
 
-int main() {
-    HMODULE hLib = LoadLibraryA("bindings/device_info.dll");
-    if (!hLib) hLib = LoadLibraryA("device_info.dll");
+static HMODULE _load(const char *name) {
+    char path[128];
+    std::snprintf(path, sizeof(path), "bindings/%s", name);
+    HMODULE h = LoadLibraryA(path);
+    if (!h) h = LoadLibraryA(name);
+    return h;
+}
+
+static int test_gpu() {
+    HMODULE hLib = _load("gpu_info.dll");
     if (!hLib) {
-        printf("Error: could not load device_info.dll (GetLastError=%lu)\n", GetLastError());
+        printf("[gpu] could not load gpu_info.dll (GetLastError=%lu)\n", GetLastError());
+        return 1;
+    }
+    auto fn = reinterpret_cast<get_gpu_info_ptr>(GetProcAddress(hLib, "get_gpu_info"));
+    if (!fn) {
+        printf("[gpu] get_gpu_info not exported\n");
+        FreeLibrary(hLib);
         return 1;
     }
 
-    auto fn = reinterpret_cast<get_wmi_data_ptr>(
-        GetProcAddress(hLib, "get_wmi_data"));
+    constexpr int MAX_GPUS = 8;
+    WinGPUProperties gpus[MAX_GPUS] = {};
+    int count = fn(gpus, MAX_GPUS);
+    if (count < 0) {
+        printf("[gpu] get_gpu_info() failed\n");
+        FreeLibrary(hLib);
+        return 1;
+    }
+
+    printf("[gpu] Found %d GPU(s):\n\n", count);
+    for (int i = 0; i < count; ++i) {
+        const auto &g = gpus[i];
+        printf("GPU %d:\n", i);
+        printf("  Name:             %s\n", g.name);
+        printf("  Manufacturer:     %s\n", g.manufacturer);
+        printf("  Vendor ID:        0x%04X\n", g.vendor_id);
+        printf("  Device ID:        0x%04X\n", g.device_id);
+        printf("  Subsystem Vendor: 0x%04X\n", g.subsystem_vendor_id);
+        printf("  Subsystem Device: 0x%04X\n", g.subsystem_device_id);
+        printf("  VRAM:             %llu MB\n", (unsigned long long)g.vram_mb);
+        printf("  PCIe Gen:         %d\n", g.pcie_gen);
+        printf("  PCIe Width:       x%d\n", g.pcie_width);
+        if (g.acpi_path[0]) printf("  ACPI Path:        %s\n", g.acpi_path);
+        if (g.pci_path[0])  printf("  PCI Path:         %s\n", g.pci_path);
+        printf("\n");
+    }
+
+    FreeLibrary(hLib);
+    return 0;
+}
+
+static int test_wmi() {
+    HMODULE hLib = _load("wmi.dll");
+    if (!hLib) {
+        printf("[wmi] could not load wmi.dll (GetLastError=%lu)\n", GetLastError());
+        return 1;
+    }
+    auto fn = reinterpret_cast<get_wmi_data_ptr>(GetProcAddress(hLib, "get_wmi_data"));
     if (!fn) {
-        printf("Error: get_wmi_data not exported\n");
+        printf("[wmi] get_wmi_data not exported\n");
         FreeLibrary(hLib);
         return 1;
     }
@@ -31,12 +86,12 @@ int main() {
     WmiRow rows[WMI_MAX_ROWS] = {};
     int n = fn("Win32_Processor", fields, field_count, "ROOT\\CIMV2", rows, WMI_MAX_ROWS);
     if (n < 0) {
-        printf("Error: get_wmi_data returned -1\n");
+        printf("[wmi] get_wmi_data returned -1\n");
         FreeLibrary(hLib);
         return 1;
     }
 
-    printf("Found %d CPU(s):\n\n", n);
+    printf("[wmi] Found %d CPU(s):\n\n", n);
     for (int i = 0; i < n; ++i) {
         printf("CPU %d:\n", i);
         for (int f = 0; f < field_count; ++f) {
@@ -47,4 +102,10 @@ int main() {
 
     FreeLibrary(hLib);
     return 0;
+}
+
+int main() {
+    int rc_gpu = test_gpu();
+    int rc_wmi = test_wmi();
+    return (rc_gpu || rc_wmi) ? 1 : 0;
 }
