@@ -5,8 +5,8 @@
 
 #include <windows.h>
 #include <ole2.h>
+#include <oleauto.h>
 #include <wbemidl.h>
-#include <comdef.h>
 
 #include <string>
 
@@ -17,6 +17,29 @@
 #pragma comment(lib, "oleaut32.lib")
 #pragma comment(lib, "wbemuuid.lib")
 #endif
+
+// ---- RAII BSTR from UTF-8 ----
+// _bstr_t's const-char* constructor calls _com_util::ConvertStringToBSTR,
+// which lives in libcomsupp — a separate lib MSVC auto-links via pragma and
+// mingw does not (and whose name varies across mingw distributions). Roll the
+// one thing we need: SysAllocString from a wide string. No comsupp, no comdef.
+class Bstr {
+public:
+    explicit Bstr(const char *utf8) {
+        if (!utf8 || !*utf8) { b_ = SysAllocString(L""); return; }
+        int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
+        if (wlen <= 0) { b_ = nullptr; return; }
+        std::wstring w(wlen - 1, L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, utf8, -1, w.data(), wlen);
+        b_ = SysAllocString(w.c_str());
+    }
+    ~Bstr() { if (b_) SysFreeString(b_); }
+    Bstr(const Bstr &) = delete;
+    Bstr &operator=(const Bstr &) = delete;
+    operator BSTR() const { return b_; }
+private:
+    BSTR b_;
+};
 
 // ---- VARIANT -> fixed UTF-8 slot ----
 // Writes a null-terminated UTF-8 rendering of vt into dst[0..dst_size-1].
@@ -108,7 +131,8 @@ extern "C" __declspec(dllexport) int get_wmi_data(const char *wmi_class,
     // lSecurityFlags is LONG — pass 0, not nullptr. nullptr won't convert to
     // long under mingw (MSVC tolerates it via NULL==0, mingw does not).
     IWbemServices *pSvc = nullptr;
-    hr = pLoc->ConnectServer(_bstr_t(namespace_str),
+    Bstr nsBstr(namespace_str);
+    hr = pLoc->ConnectServer(nsBstr,
                              nullptr,   // strUser
                              nullptr,   // strPassword
                              nullptr,   // strLocale
@@ -135,10 +159,9 @@ extern "C" __declspec(dllexport) int get_wmi_data(const char *wmi_class,
     wql += " FROM ";
     wql += wmi_class;
 
-    // _bstr_t (not bstr_t — the lowercase typedef is MSVC-only, mingw does
-    // not define it). _bstr_t is the actual class in both MSVC and mingw-w64.
     IEnumWbemClassObject *pEnum = nullptr;
-    hr = pSvc->ExecQuery(_bstr_t("WQL"), _bstr_t(wql.c_str()),
+    Bstr lang("WQL"), query(wql.c_str());
+    hr = pSvc->ExecQuery(lang, query,
                          WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
                          nullptr, &pEnum);
     if (FAILED(hr)) {
@@ -163,7 +186,8 @@ extern "C" __declspec(dllexport) int get_wmi_data(const char *wmi_class,
         for (int i = 0; i < field_count; ++i) {
             VARIANT vtProp;
             VariantInit(&vtProp);
-            hr = pObj->Get(_bstr_t(fields[i]), 0, &vtProp, nullptr, nullptr);
+            Bstr field(fields[i]);
+            hr = pObj->Get(field, 0, &vtProp, nullptr, nullptr);
             if (SUCCEEDED(hr)) {
                 VariantToUtf8Slot(vtProp, row.values[i], WMI_FIELD_LEN);
             } else {
