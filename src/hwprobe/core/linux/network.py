@@ -59,6 +59,8 @@ def _fetch_ip_data() -> NetworkInfo:
     for row in data:
         nic = NICInfo()
         ifname = row.get("ifname")
+        if not ifname:
+            continue
 
         nic.interface = ifname
         nic.type = row.get("link_type")
