@@ -1,4 +1,5 @@
 import plistlib
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,6 +14,7 @@ from hwprobe.core.mac.network import (
     fetch_network_info,
 )
 from hwprobe.models.network_models import NetworkInfo, NICInfo
+from hwprobe.models.status_models import StatusType
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -110,6 +112,37 @@ def _make_brcm4331_ioreg_entry(
     }
 
 
+def _make_wlan_driver_ioreg_entry(
+    chipset="BCM4389",
+    vendor="Apple",
+    bsd_name="en0",
+):
+    """AppleWLANDriver entry as seen on Wi-Fi 7 / M5 series Macs."""
+    return {
+        "IORegistryEntryName": "AppleWLANDriver",
+        "AirshipDeviceCriteria": {
+            "Chipset": chipset,
+            "Vendor": vendor,
+        },
+        "IORegistryEntryChildren": [
+            {
+                "IORegistryEntryName": "AppleWLANInterfaceSTA",
+                "IORegistryEntryChildren": [
+                    {
+                        "IORegistryEntryName": "IOSkywalkLegacyEthernet",
+                        "IORegistryEntryChildren": [
+                            {
+                                "IOObjectClass": "IOSkywalkLegacyEthernetInterface",
+                                "IORegistryEntryName": bsd_name,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+
 # ── _fetch_controllers ───────────────────────────────────────────────────────
 
 
@@ -140,6 +173,11 @@ class TestFetchControllers:
         mock_run.side_effect = FileNotFoundError("ipconfig not found")
         with pytest.raises(FileNotFoundError):
             _fetch_controllers()
+
+    @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_called_process_error_returns_empty(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "ipconfig")
+        assert _fetch_controllers() == []
 
 
 # ── _fetch_ethernet_details ──────────────────────────────────────────────────
@@ -197,6 +235,11 @@ class TestFetchEthernetDetails:
         mock_run.side_effect = FileNotFoundError("system_profiler not found")
         with pytest.raises(FileNotFoundError):
             _fetch_ethernet_details()
+
+    @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_called_process_error_returns_empty(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "system_profiler")
+        assert _fetch_ethernet_details() == {}
 
 
 # ── _find_child ──────────────────────────────────────────────────────────────
@@ -278,6 +321,26 @@ class TestGetBsdInterfaceAppleSilicon:
     def test_returns_none_when_children_key_absent(self):
         assert _get_bsd_interface_apple_silicon({}) is None
 
+    def test_unknown_driver_falls_back_to_bcm_then_wlan(self):
+        """Unknown driver name tries BCM path first, then WLAN path."""
+        # BCM path matches → returns en0
+        item = _make_apple_silicon_ioreg_entry(bsd_name="en0")
+        assert _get_bsd_interface_apple_silicon(item, driver="UnknownDriver") == "en0"
+
+    def test_unknown_driver_falls_back_to_wlan_when_bcm_fails(self):
+        """Unknown driver: BCM path fails, WLAN path succeeds."""
+        item = _make_wlan_driver_ioreg_entry(bsd_name="en1")
+        assert _get_bsd_interface_apple_silicon(item, driver="UnknownDriver") == "en1"
+
+    def test_unknown_driver_returns_none_when_both_paths_fail(self):
+        """Unknown driver: both BCM and WLAN paths fail."""
+        assert _get_bsd_interface_apple_silicon({}, driver="UnknownDriver") is None
+
+    def test_wlan_driver_path_resolves(self):
+        """AppleWLANDriver traversal path resolves BSD interface name."""
+        item = _make_wlan_driver_ioreg_entry(bsd_name="en1")
+        assert _get_bsd_interface_apple_silicon(item, driver="AppleWLANDriver") == "en1"
+
 
 # ── _fetch_airport_details ───────────────────────────────────────────────────
 
@@ -355,12 +418,109 @@ class TestFetchAirportDetails:
         assert result["en0"].device_id == "0x4488"
 
     @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_apple_silicon_bcm_apple_manufacturer(self, mock_run):
+        """AppleBCMWLANCore with subsystem-vendor-id 0x106b sets manufacturer to Apple."""
+        entry = _make_apple_silicon_ioreg_entry(bsd_name="en0")
+        entry["ModuleDictionary"]["subsystem-vendor-id"] = 4203  # 0x106b
+        plist_data = _make_ioreg_plist([entry])
+        mock_run.return_value = MagicMock(stdout=plist_data)
+
+        result = _fetch_airport_details()
+        assert result["en0"].manufacturer == "Apple"
+
+    @patch("hwprobe.core.mac.network.subprocess.run")
     def test_apple_silicon_no_bsd_interface_skipped(self, mock_run):
         """Apple Silicon entry with no resolvable BSD interface is not added."""
         entry = {
             "IORegistryEntryName": "AppleBCMWLANCore",
             "ModuleDictionary": {"ManufacturerID": 0x14E4, "ProductID": 0x4488},
             "IORegistryEntryChildren": [],  # missing Skywalk tree
+        }
+        plist_data = _make_ioreg_plist([entry])
+        mock_run.return_value = MagicMock(stdout=plist_data)
+
+        result = _fetch_airport_details()
+        assert result == {}
+
+    @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_wlan_driver_with_chipset_and_vendor(self, mock_run):
+        """AppleWLANDriver entry with chipset and vendor is parsed correctly."""
+        plist_data = _make_ioreg_plist(
+            [_make_wlan_driver_ioreg_entry(chipset="BCM4389", vendor="Apple", bsd_name="en0")]
+        )
+        mock_run.return_value = MagicMock(stdout=plist_data)
+
+        result = _fetch_airport_details()
+        assert "en0" in result
+        assert result["en0"].manufacturer == "Apple (Apple)"
+        assert result["en0"].name == "Wi-Fi (BCM4389 chipset)"
+
+    @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_wlan_driver_without_vendor(self, mock_run):
+        """AppleWLANDriver with no vendor falls back to plain 'Apple'."""
+        entry = _make_wlan_driver_ioreg_entry(vendor=None, bsd_name="en0")
+        # Remove the Vendor key entirely to test the `else` branch
+        del entry["AirshipDeviceCriteria"]["Vendor"]
+        plist_data = _make_ioreg_plist([entry])
+        mock_run.return_value = MagicMock(stdout=plist_data)
+
+        result = _fetch_airport_details()
+        assert result["en0"].manufacturer == "Apple"
+        assert result["en0"].name == "Wi-Fi (BCM4389 chipset)"
+
+    @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_wlan_driver_without_chipset(self, mock_run):
+        """AppleWLANDriver with no chipset leaves name as None."""
+        entry = _make_wlan_driver_ioreg_entry(chipset=None, bsd_name="en0")
+        del entry["AirshipDeviceCriteria"]["Chipset"]
+        plist_data = _make_ioreg_plist([entry])
+        mock_run.return_value = MagicMock(stdout=plist_data)
+
+        result = _fetch_airport_details()
+        assert result["en0"].name is None
+        assert result["en0"].manufacturer == "Apple (Apple)"
+
+    @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_wlan_driver_missing_airship_criteria(self, mock_run):
+        """AppleWLANDriver with no AirshipDeviceCriteria key doesn't crash."""
+        entry = {
+            "IORegistryEntryName": "AppleWLANDriver",
+            "IORegistryEntryChildren": _make_wlan_driver_ioreg_entry()["IORegistryEntryChildren"],
+        }
+        plist_data = _make_ioreg_plist([entry])
+        mock_run.return_value = MagicMock(stdout=plist_data)
+
+        result = _fetch_airport_details()
+        assert "en0" in result
+        assert result["en0"].manufacturer == "Apple"
+        assert result["en0"].name is None
+
+    @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_wlan_driver_no_bsd_interface_skipped(self, mock_run):
+        """AppleWLANDriver with no resolvable BSD interface is skipped."""
+        entry = _make_wlan_driver_ioreg_entry(bsd_name="en0")
+        entry["IORegistryEntryChildren"] = []  # break the traversal
+        plist_data = _make_ioreg_plist([entry])
+        mock_run.return_value = MagicMock(stdout=plist_data)
+
+        result = _fetch_airport_details()
+        assert result == {}
+
+    @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_called_process_error_returns_empty(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "ioreg")
+        assert _fetch_airport_details() == {}
+
+    @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_brcm_nic_no_regex_match_skipped(self, mock_run):
+        """AirPort_BrcmNIC with malformed IONameMatched is skipped (no crash)."""
+        entry = {
+            "IORegistryEntryName": "AirPort_BrcmNIC",
+            "IONameMatched": "invalid-format",
+            "IOModel": "AirPort Extreme",
+            "IORegistryEntryChildren": [
+                {"IOObjectClass": "AirPort_BrcmNIC_Interface", "IORegistryEntryName": "en1"}
+            ],
         }
         plist_data = _make_ioreg_plist([entry])
         mock_run.return_value = MagicMock(stdout=plist_data)
@@ -545,6 +705,37 @@ class TestFetchSystemProfilerDetails:
         assert m.type == "AirPort"
         assert m.vendor_id == "0x14e4"
 
+    @patch("hwprobe.core.mac.network._fetch_airport_details")
+    @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_wifi_nic_enriched_with_manufacturer_and_name(self, mock_run, mock_air):
+        """AirPort module gets manufacturer and name from airport_info."""
+        network_plist = _make_network_plist(
+            [
+                {
+                    "interface": "en1",
+                    "_name": "Wi-Fi",
+                    "Ethernet": {"MAC Address": "11:22:33:44:55:66"},
+                    "type": "AirPort",
+                }
+            ]
+        )
+        mock_run.return_value = MagicMock(stdout=network_plist)
+        mock_air.return_value = {
+            "en1": NICInfo(
+                vendor_id="0x14e4",
+                device_id="0x4331",
+                manufacturer="Broadcom",
+                name="BCM4389",
+            )
+        }
+
+        result = _fetch_system_profiler_details(["en1"])
+        m = result.modules[0]
+        assert m.manufacturer == "Broadcom"
+        assert m.name == "BCM4389"
+        assert m.vendor_id == "0x14e4"
+        assert m.device_id == "0x4331"
+
     @patch("hwprobe.core.mac.network.subprocess.run")
     def test_interface_not_in_valid_list_is_skipped(self, mock_run):
         network_plist = _make_network_plist(
@@ -623,6 +814,14 @@ class TestFetchSystemProfilerDetails:
 
         result = _fetch_system_profiler_details(["en0", "en1"])
         assert len(result.modules) == 2
+
+    @patch("hwprobe.core.mac.network.subprocess.run")
+    def test_called_process_error_returns_failed_status(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "system_profiler")
+        result = _fetch_system_profiler_details(["en0"])
+        assert result.status.type == StatusType.FAILED
+        assert any("system_profiler" in m for m in result.status.messages)
+        assert result.modules == []
 
 
 # ── Missing _items key handled gracefully ─────────────────────────────────
