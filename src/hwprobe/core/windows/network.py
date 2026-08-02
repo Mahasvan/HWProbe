@@ -37,9 +37,9 @@ def fetch_network_info_fast() -> NetworkInfo:
             network_info.status.messages.append("Missing PNPDeviceID for network interface; skipping")
             continue
 
-        # Only physical PCI and USB NICs
+        # Skip virtual/software adapters (ROOT\ prefix = software-enumerated)
         upper_pnp = pnp_device_id.upper()
-        if "PCI" not in upper_pnp and "USB" not in upper_pnp:
+        if upper_pnp.startswith("ROOT\\"):
             continue
 
         module = NICInfo()

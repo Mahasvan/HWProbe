@@ -195,7 +195,7 @@ class TestMultipleAdaptersAndFormatting:
         assert len(network_info.modules) == 1
         assert network_info.modules[0].name == "Intel NIC"
 
-    def test_non_pci_usb_adapters_skipped(self, monkeypatch):
+    def test_root_adapters_skipped(self, monkeypatch):
         rows = [
             _row("Root Device", "Microsoft", r"ROOT\\SOMETHING"),
             _row("Intel NIC", "Intel", r"PCI\VEN_8086&DEV_15B8"),
@@ -206,6 +206,20 @@ class TestMultipleAdaptersAndFormatting:
 
         assert len(network_info.modules) == 1
         assert network_info.modules[0].name == "Intel NIC"
+
+    def test_non_pci_usb_hardware_nic_included(self, monkeypatch):
+        """NICs on non-PCI/USB buses (e.g. SDIO) should not be filtered out."""
+        rows = [
+            _row("Broadcom SDIO WiFi", "Broadcom", r"SD\VID_02D0&PID_A4A5"),
+            _row("Intel NIC", "Intel", r"PCI\VEN_8086&DEV_15B8"),
+        ]
+        _patch_wmi(rows, monkeypatch)
+
+        network_info = network.fetch_network_info_fast()
+
+        assert len(network_info.modules) == 2
+        assert network_info.modules[0].name == "Broadcom SDIO WiFi"
+        assert network_info.modules[1].name == "Intel NIC"
 
 
 # ============================================================
