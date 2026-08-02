@@ -48,49 +48,46 @@ private:
 // dst_size-1 (WideCharToMultiByte fails rather than truncates when the
 // output doesn't fit, so we convert into a temp buffer first).
 static void WideToUtf8Slot(const wchar_t *src, char *dst, int dst_size) {
-    dst[0] = '\0';
-    if (!src) return;
+    if (!dst || dst_size <= 0) return;
 
-    int needed = WideCharToMultiByte(CP_UTF8, 0, src, -1, nullptr, 0, nullptr, nullptr);
-    if (needed <= 0) return;
-
-    if (needed <= dst_size) {
-        WideCharToMultiByte(CP_UTF8, 0, src, -1, dst, dst_size, nullptr, nullptr);
-        return;
+    int written = 0;
+    if (src) {
+        int needed = WideCharToMultiByte(CP_UTF8, 0, src, -1, nullptr, 0, nullptr, nullptr);
+        if (needed > 0) {
+            if (needed <= dst_size) {
+                WideCharToMultiByte(CP_UTF8, 0, src, -1, dst, dst_size, nullptr, nullptr);
+                return;  // WideCharToMultiByte null-terminates on success
+            }
+            // Value exceeds the slot: convert fully into a temp buffer, then copy
+            // the prefix. Walk back from the cut point to avoid splitting a UTF-8
+            // multi-byte sequence (continuation bytes have the high bits 10xxxxxx).
+            std::string tmp(needed - 1, '\0');
+            WideCharToMultiByte(CP_UTF8, 0, src, -1, tmp.data(), needed, nullptr, nullptr);
+            int cut = dst_size - 1;
+            while (cut > 0 && (static_cast<unsigned char>(tmp[cut]) & 0xC0) == 0x80)
+                --cut;
+            std::memcpy(dst, tmp.data(), cut);
+            written = cut;
+        }
     }
-
-    // Value exceeds the slot: convert fully into a temp buffer, then copy
-    // the prefix. Walk back from the cut point to avoid splitting a UTF-8
-    // multi-byte sequence (continuation bytes have the high bits 10xxxxxx).
-    std::string tmp(needed - 1, '\0');
-    WideCharToMultiByte(CP_UTF8, 0, src, -1, tmp.data(), needed, nullptr, nullptr);
-
-    int cut = dst_size - 1;
-    while (cut > 0 && (static_cast<unsigned char>(tmp[cut]) & 0xC0) == 0x80)
-        --cut;
-
-    std::memcpy(dst, tmp.data(), cut);
-    dst[cut] = '\0';
+    dst[written] = '\0';
 }
 
 static void VariantToUtf8Slot(VARIANT &vt, char *dst, int dst_size) {
-    if (dst_size <= 0) return;
-    dst[0] = '\0';
-    if (vt.vt == VT_NULL || vt.vt == VT_EMPTY) return;
+    if (!dst || dst_size <= 0) return;
 
-    if (vt.vt == VT_BSTR) {
-        WideToUtf8Slot(vt.bstrVal, dst, dst_size);
-        return;
-    }
-
+    const wchar_t *src = nullptr;
     VARIANT vtBstr;
     VariantInit(&vtBstr);
-    HRESULT hr = VariantChangeType(&vtBstr, &vt, 0, VT_BSTR);
-    if (FAILED(hr)) {
-        VariantClear(&vtBstr);
-        return;
+
+    if (vt.vt == VT_BSTR) {
+        src = vt.bstrVal;
+    } else if (vt.vt != VT_NULL && vt.vt != VT_EMPTY) {
+        HRESULT hr = VariantChangeType(&vtBstr, &vt, 0, VT_BSTR);
+        if (SUCCEEDED(hr)) src = vtBstr.bstrVal;
     }
-    WideToUtf8Slot(vtBstr.bstrVal, dst, dst_size);
+
+    WideToUtf8Slot(src, dst, dst_size);
     VariantClear(&vtBstr);
 }
 
