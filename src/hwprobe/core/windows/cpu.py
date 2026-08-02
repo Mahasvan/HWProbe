@@ -10,6 +10,15 @@ kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 kernel32.IsProcessorFeaturePresent.argtypes = [wintypes.DWORD]
 kernel32.IsProcessorFeaturePresent.restype = wintypes.BOOL
 
+# ARM processor feature IDs for IsProcessorFeaturePresent.
+# These are not defined in the Windows SDK headers — they're undocumented
+# feature IDs discovered via testing on ARM hardware.
+# ref: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocessorfeaturepresent
+PF_SSVE_FP8DOT2 = 78   # ARMv9 — FEAT_SSVE_FP8DOT2
+PF_SSVE_FP8DOT4 = 79   # ARMv9 — FEAT_SSVE_FP8DOT4
+PF_SSVE_FP8FMA = 80    # ARMv9 — FEAT_SSVE_FP8FMA
+PF_SME_FA64 = 88       # ARMv8 — FEAT_SME_FA64
+
 
 def is_processor_feature_present(feature_id: int) -> bool:
     """
@@ -36,9 +45,9 @@ def get_arm_version() -> str:
 
     ref: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocessorfeaturepresent
     """
-    if any(is_processor_feature_present(i) for i in [78, 79, 80]):
+    if any(is_processor_feature_present(i) for i in [PF_SSVE_FP8DOT2, PF_SSVE_FP8DOT4, PF_SSVE_FP8FMA]):
         return "9"
-    elif is_processor_feature_present(88):
+    elif is_processor_feature_present(PF_SME_FA64):
         return "8"
     else:
         return "7 or lower"

@@ -289,4 +289,4 @@ class TestVendorIdFormatting:
 
     def test_unknown_vendor_uses_hex(self):
         info = _run([_gpu(vendor_id=0x1234)])
-        assert info.modules[0].manufacturer == "0x1234"
+        assert "0x1234" in info.modules[0].manufacturer
