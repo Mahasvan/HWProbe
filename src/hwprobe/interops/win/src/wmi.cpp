@@ -31,7 +31,10 @@ public:
         int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
         if (wlen <= 0) { b_ = nullptr; return; }
         std::wstring w(wlen - 1, L'\0');
-        MultiByteToWideChar(CP_UTF8, 0, utf8, -1, w.data(), wlen);
+        if (MultiByteToWideChar(CP_UTF8, 0, utf8, -1, w.data(), wlen) <= 0) {
+            b_ = nullptr;
+            return;
+        }
         b_ = SysAllocString(w.c_str());
     }
     ~Bstr() { if (b_) SysFreeString(b_); }
