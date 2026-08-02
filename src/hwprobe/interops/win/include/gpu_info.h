@@ -12,15 +12,15 @@ extern "C" {
 // enumeration (DXGI) and SetupAPI handle flow.
 //
 // Fields:
-//   name                       — DXGI Description, UTF-8
-//   vendor_id                  — DXGI VendorId
-//   device_id                  — DXGI DeviceId
-//   subsystem_id               — DXGI SubSysId (raw uint32; high 16 = subsystem
+//   name                         — DXGI Description, UTF-8
+//   vendor_id                    — DXGI VendorId
+//   device_id                    — DXGI DeviceId
+//   subsystem_id                 — DXGI SubSysId (raw uint32; high 16 = subsystem
 //                                vendor, low 16 = subsystem device — Python splits)
 //   dedicated_video_memory_bytes — DXGI DedicatedVideoMemory, raw bytes
-//   pnp_device_id              — from SetupAPI, raw "PCI\VEN_...&DEV_...&SUBSYS_..."
+//   pnp_device_id                — from SetupAPI, raw "PCI\VEN_...&DEV_...&SUBSYS_..."
 //                                (empty if SetupAPI match failed)
-//   vram_bytes                 — registry fallback for >4GB cards, raw bytes
+//   vram_bytes                   — registry fallback for >4GB cards, raw bytes
 //                                (0 if DXGI value was used or registry lookup failed)
 typedef struct {
     char name[256];
