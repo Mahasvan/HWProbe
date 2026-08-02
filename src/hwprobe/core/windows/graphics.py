@@ -15,7 +15,7 @@ _VENDOR_NAMES = {
 def _map_gpu(raw: GPURaw) -> GPUInfo:
     gpu = GPUInfo()
     gpu.name = raw.name
-    gpu.manufacturer = _VENDOR_NAMES.get(raw.vendor_id, f"0x{raw.vendor_id:04X}")
+    gpu.manufacturer = _VENDOR_NAMES.get(raw.vendor_id, f"Not Recognized (0x{raw.vendor_id:04X})")
     gpu.vendor_id = f"0x{raw.vendor_id:04X}"
     gpu.device_id = f"0x{raw.device_id:04X}"
 
