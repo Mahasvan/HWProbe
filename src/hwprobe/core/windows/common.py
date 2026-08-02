@@ -1,11 +1,12 @@
 import re
+from typing import Optional
 
 pciroot_re = re.compile(r"PCIROOT\((\d+)\)")
 pciusb_re = re.compile(r"(PCI|USB)\(([0-9A-Fa-f]+)\)")
 acpiusb_re = re.compile(r"(ACPI|USB)\(([^)]+)\)")
 
 
-def format_acpi_path(raw_path: str) -> str:
+def format_acpi_path(raw_path: str) -> Optional[str]:
     if not raw_path:
         return None
 
@@ -17,7 +18,7 @@ def format_acpi_path(raw_path: str) -> str:
     return "\\" + ".".join(seg[1] for seg in segments)
 
 
-def format_pci_path(raw_path: str) -> str:
+def format_pci_path(raw_path: str) -> Optional[str]:
     if not raw_path:
         return None
 
