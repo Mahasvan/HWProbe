@@ -1,6 +1,7 @@
 # Source: https://github.com/KernelWanderers/OCSysInfo/blob/main/src/util/pci_root.py
 
 import os
+import posixpath
 import re
 
 _PCI_BDF_PATTERN = re.compile(r"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]$")
@@ -38,7 +39,7 @@ def _resolve_device_chain_from_sysfs(device_slot: str):
     if not sysfs_path:
         return None
 
-    bdfs = [p for p in sysfs_path.split(os.path.sep) if _PCI_BDF_PATTERN.match(p)]
+    bdfs = [p for p in sysfs_path.split(posixpath.sep) if _PCI_BDF_PATTERN.match(p)]
     if not bdfs:
         return None
 

@@ -1,4 +1,5 @@
 import os
+import posixpath
 import re
 from typing import Optional
 
@@ -25,7 +26,7 @@ DRM_CONNECTOR_TYPE = {
 
 def _extract_pci_bdf_from_sysfs_path(path: str) -> Optional[str]:
     """Extract the endpoint PCI BDF from a resolved sysfs path."""
-    parts = [part for part in path.strip().split(os.path.sep) if part]
+    parts = [part for part in path.strip().split(posixpath.sep) if part]
     bdf_candidates = [part for part in parts if _PCI_BDF_PATTERN.match(part)]
     return bdf_candidates[-1] if bdf_candidates else None
 
@@ -40,10 +41,10 @@ def _parse_connector_type(device_path: str) -> Optional[str]:
 
 
 def _fetch_individual_monitor_info(device_path: str) -> Optional[DisplayModuleInfo]:
-    edid_path = os.path.join(device_path, "edid")
+    edid_path = posixpath.join(device_path, "edid")
     if not os.path.exists(edid_path):
         return None
-    parent_path = os.path.join(device_path, "device")
+    parent_path = posixpath.join(device_path, "device")
 
     # todo: populate parent graphics card info
     # we have vendor and device ids of the parent gpu. When PCI-IDs integration is done, use it to get name
@@ -63,7 +64,7 @@ def _fetch_individual_monitor_info(device_path: str) -> Optional[DisplayModuleIn
     if pci_bdf:
         monitor_data.pci_path = pci_path_linux(pci_bdf)
 
-    acpi_file = os.path.join(device_path, "firmware_node", "path")
+    acpi_file = posixpath.join(device_path, "firmware_node", "path")
     if os.path.exists(acpi_file):
         with open(acpi_file) as f:
             monitor_data.acpi_path = f.read().strip()
@@ -82,13 +83,13 @@ def fetch_display_info():
         return display_info
 
     parent_devices = os.listdir(root_path)
-    parent_devices = [os.path.join(root_path, device) for device in parent_devices if pattern.match(device)]
+    parent_devices = [posixpath.join(root_path, device) for device in parent_devices if pattern.match(device)]
 
     for parent_path in parent_devices:
         children = [x for x in os.listdir(parent_path) if x.startswith("card")]
         for child in children:
             try:
-                response = _fetch_individual_monitor_info(os.path.join(parent_path, child))
+                response = _fetch_individual_monitor_info(posixpath.join(parent_path, child))
                 if response:
                     display_info.modules.append(response)
             except Exception as e:
