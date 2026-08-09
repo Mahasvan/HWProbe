@@ -1,5 +1,3 @@
-from hwprobe.core.windows.audio import fetch_audio_info_fast
-from hwprobe.core.windows.baseboard import fetch_baseboard_info
 from hwprobe.core.windows.cpu import fetch_cpu_info
 from hwprobe.core.windows.display import fetch_display_info
 from hwprobe.core.windows.graphics import fetch_graphics_info
@@ -53,13 +51,6 @@ class WindowsHardwareManager(HardwareManagerInterface):
         self.info.display = fetch_display_info()
         return self.info.display
 
-    def fetch_audio_info(self):
-        self.info.audio = fetch_audio_info_fast()
-        return self.info.audio
-
-    def fetch_baseboard_info(self):
-        self.info.baseboard = fetch_baseboard_info()
-        return self.info.baseboard
 
     def fetch_hardware_info(self) -> HardwareInfo:
         self.fetch_cpu_info()

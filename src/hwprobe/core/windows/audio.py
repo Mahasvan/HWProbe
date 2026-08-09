@@ -1,3 +1,4 @@
+"""
 import ctypes
 
 # todo: refactor to new bindings
@@ -43,10 +44,9 @@ def fetch_audio_info_fast() -> AudioInfo:
         parsed = dict(x.split("=", 1) for x in line.split("|") if "=" in x)
         device_type = parsed.get("Type")
 
-        """
-        Device types can be "Hardware" (audio controller) or "Endpoint" (audio device)
-        We group endpoints under their parent hardware controller.
-        """
+
+        # Device types can be "Hardware" (audio controller) or "Endpoint" (audio device)
+        # We group endpoints under their parent hardware controller.
         if device_type == "Hardware":
             if current_hardware:
                 audio_info.modules.append(current_hardware)
@@ -68,3 +68,4 @@ def fetch_audio_info_fast() -> AudioInfo:
         audio_info.modules.append(current_hardware)
 
     return audio_info
+"""
