@@ -3,6 +3,7 @@
 // See display_info.h for the ABI.
 
 #include "display_info.h"
+#include "win_util.h"
 
 #include <windows.h>
 #include <dxgi.h>
@@ -17,17 +18,6 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "setupapi.lib")
 #endif
-
-// ---- wide -> UTF-8 ----
-
-static std::string WideToUtf8(const wchar_t *src) {
-    if (!src || !*src) return {};
-    int len = WideCharToMultiByte(CP_UTF8, 0, src, -1, nullptr, 0, nullptr, nullptr);
-    if (len <= 1) return {};
-    std::string out(len - 1, '\0');
-    WideCharToMultiByte(CP_UTF8, 0, src, -1, out.data(), len, nullptr, nullptr);
-    return out;
-}
 
 // =====================================================================
 // get_monitor_devices — user32 monitor enumeration

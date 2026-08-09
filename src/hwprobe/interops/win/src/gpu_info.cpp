@@ -4,6 +4,7 @@
 // See gpu_info.h for the ABI.
 
 #include "gpu_info.h"
+#include "win_util.h"
 
 #include <windows.h>
 #include <dxgi.h>
@@ -135,13 +136,8 @@ static std::string GetDriverVersion(const wchar_t *pnp_device_id) {
         return {};
 
     // Convert PNP ID to UTF-8 for substring matching
-    int utf8_len = WideCharToMultiByte(CP_UTF8, 0, pnp_device_id, -1, nullptr, 0, nullptr, nullptr);
-    if (utf8_len <= 0) { RegCloseKey(hKey); return {}; }
-    std::string pnp_utf8(utf8_len - 1, '\0');
-    if (WideCharToMultiByte(CP_UTF8, 0, pnp_device_id, -1, pnp_utf8.data(), utf8_len, nullptr, nullptr) <= 0) {
-        RegCloseKey(hKey);
-        return {};
-    }
+    std::string pnp_utf8 = WideToUtf8(pnp_device_id);
+    if (pnp_utf8.empty()) { RegCloseKey(hKey); return {}; }
 
     std::string upper_pnp = pnp_utf8;
     for (auto &ch : upper_pnp) ch = static_cast<char>(toupper(static_cast<unsigned char>(ch)));
@@ -222,8 +218,7 @@ int get_gpu_info(WinGPURaw *out, int max_count) {
         WinGPURaw gpu = {};
 
         // Name from DXGI (wide -> UTF-8)
-        if (WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, gpu.name, sizeof(gpu.name), nullptr, nullptr) <= 0)
-            gpu.name[0] = '\0';
+        WideToUtf8Slot(desc.Description, gpu.name, sizeof(gpu.name));
 
         // Raw IDs from DXGI
         gpu.vendor_id = desc.VendorId;
@@ -235,9 +230,7 @@ int get_gpu_info(WinGPURaw *out, int max_count) {
 
         // PNP device ID (UTF-8) for Python-side location/PCIe lookup
         if (!pnp_id.empty()) {
-            if (WideCharToMultiByte(CP_UTF8, 0, pnp_id.c_str(), -1,
-                                    gpu.pnp_device_id, sizeof(gpu.pnp_device_id), nullptr, nullptr) <= 0)
-                gpu.pnp_device_id[0] = '\0';
+            WideToUtf8Slot(pnp_id.c_str(), gpu.pnp_device_id, sizeof(gpu.pnp_device_id));
         }
 
         // Registry VRAM fallback for >4GB cards (DXGI may cap at 4GB).

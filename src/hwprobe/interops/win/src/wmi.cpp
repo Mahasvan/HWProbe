@@ -2,6 +2,7 @@
 // delimiter-based text format. See include/wmi.h for the ABI.
 
 #include "wmi.h"
+#include "win_util.h"
 
 #include <windows.h>
 #include <ole2.h>
@@ -47,38 +48,8 @@ private:
 
 // ---- VARIANT -> fixed UTF-8 slot ----
 // Writes a null-terminated UTF-8 rendering of vt into dst[0..dst_size-1].
-// Missing/null/empty -> "". Overlong values are truncated cleanly at
-// dst_size-1 (WideCharToMultiByte fails rather than truncates when the
-// output doesn't fit, so we convert into a temp buffer first).
-static void WideToUtf8Slot(const wchar_t *src, char *dst, int dst_size) {
-    if (!dst || dst_size <= 0) return;
-
-    int written = 0;
-    if (src) {
-        int needed = WideCharToMultiByte(CP_UTF8, 0, src, -1, nullptr, 0, nullptr, nullptr);
-        if (needed > 0) {
-            if (needed <= dst_size) {
-                int rc = WideCharToMultiByte(CP_UTF8, 0, src, -1, dst, dst_size, nullptr, nullptr);
-                if (rc > 0) return;  // success — null-terminated by WideCharToMultiByte
-                // fall through: dst[0] = '\0'
-            } else {
-                // Value exceeds the slot: convert fully into a temp buffer, then copy
-                // the prefix. Walk back from the cut point to avoid splitting a UTF-8
-                // multi-byte sequence (continuation bytes have the high bits 10xxxxxx).
-                std::string tmp(needed - 1, '\0');
-                int rc = WideCharToMultiByte(CP_UTF8, 0, src, -1, tmp.data(), needed, nullptr, nullptr);
-                if (rc > 0) {
-                    int cut = dst_size - 1;
-                    while (cut > 0 && (static_cast<unsigned char>(tmp[cut]) & 0xC0) == 0x80)
-                        --cut;
-                    std::memcpy(dst, tmp.data(), cut);
-                    written = cut;
-                }
-            }
-        }
-    }
-    dst[written] = '\0';
-}
+// Missing/null/empty -> "". Delegates wide->UTF-8 to WideToUtf8Slot from
+// win_util.h.
 
 static void VariantToUtf8Slot(VARIANT &vt, char *dst, int dst_size) {
     if (!dst || dst_size <= 0) return;
