@@ -5,9 +5,6 @@ __version__ = "0.0.1b2"
 __author__ = "Mahasvan"
 __license__ = "BSD-3-Clause"
 
-# Refactor this if we have Linux/OSX interops in future
-# Should be defined in each platform.
-_dll_path = os.path.join(os.path.dirname(__file__), "interops", "win", "dll")
 
 
 def _detect_platform() -> str:
@@ -28,7 +25,8 @@ if _platform in {"windows", "win32", "nt"}:
     from hwprobe.core.windows import WindowsHardwareManager as HardwareManager
 
     if hasattr(os, "add_dll_directory"):
-        os.add_dll_directory(_dll_path)
+        dll_path = os.path.join(os.path.dirname(__file__), "interops", "win", "bindings")
+        os.add_dll_directory(dll_path)
 elif _platform == "darwin":
     from hwprobe.core.mac import MacHardwareManager as HardwareManager
 else:
