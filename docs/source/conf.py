@@ -72,3 +72,7 @@ exclude_patterns = []
 
 html_theme = "alabaster"
 html_static_path = ["_static"]
+html_css_files = [
+    "https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap",
+    "custom.css"
+]

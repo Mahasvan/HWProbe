@@ -1,5 +1,6 @@
 import os
-from typing import Optional
+from abc import ABC, abstractmethod
+from typing import Optional, List
 
 from hwprobe.core.linux.dmi_decode import MEMORY_TYPE, get_string_entry
 from hwprobe.models.memory_models import MemoryInfo, MemoryModuleInfo, MemoryModuleSlot
@@ -7,6 +8,30 @@ from hwprobe.models.size_models import Kilobyte, Megabyte, StorageSize
 from hwprobe.models.status_models import StatusType
 
 # Thank you to [Quist](https://github.com/nadiaholmquist) for helping with our understanding of this.
+
+
+class DMIProvider(ABC):
+    """
+    Interface for providing DMI data to the library.
+    """
+    
+    @abstractmethod
+    def get_entries_by_type(self, t: int) -> List[bytes]:
+        """
+        Return raw DMI Type <t> entries.
+        
+        Each entry is the complete binary structure from:
+        - /sys/firmware/dmi/entries/<t>-*/raw (requires read access)
+        - dmidecode -t <t> --dump-bin output
+        - Pre-saved binary files
+        - Mock/test data
+        
+        Returns:
+            List of raw DMI Type <t> entries (one bytes object per memory slot)
+            
+        Raises: ?
+        """
+        raise NotImplementedError("DMIProvider.get_entries_by_type not implemented")
 
 
 def _part_no(strings: list[bytes], value: bytes) -> Optional[str]:
@@ -93,78 +118,104 @@ def _dimm_speed(value: bytes) -> Optional[int]:
     return None
 
 
-def fetch_memory_info() -> MemoryInfo:
+def _parse_single_entry(value: bytes) -> Optional[MemoryModuleInfo]:
+    """
+    Parse a single DMI Type 17 entry into MemoryModuleInfo.
+    
+    Args:
+        value: Raw binary DMI Type 17 structure
+        
+    Returns:
+        MemoryModuleInfo if entry is valid and populated, None otherwise
+    """
+    try:
+        if len(value) < 0x20 or value[0x0] != 17:
+            return None
+        
+        length_field = value[0x1]
+        strings = value[length_field : len(value)].split(b"\0")
+
+        module = MemoryModuleInfo()
+        
+        module.part_number = _part_no(strings, value)
+
+        if (t := _dimm_type(value)) is not None:
+            module.type = t
+        
+        if (slot := _dimm_slot(strings, value)) is not None:
+            module.slot = slot
+
+        module.manufacturer = get_string_entry(strings, value[0x17])
+        
+        if (capacity := _dimm_capacity(value)) is not None:
+            module.capacity = capacity
+        
+        module.supports_ecc = _ecc_support(value)
+        module.frequency_mhz = _dimm_speed(value)
+
+        return module
+        
+    except Exception:
+        return None
+
+
+def fetch_memory_info(provider: Optional[DMIProvider] = None) -> MemoryInfo:
+    """
+    Fetch memory information using user-provided DMI data.
+    
+    The library never reads /sys/firmware/dmi itself. Users must implement
+    DMIProvider to supply raw DMI Type <type> data, giving them full control
+    over data acquisition and permissions.
+    
+    Args:
+        provider: DMIProvider implementation (REQUIRED)
+        
+    Returns:
+        MemoryInfo with parsed memory modules and status
+        
+    Example:
+        >>> class SysfsProvider(DMIProvider):
+        ...     def get_entries_by_type(self, t: int) -> List[bytes]:
+        ...         # Read from /sys/firmware/dmi/entries/<t>-*/raw
+        ...         pass
+        >>> provider = SysfsProvider()
+        >>> hm = HardwareManager(provider)
+        
+    References:
+        SMBIOS Specification - Section 7.18 - Memory Device (Type 17)
+        https://www.dmtf.org/sites/default/files/standards/documents/DSP0134_3.9.0.pdf
+    """
     memory_info = MemoryInfo()
 
-    if not os.path.isdir("/sys/firmware/dmi/entries"):
+    if provider is None:
         memory_info.status.type = StatusType.FAILED
-        memory_info.status.messages.append("The /sys/firmware/dmi/entries directory doesn't exist")
+        memory_info.status.messages.append("No DMIProvider provided")
         return memory_info
 
-    """
-    DMI Documentation: 
-    SMBIOS Specification - Section 7.18 - Memory Device (Type 17)
-    - https://www.dmtf.org/sites/default/files/standards/documents/DSP0134_3.9.0.pdf
-    Other noteworthy mentions:
-    - https://android.googlesource.com/kernel/common/+/android-trusty-3.10/Documentation/ABI/testing/sysfs-firmware-dmi
-    - https://linux.die.net/man/8/dmidecode
-    """
+    try:
+        raw_entries = provider.get_entries_by_type(17)
+    except Exception as e:
+        memory_info.status.type = StatusType.FAILED
+        memory_info.status.messages.append(f"Failed to retrieve DMI Type 17 entries")
+        memory_info.status.messages.append(str(e))
+        return memory_info
+    
+    if not raw_entries:
+        memory_info.status.type = StatusType.FAILED
+        memory_info.status.messages.append("No DMI Type 17 entries provided by DMIProvider.")
+        return memory_info
 
-    # Memory Module entries in DMI are of type 17, this is what we want to iterate over
-    dmi_entries = os.scandir("/sys/firmware/dmi/entries")
-    memory_dmi_types = "17-"
-    parent_dirs = [p for p in dmi_entries if p.path.split("/")[-1].startswith(memory_dmi_types)]
+    for raw_entry in raw_entries:
+        module = _parse_single_entry(raw_entry)
 
-    for parent_dir in parent_dirs:
-        module = MemoryModuleInfo()
-        try:
-            with open(f"{parent_dir.path}/raw", "rb") as f:
-                value = f.read()
-        except PermissionError:
-            memory_info.status.type = StatusType.FAILED
-            memory_info.status.messages.append("Unable to open /sys/firmware/dmi/entries. Are you root?")
-            return memory_info
-
-        except Exception as e:
+        # SMBIOS/DMI describe the physical slot, not the actual populated module. 
+        # If the "module" has a capacity of 0, it means the slot is empty.
+        if module:
+            # Better to do it here to not signify a PARTIAL if one of the entries is empty (capacity 0)
+            if module.capacity is None or module.capacity.capacity > 0:
+                memory_info.modules.append(module)
+        else:
             memory_info.status.type = StatusType.PARTIAL
-            memory_info.status.messages.append("Error Reading DMI Entries: " + str(e))
-            continue
+            memory_info.status.messages.append("Failed to parse one or more DMI entries")
 
-        try:
-            length_field = value[0x1]
-            strings = value[length_field : len(value)].split(b"\0")
-
-            module.part_number = _part_no(strings, value)
-
-            if (t := _dimm_type(value)) is not None:
-                module.type = t
-            else:
-                memory_info.status.type = StatusType.PARTIAL
-                memory_info.status.messages.append("Could not get DIMM Type")
-
-            if (slot := _dimm_slot(strings, value)) is not None:
-                module.slot = slot
-            else:
-                memory_info.status.type = StatusType.PARTIAL
-                memory_info.status.messages.append("Could not get DIMM Location")
-
-            module.manufacturer = get_string_entry(strings, value[0x17])
-            if not module.manufacturer:
-                memory_info.status.type = StatusType.PARTIAL
-                memory_info.status.messages.append("Could not get DIMM Manufacturer")
-
-            if (capacity := _dimm_capacity(value)) is not None:
-                module.capacity = capacity
-            else:
-                memory_info.status.type = StatusType.PARTIAL
-                memory_info.status.messages.append("Could not get DIMM Capacity")
-
-            module.supports_ecc = _ecc_support(value)
-            module.frequency_mhz = _dimm_speed(value)
-
-            memory_info.modules.append(module)
-
-        except Exception as e:
-            memory_info.status.type = StatusType.PARTIAL
-            memory_info.status.messages.append("Error while fetching Memory Info: " + str(e))
     return memory_info

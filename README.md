@@ -1,9 +1,22 @@
 # HWProbe
 
-A Python Library to simplify retrieval of hardware components of your computer.
+A cross-platform Python library that gathers hardware component info — CPU, GPU, memory, storage, and
+network — from Linux, macOS, and Windows, returning it in a **consistent, strictly-typed schema** so your
+code doesn't need per-platform branches.
 
 - To get started, read the **[Quickstart](https://mahasvan.github.io/HWProbe/quickstart.html).**
 - Additionally, you can view the **[Documentation](https://mahasvan.github.io/HWProbe/)**.
+
+## Features
+
+- **Consistent schema everywhere** — every platform returns the same [Pydantic](https://docs.pydantic.dev/latest/concepts/models/) models, so the same code works unmodified on Linux, macOS, and Windows.
+- **Structured output** — access data as Python objects, dicts, or JSON-serializable strings.
+- **No required external tools** — Linux/macOS/Windows ship optional native C++ accelerators (see [interops](src/hwprobe/interops)) that query the kernel/IOKit/WMI directly instead of shelling out to external tools, with automatic fallback if the native library isn't built.
+- **Per-component granularity** — fetch just the CPU, or just storage, instead of the whole hardware profile.
+
+## Requirements
+
+- Python 3.9 or newer.
 
 ## Installation
 
@@ -35,6 +48,16 @@ data = hm.fetch_hardware_info()
 
 json_data = json.loads(data.model_dump_json())
 print(json.dumps(json_data, indent=2))
+```
+
+You can also fetch a single component instead of everything at once:
+
+```python
+from hwprobe import HardwareManager
+
+hm = HardwareManager()
+cpu = hm.fetch_cpu_info()
+print(cpu.name, cpu.vendor)
 ```
 
 <details>
@@ -179,26 +202,25 @@ print(json.dumps(json_data, indent=2))
 
 </details>
 
-## Tracker
-
-### Hardware Discovery Progress Tracker
+## Hardware Discovery Progress Tracker
 
 | Component   | Linux | macOS  | Windows |
 |-------------|:-----:|:------:|:-------:|
-| CPU         |   ✅   |   ✅    |    ✅    |
-| GPU         |   ✅   |   ✅    |    ✅    |
-| Memory      |   ✅   |   ✅    |    ✅    |
-| Network     |   ✅   |   ✅    |    ✅    |
-| Storage     |   ✅   |   ✅    |    ✅    | 
-| --          |  --   |   -    |    -    |
-| Display     |   ❌   | ❌* (1) | ✅* (2)  |
-| Audio       |   ❌   |   ❌    | ✅* (2)  |
-| Motherboard |   ❌   |   ❌    |    ✅    |
-| Vendor      |   ❌   |   ❌    |    ➖    |
-| Input       |   ❌   |   ❌    |    ❌    |
+| CPU         |   ✅        |   ✅    |    ✅    |
+| GPU         |   ✅        |   ✅    |    ✅    |
+| Memory      |   ✅* (3)   |   ✅    |    ✅    |
+| Network     |   ✅        |   ✅    |    ✅    |
+| Storage     |   ✅        |   ✅    |    ✅    | 
+| Display     |   ✅        | ❌* (1) | ✅* (2)  |
+| Audio       |   ❌        |   ❌    | ✅* (2)  |
+| Motherboard |   ❌        |   ❌    |    ✅    |
+| Vendor      |   ❌        |   ❌    |    ➖    |
+| Input       |   ❌        |   ❌    |    ❌    |
 
 1. In progress
 2. Need to rewrite C++ bindings (In progress)
+3. HWProbe doesn't directly interact with `/sys/firmware/dmi/entries/17-*`, 
+the user is encouraged to satisfy the data acquisition contract via the `DMIProvider` interface.
 
 ### Miscellaneous Tasks
 
@@ -206,7 +228,17 @@ print(json.dumps(json_data, indent=2))
 |-----------------------------------------------------------------------|:------:|
 | Pending components                                                    |   ❌    |
 | Autodetection of storage units                                        |   ❌    |
-| PCI Lookup — [PCI IDs Repository](https://github.com/pciutils/pciids) |   ❌    |
+| PCI Lookup — [PCI IDs Repository](https://github.com/pciutils/pciids) |   ✅    |
+
+## Building Native Components (optional)
+
+Linux, macOS, and Windows each have an optional native C++ accelerator under `src/hwprobe/interops/<platform>/`
+that HWProbe uses automatically when present, falling back to pure-Python/subprocess-based detection otherwise.
+See each platform's README for build instructions and requirements:
+
+- [Linux](src/hwprobe/interops/linux/README.md)
+- [macOS](src/hwprobe/interops/mac/README.md)
+- [Windows](src/hwprobe/interops/win/README.md)
 
 ## Credits
 

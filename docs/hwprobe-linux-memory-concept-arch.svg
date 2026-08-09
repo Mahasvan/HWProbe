@@ -1,0 +1,207 @@
+<!-- BRIEF: Vertical UML, left-spine connectors at x=100, all arrows straight, no text overflow -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1380">
+  <defs>
+    <style>
+      .interface-box { fill:#e8f4fd; stroke:#4a90e2; stroke-width:2; }
+      .library-box   { fill:#fff4e6; stroke:#f59e0b; stroke-width:2; }
+      .function-box  { fill:#fef3c7; stroke:#eab308; stroke-width:2; }
+      .raw-box       { fill:#f3e8ff; stroke:#a855f7; stroke-width:2; }
+      .parsed-box    { fill:#d1fae5; stroke:#10b981; stroke-width:2; }
+      .user-box      { fill:#f0f9ff; stroke:#64748b; stroke-width:2; }
+      .note-box      { fill:#fffbeb; stroke:#d97706; stroke-width:1.5; stroke-dasharray:6,3; }
+      .sep           { stroke:#cbd5e1; stroke-width:1.5; }
+
+      .f-title  { fill:#1e293b; font:bold 16px 'Segoe UI',sans-serif; }
+      .f-sub    { fill:#4a90e2; font:italic 13px 'Segoe UI',sans-serif; }
+      .f-mono   { fill:#475569; font:13px 'Consolas',monospace; }
+      .f-desc   { fill:#64748b; font:12px 'Segoe UI',sans-serif; }
+      .f-lbl    { font:600 11px 'Segoe UI',sans-serif; }
+
+      .a-blue   { stroke:#4a90e2; stroke-width:2;   stroke-dasharray:7,3; fill:none; marker-end:url(#mb); }
+      .a-purple { stroke:#6366f1; stroke-width:2.5; fill:none;            marker-end:url(#mp); }
+      .a-orange { stroke: #d97706; stroke-width: 2; stroke-dasharray: 7,3; fill: none; marker-end: url(#arrow-orange); }
+    </style>
+    <marker id="mg" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+      <polygon points="0 0,9 3,0 6" fill="#64748b"/>
+    </marker>
+    <marker id="mb" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+      <polygon points="0 0,9 3,0 6" fill="#4a90e2"/>
+    </marker>
+    <marker id="mp" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+      <polygon points="0 0,9 3,0 6" fill="#6366f1"/>
+    </marker>
+  </defs>
+
+  <!-- ── Title ── -->
+  <text x="480" y="36" text-anchor="middle"
+        style="fill:#1e293b;font:bold 22px 'Segoe UI',sans-serif;">
+    HWProbe Memory Module Concept Architecture  for Linux
+  </text>
+
+  <!--
+    LAYOUT SPINE
+    All flow arrows run along x=100 (left edge of content area).
+    Boxes start at x=130 (right of spine).
+    Right edge of main boxes: x=130+680=810.
+    Contract note floats to the right, connected horizontally.
+
+    y positions:
+      Row 1  User:              y=60  h=140  bottom=200
+      gap+arrow                        200→260
+      Row 2  DMIProvider:       y=260 h=160  bottom=420
+      gap+arrow                        420→480
+      Row 3  HardwareManager:  y=480 h=130  bottom=610
+      gap+arrow                        610→670
+      Row 4  fetch_memory_info: y=670 h=140  bottom=810
+      gap+arrow                        810→870
+      Row 5  data models:       y=870
+  -->
+
+  <!-- ═══ ROW 1: User ═══════════════════════════════════ -->
+  <rect x="130" y="60" width="490" height="140" rx="8" class="user-box"/>
+  <!-- person icon -->
+  <circle cx="195" cy="95"  r="14" style="fill:#64748b"/>
+  <circle cx="195" cy="87"  r="6"  style="fill:#f0f9ff"/>
+  <ellipse cx="195" cy="103" rx="11" ry="8" style="fill:#f0f9ff"/>
+  <text x="250" y="95"  class="f-title">User (Your Application)</text>
+  <line x1="130" y1="107" x2="620" y2="107" class="sep"/>
+  <text x="150" y="127" class="f-desc">Implements the DMIProvider interface to supply</text>
+  <text x="150" y="146" class="f-desc">raw DMI Type &lt;TYPE&gt; entries from the system.</text>
+  <text x="150" y="165" class="f-desc">Passes the instance to HardwareManager.</text>
+  <text x="150" y="184" class="f-desc">Controls all data access and permissions.</text>
+
+  <!-- implements arrow: right edge of User → left edge of DMIProvider
+       Both are in the same horizontal band at y=107 -->
+  <path d="M 700 112 L 620 112" class="a-orange"/>
+  <marker id="arrow-orange" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+    <polygon points="0 0, 9 3, 0 6" fill="#d97706"/>
+  </marker>
+
+  <!-- DMIProvider note — floats right of User, aligned to User top -->
+  <rect x="700" y="60" width="230" height="105" rx="8" class="note-box"/>
+  <text x="815" y="88"  text-anchor="middle" class="f-title" style="font-size:14px;">Contract</text>
+  <line x1="700" y1="97" x2="930" y2="97" class="sep"/>
+  <text x="718" y="116" class="f-desc">User must implement</text>
+  <text x="718" y="134" class="f-desc">this interface and</text>
+  <text x="718" y="152" class="f-desc">return raw DMI bytes.</text>
+
+  <!-- ── Spine arrow: User → DMIProvider (vertical, x=100) ── -->
+  <!-- Exit from left edge of User at (130, 150), go left to spine, down, re-enter -->
+  <path d="M 130 150 L 100 150 L 100 260 L 130 260" class="a-blue"/>
+  <text x="105" y="215" fill="#4a90e2" class="f-lbl">implements</text>
+
+  <!-- ═══ ROW 2: DMIProvider ════════════════════════════ -->
+  <rect x="130" y="260" width="490" height="160" rx="8" class="interface-box"/>
+  <text x="375" y="293" text-anchor="middle" class="f-sub">«interface»</text>
+  <text x="375" y="314" text-anchor="middle" class="f-title">DMIProvider</text>
+  <line x1="130" y1="324" x2="620" y2="324" class="sep"/>
+  <text x="150" y="348" class="f-mono">+ get_entries_by_type(t: int) -> list[bytes]</text>
+  <line x1="130" y1="362" x2="620" y2="362" class="sep"/>
+  <text x="150" y="383" class="f-desc">Returns the raw contents of every DMI entry</text>
+  <text x="150" y="401" class="f-desc">of type &lt;TYPE&gt; (equivalent to &lt;TYPE&gt;-*/raw in sysfs).</text>
+
+  <!-- ── Spine arrow: DMIProvider → HardwareManager ── -->
+  <path d="M 130 390 L 100 390 L 100 480 L 130 480" class="a-blue"/>
+  <text x="105" y="440" fill="#4a90e2" class="f-lbl">passed to</text>
+
+  <!-- ═══ ROW 3: HardwareManager ════════════════════════ -->
+  <rect x="130" y="480" width="490" height="130" rx="8" class="library-box"/>
+  <text x="375" y="513" text-anchor="middle" class="f-title" style="fill:#ea580c;">HardwareManager</text>
+  <line x1="130" y1="523" x2="620" y2="523" class="sep"/>
+  <text x="150" y="548" class="f-mono">+ __init__(memory_provider: DMIProvider)</text>
+  <text x="150" y="571" class="f-mono">+ fetch_memory_info() -> MemoryInfo</text>
+  <line x1="130" y1="583" x2="620" y2="583" class="sep"/>
+  <text x="150" y="601" class="f-desc">Stores provider, delegates to fetch_memory_info().</text>
+
+  <!-- ── Spine arrow: HardwareManager → fetch_memory_info ── -->
+  <path d="M 130 570 L 100 570 L 100 670 L 130 670" class="a-blue"/>
+  <text x="105" y="625" fill="#4a90e2" class="f-lbl">calls with</text>
+  <text x="105" y="638" fill="#4a90e2" class="f-lbl">provider</text>
+
+  <!-- ═══ ROW 4: fetch_memory_info ══════════════════════ -->
+  <rect x="130" y="670" width="490" height="140" rx="8" class="function-box"/>
+  <text x="375" y="703" text-anchor="middle" class="f-title" style="fill:#ca8a04;">fetch_memory_info()</text>
+  <line x1="130" y1="713" x2="620" y2="713" class="sep"/>
+  <text x="150" y="737" class="f-mono">+ fetch_memory_info(provider: DMIProvider)</text>
+  <text x="170" y="757" class="f-mono">  -> MemoryInfo</text>
+  <line x1="130" y1="768" x2="620" y2="768" class="sep"/>
+  <text x="150" y="787" class="f-desc">Calls provider, parses each raw DMI entry,</text>
+  <text x="150" y="803" class="f-desc">assembles and returns a MemoryInfo object.</text>
+
+  <!-- ── Spine arrow: fetch_memory_info → data row ── -->
+  <path d="M 130 780 L 100 780 L 100 870 L 130 870" class="a-purple"/>
+  <text x="105" y="830" fill="#6366f1" class="f-lbl">parses</text>
+  <text x="105" y="843" fill="#6366f1" class="f-lbl">into</text>
+
+  <!-- ═══ ROW 5: RawDMIEntry ════════════════════════════ -->
+  <rect x="130" y="870" width="220" height="100" rx="8" class="raw-box"/>
+  <text x="240" y="902" text-anchor="middle" class="f-title" style="fill:#9333ea;">RawDMIEntry</text>
+  <line x1="130" y1="912" x2="350" y2="912" class="sep"/>
+  <text x="150" y="935" class="f-mono">+ raw_data: bytes</text>
+  <text x="150" y="956" class="f-desc">Raw bytes per entry</text>
+
+  <!-- horizontal arrow: RawDMIEntry → MemoryModuleInfo (y=930) -->
+  <path d="M 350 930 L 470 930" class="a-purple"/>
+  <text x="358" y="921" fill="#6366f1" class="f-lbl">parsed into</text>
+
+  <!-- ═══ ROW 5: MemoryModuleInfo ══════════════════════ -->
+  <rect x="470" y="870" width="310" height="175" rx="8" class="parsed-box"/>
+  <text x="625" y="902" text-anchor="middle" class="f-title" style="fill:#059669;">MemoryModuleInfo</text>
+  <line x1="470" y1="912" x2="780" y2="912" class="sep"/>
+  <text x="490" y="933" class="f-mono">+ manufacturer:  str</text>
+  <text x="490" y="953" class="f-mono">+ part_number:   str</text>
+  <text x="490" y="973" class="f-mono">+ type:          str</text>
+  <text x="490" y="993" class="f-mono">+ capacity:      int</text>
+  <text x="490" y="1013" class="f-mono">+ frequency_mhz: int</text>
+  <text x="490" y="1033" class="f-mono">+ slot:          str</text>
+
+  <!-- vertical arrow: MemoryModuleInfo bottom → MemoryInfo top (x=625) -->
+  <path d="M 625 1045 L 625 1090" class="a-purple"/>
+  <text x="635" y="1072" fill="#6366f1" class="f-lbl">collected into</text>
+
+  <!-- ═══ ROW 6: MemoryInfo ════════════════════════════ -->
+  <rect x="440" y="1090" width="370" height="95" rx="8" class="parsed-box"/>
+  <text x="625" y="1120" text-anchor="middle" class="f-title" style="fill:#059669;">MemoryInfo</text>
+  <line x1="440" y1="1130" x2="810" y2="1130" class="sep"/>
+  <text x="460" y="1152" class="f-mono">+ modules: list[MemoryModuleInfo]</text>
+  <text x="460" y="1170" class="f-mono">+ status:  StatusInfo</text>
+
+  <!-- ════════════════════════════════════════════════════
+       LEGEND
+  ═══════════════════════════════════════════════════════ -->
+  <rect x="60" y="1210" width="980" height="145" rx="8"
+        style="fill:#f8fafc; stroke:#cbd5e1; stroke-width:2;"/>
+  <text x="80" y="1238" class="f-title">Legend</text>
+  <line x1="60" y1="1248" x2="1040" y2="1248" class="sep"/>
+
+  <!-- col 1: arrow types -->
+  <g transform="translate(85,1260)">
+    <path d="M 0 8 L 50 8"   class="a-orange"/>
+    <text x="60" y="13" class="f-desc">Note</text>
+    <path d="M 0 33 L 50 33" class="a-blue"/>
+    <text x="60" y="38" class="f-desc">Dependency / Injection</text>
+    <path d="M 0 58 L 50 58" class="a-purple"/>
+    <text x="60" y="63" class="f-desc">Data Flow / Returns</text>
+  </g>
+
+  <!-- col 2: component colours -->
+  <g transform="translate(380,1263)">
+    <rect x="0" y="0"  width="44" height="20" rx="3" class="interface-box"/>
+    <text x="54" y="15" class="f-desc">Interface (Provided by Library)</text>
+    <rect x="0" y="28" width="44" height="20" rx="3" class="library-box"/>
+    <text x="54" y="43" class="f-desc">Library Class</text>
+    <rect x="0" y="56" width="44" height="20" rx="3" class="function-box"/>
+    <text x="54" y="71" class="f-desc">Library Function</text>
+  </g>
+
+  <!-- col 3: data colours -->
+  <g transform="translate(700,1263)">
+    <rect x="0" y="0"  width="44" height="20" rx="3" class="raw-box"/>
+    <text x="54" y="15" class="f-desc">Raw Data Model</text>
+    <rect x="0" y="28" width="44" height="20" rx="3" class="parsed-box"/>
+    <text x="54" y="43" class="f-desc">Parsed Data Model</text>
+    <rect x="0" y="56" width="44" height="20" rx="3" class="note-box"/>
+    <text x="54" y="71" class="f-desc">Documentation Note</text>
+  </g>
+
+</svg>

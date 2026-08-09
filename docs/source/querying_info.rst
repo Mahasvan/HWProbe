@@ -43,7 +43,7 @@ fetched data remains accessible without re-querying.
    print("CPU Name:", hm.info.cpu.name)
 
    hm.fetch_storage_info()
-   print("Found", len(hm.info.storage.disks), "disks")
+   print("Found", len(hm.info.storage.modules), "disks")
 
    # CPU data is still available
    print("CPU Manufacturer:", hm.info.cpu.vendor)
@@ -75,8 +75,8 @@ Components like storage and graphics contain lists of devices:
    hm = hwprobe.HardwareManager()
    storage = hm.fetch_storage_info()
 
-   print("Found", len(storage.disks), "storage devices")
-   for disk in storage.disks:
+   print("Found", len(storage.modules), "storage devices")
+   for disk in storage.modules:
        print("Name:", disk.model)
        print("Size:", disk.size.capacity, disk.size.unit)
 

@@ -1,7 +1,10 @@
+from typing import Optional
+
+from hwprobe.core.common.pci_ids import lookup as pci_ids_lookup
 from hwprobe.core.linux.cpu import fetch_cpu_info
 from hwprobe.core.linux.display import fetch_display_info
 from hwprobe.core.linux.graphics import fetch_graphics_info
-from hwprobe.core.linux.memory import fetch_memory_info
+from hwprobe.core.linux.memory import DMIProvider, fetch_memory_info
 from hwprobe.core.linux.network import fetch_network_info
 from hwprobe.core.linux.storage import fetch_storage_info
 from hwprobe.models.display_models import DisplayInfo
@@ -22,7 +25,7 @@ class LinuxHardwareManager(HardwareManagerInterface):
     Uses the `sysfs` pseudo file system to extract info.
     """
 
-    def __init__(self):
+    def __init__(self, provider: Optional[DMIProvider] = None):
         self.info = LinuxHardwareInfo(
             cpu=CPUInfo(),
             graphics=GraphicsInfo(),
@@ -30,13 +33,14 @@ class LinuxHardwareManager(HardwareManagerInterface):
             storage=StorageInfo(),
             network=NetworkInfo(),
         )
+        self.provider = provider
 
     def fetch_cpu_info(self) -> CPUInfo:
         self.info.cpu = fetch_cpu_info()
         return self.info.cpu
 
     def fetch_memory_info(self) -> MemoryInfo:
-        self.info.memory = fetch_memory_info()
+        self.info.memory = fetch_memory_info(self.provider)
         return self.info.memory
 
     def fetch_storage_info(self) -> StorageInfo:
@@ -53,10 +57,13 @@ class LinuxHardwareManager(HardwareManagerInterface):
         self.fetch_memory_info()
         self.fetch_network_info()
         self.fetch_storage_info()
+        self.fetch_display_info()
         return self.info
 
     def fetch_display_info(self) -> DisplayInfo:
-        return fetch_display_info()
+        self.info.display = fetch_display_info(pci_lookup=pci_ids_lookup)
+        return self.info.display
 
     def fetch_network_info(self) -> NetworkInfo:
-        return fetch_network_info()
+        self.info.network = fetch_network_info()
+        return self.info.network
