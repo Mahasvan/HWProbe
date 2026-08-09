@@ -1,12 +1,3 @@
-"""
-Windows Display Information Module
-
-All Win32 calls go through display_info.dll (C++). Python only does:
-- EDID parsing (shared hwprobe.core.common.edid)
-- Connector type mapping (DISPLAY_CON_TYPE from win_enum)
-- Data assembly into DisplayModuleInfo
-"""
-
 from hwprobe.core.common.edid import parse_edid
 from hwprobe.core.windows.win_enum import DISPLAY_CON_TYPE
 from hwprobe.interops.win.bindings.display_info import (

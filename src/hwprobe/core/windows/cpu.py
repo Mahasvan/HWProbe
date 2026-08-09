@@ -11,8 +11,6 @@ kernel32.IsProcessorFeaturePresent.argtypes = [wintypes.DWORD]
 kernel32.IsProcessorFeaturePresent.restype = wintypes.BOOL
 
 # ARM processor feature IDs for IsProcessorFeaturePresent.
-# These are not defined in the Windows SDK headers — they're undocumented
-# feature IDs discovered via testing on ARM hardware.
 # ref: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocessorfeaturepresent
 PF_SSVE_FP8DOT2 = 78   # ARMv9 — FEAT_SSVE_FP8DOT2
 PF_SSVE_FP8DOT4 = 79   # ARMv9 — FEAT_SSVE_FP8DOT4
@@ -57,14 +55,6 @@ def get_features() -> list[str]:
     """
     We use the Win32 API function IsProcessorFeaturePresent to check for SSE features.
     https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocessorfeaturepresent
-
-    Feature IDs:
-    - SSE - 6
-    - SSE2 - 10
-    - SSE3 - 13
-    - SSSE3 - 36
-    - SSE4.1 - 37
-    - SSE4.2 - 38
     """
 
     return [k for k, v in FEATURE_ID_MAP.items() if is_processor_feature_present(v)]
