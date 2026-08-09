@@ -1,22 +1,35 @@
-// Standalone CLI test for all bindings in interops/win/:
-//   gpu_info.dll    -> get_gpu_info (DXGI + SetupAPI)
-//   wmi.dll         -> get_wmi_data (COM + WbemLocator)
-//   display_info.dll -> get_display_connectors, get_gpu_for_display, get_edid
+// Standalone CLI self-test for all bindings in interops/win/:
+//   gpu_info.dll      -> get_gpu_info                       (DXGI + SetupAPI)
+//   wmi.dll           -> get_wmi_data                       (COM + WbemLocator)
+//   display_info.dll  -> get_monitor_devices,
+//                       get_display_connectors,
+//                       get_gpu_for_display,
+//                       get_edid                            (user32 + CCD + DXGI + SetupAPI)
 //
 // Loads each DLL at runtime (same path the Python bindings use) so we exercise
-// the real ABI without needing matching import libs.
+// the real ABI without needing matching import libs. Mirrors the ctypes calls
+// in bindings/*.py — if a signature drifts here, it has drifted for Python too.
 
 #include "gpu_info.h"
 #include "wmi.h"
 #include "display_info.h"
+
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
 
+// ---- function pointer types matching the C exports ----
+
 typedef int (*get_gpu_info_ptr)(WinGPURaw *, int);
 typedef int (*get_wmi_data_ptr)(const char *, const char *const *, int,
                                 const char *, WmiRow *, int);
+typedef int (*get_monitor_devices_ptr)(MonitorDevice *, int);
+typedef int (*get_display_connectors_ptr)(ConnectorInfo *, int);
+typedef int (*get_gpu_for_display_ptr)(const char *, char *, int);
+typedef int (*get_edid_ptr)(const char *, unsigned char *, int);
 
+// Load from bindings/ (CMake output dir / Python layout) then fall back to the
+// exe's directory, exactly the search order the Python bindings rely on.
 static HMODULE _load(const char *name) {
     char path[128];
     std::snprintf(path, sizeof(path), "bindings/%s", name);
@@ -24,6 +37,10 @@ static HMODULE _load(const char *name) {
     if (!h) h = LoadLibraryA(name);
     return h;
 }
+
+// =====================================================================
+// gpu_info.dll
+// =====================================================================
 
 static int test_gpu() {
     HMODULE hLib = _load("gpu_info.dll");
@@ -67,6 +84,10 @@ static int test_gpu() {
     return 0;
 }
 
+// =====================================================================
+// wmi.dll
+// =====================================================================
+
 static int test_wmi() {
     HMODULE hLib = _load("wmi.dll");
     if (!hLib) {
@@ -104,10 +125,9 @@ static int test_wmi() {
     return 0;
 }
 
-typedef int (*get_monitor_devices_ptr)(MonitorDevice *, int);
-typedef int (*get_display_connectors_ptr)(ConnectorInfo *, int);
-typedef int (*get_gpu_for_display_ptr)(const char *, char *, int);
-typedef int (*get_edid_ptr)(const char *, unsigned char *, int);
+// =====================================================================
+// display_info.dll
+// =====================================================================
 
 static int test_display() {
     HMODULE hLib = _load("display_info.dll");
@@ -126,12 +146,13 @@ static int test_display() {
         GetProcAddress(hLib, "get_edid"));
 
     if (!fnMonitors || !fnConnectors || !fnGpu || !fnEdid) {
-        printf("[display] missing exports\n");
+        printf("[display] missing exports (mon=%d conn=%d gpu=%d edid=%d)\n",
+               !!fnMonitors, !!fnConnectors, !!fnGpu, !!fnEdid);
         FreeLibrary(hLib);
         return 1;
     }
 
-    // Monitors
+    // Monitors (user32 enumeration) — one entry per attached display.
     MonitorDevice monitors[8] = {};
     int nm = fnMonitors(monitors, 8);
     if (nm < 0) {
@@ -140,38 +161,48 @@ static int test_display() {
         return 1;
     }
 
-    // Connectors (for matching)
+    // Connectors (CCD API) — matched to monitors by GDI device name below.
     ConnectorInfo connectors[8] = {};
     int nc = fnConnectors(connectors, 8);
+    if (nc < 0) {
+        printf("[display] get_display_connectors failed\n");
+        FreeLibrary(hLib);
+        return 1;
+    }
 
-    printf("[display] Found %d monitor(s):\n\n", nm);
+    printf("[display] Found %d monitor(s), %d connector(s):\n\n", nm, nc);
     for (int i = 0; i < nm; ++i) {
+        const auto &m = monitors[i];
         printf("Monitor %d:\n", i);
-        printf("  DeviceID:    %s\n", monitors[i].device_id);
-        printf("  PNPDeviceID: %s\n", monitors[i].pnp_device_id);
-        printf("  Resolution:  %dx%d @ %d Hz\n",
-               monitors[i].width, monitors[i].height, monitors[i].refresh_rate);
+        printf("  DeviceID:    %s\n", m.device_id);
+        printf("  PNPDeviceID: %s\n", m.pnp_device_id);
+        printf("  Resolution:  %dx%d @ %d Hz\n", m.width, m.height, m.refresh_rate);
 
-        // GPU for this display
+        // GPU driving this display (DXGI output -> adapter name match).
         char gpuName[256] = {};
-        if (fnGpu(monitors[i].device_id, gpuName, sizeof(gpuName)) == 0) {
+        if (fnGpu(m.device_id, gpuName, sizeof(gpuName)) == 0) {
             printf("  GPU:         %s\n", gpuName);
         }
 
-        // Connector info
+        // Connector info for this display (matched by GDI device name).
         for (int j = 0; j < nc; ++j) {
-            if (strcmp(connectors[j].display_id, monitors[i].device_id) == 0) {
+            if (std::strcmp(connectors[j].display_id, m.device_id) == 0) {
                 printf("  Connector:   %s (tech=%d)\n",
                        connectors[j].display_path, connectors[j].output_technology);
-
-                // EDID via display path
-                unsigned char edidBuf[1024] = {};
-                int edidLen = fnEdid(connectors[j].display_path, edidBuf, sizeof(edidBuf));
-                if (edidLen > 0) {
-                    printf("  EDID:        %d bytes\n", edidLen);
-                }
                 break;
             }
+        }
+
+        // EDID via the monitor's PNP device ID (SetupAPI + registry lookup).
+        // get_edid matches on pnp_device_id, NOT the CCD display_path.
+        unsigned char edidBuf[1024] = {};
+        int edidLen = fnEdid(m.pnp_device_id, edidBuf, sizeof(edidBuf));
+        if (edidLen > 0) {
+            printf("  EDID:        %d bytes\n", edidLen);
+        } else if (edidLen == 0) {
+            printf("  EDID:        not found\n");
+        } else {
+            printf("  EDID:        lookup error\n");
         }
         printf("\n");
     }
@@ -179,6 +210,10 @@ static int test_display() {
     FreeLibrary(hLib);
     return 0;
 }
+
+// =====================================================================
+// main
+// =====================================================================
 
 int main() {
     int rc_gpu = test_gpu();
