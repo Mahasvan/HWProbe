@@ -156,7 +156,7 @@ class TestFetchDisplayInfo:
         )
         monkeypatch.setattr(
             "hwprobe.core.linux.display._fetch_individual_monitor_info",
-            lambda path: DisplayModuleInfo(name=os.path.basename(path)),
+            lambda path, pci_lookup=None: DisplayModuleInfo(name=os.path.basename(path)),
         )
 
         info = fetch_display_info()
@@ -206,7 +206,7 @@ class TestFetchDisplayInfo:
 
         call_count = {"n": 0}
 
-        def _mock_fetch(path):
+        def _mock_fetch(path, pci_lookup=None):
             call_count["n"] += 1
             if call_count["n"] == 1:
                 raise RuntimeError("EDID decode failed")

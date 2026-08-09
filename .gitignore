@@ -376,6 +376,7 @@ compile_commands.json
 *.log
 *.bak
 *.swp
+*.lock
 
 # vcpkg
 vcpkg_installed/
@@ -386,3 +387,9 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Profiling
+*profile*
+
+# VSCode config/settings
+.vscode/

@@ -65,7 +65,7 @@ _STORING_FETCHES = [
 )
 def test_fetch_method_delegates_to_module_function(mgr, module_path, method_name, info_attr, fake_return):
     with pytest.MonkeyPatch().context() as mp:
-        mp.setattr(module_path, lambda: fake_return)
+        mp.setattr(module_path, lambda *args, **kwargs: fake_return)
         result = getattr(mgr, method_name)()
     assert result is fake_return
 
@@ -77,7 +77,7 @@ def test_fetch_method_delegates_to_module_function(mgr, module_path, method_name
 )
 def test_fetch_method_stores_result_on_info(mgr, module_path, method_name, info_attr, fake_return):
     with pytest.MonkeyPatch().context() as mp:
-        mp.setattr(module_path, lambda: fake_return)
+        mp.setattr(module_path, lambda *args, **kwargs: fake_return)
         getattr(mgr, method_name)()
     assert getattr(mgr.info, info_attr) is fake_return
 
@@ -100,11 +100,11 @@ def test_fetch_network_info_delegates_to_module_function(mgr):
 def mgr_with_all_mocked(mgr):
     """Manager with all fetch_* module functions patched."""
     mp = pytest.MonkeyPatch()
-    mp.setattr("hwprobe.core.linux.manager.fetch_cpu_info", lambda: CPUInfo(name="AMD Ryzen 9 7950X", vendor="AuthenticAMD"))
-    mp.setattr("hwprobe.core.linux.manager.fetch_graphics_info", lambda: GraphicsInfo())
-    mp.setattr("hwprobe.core.linux.manager.fetch_memory_info", lambda: MemoryInfo())
-    mp.setattr("hwprobe.core.linux.manager.fetch_storage_info", lambda: StorageInfo())
-    mp.setattr("hwprobe.core.linux.manager.fetch_network_info", lambda: NetworkInfo())
+    mp.setattr("hwprobe.core.linux.manager.fetch_cpu_info", lambda *args, **kwargs: CPUInfo(name="AMD Ryzen 9 7950X", vendor="AuthenticAMD"))
+    mp.setattr("hwprobe.core.linux.manager.fetch_graphics_info", lambda *args, **kwargs: GraphicsInfo())
+    mp.setattr("hwprobe.core.linux.manager.fetch_memory_info", lambda *args, **kwargs: MemoryInfo())
+    mp.setattr("hwprobe.core.linux.manager.fetch_storage_info", lambda *args, **kwargs: StorageInfo())
+    mp.setattr("hwprobe.core.linux.manager.fetch_network_info", lambda *args, **kwargs: NetworkInfo())
     yield mgr
     mp.undo()
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 import re
 import subprocess
 from typing import Optional
@@ -168,9 +169,10 @@ def fetch_cpu_info() -> CPUInfo:
         cpu_info.status.messages.append("/proc/cpuinfo has no content")
         return cpu_info
 
-    architecture = subprocess.run(["uname", "-m"], capture_output=True, text=True, check=True)
+    # platform.machine() reads uname(2) in-process, avoiding a subprocess spawn.
+    machine = platform.machine()
 
-    if ("aarch64" in architecture.stdout) or ("arm" in architecture.stdout):
+    if ("aarch64" in machine) or ("arm" in machine):
         return fetch_arm_cpu_info(raw_cpu_info)
 
     return fetch_x86_cpu_info(raw_cpu_info)

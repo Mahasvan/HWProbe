@@ -3,12 +3,16 @@ import os
 import subprocess
 from unittest.mock import mock_open
 
+import pytest
+
+from hwprobe.core.common.pci_ids import PCILookupResult
 from hwprobe.core.linux.graphics import (
     _check_gpu_class,
     _pcie_gen,
     _populate_amd_info,
     _populate_lspci_info,
     _populate_nvidia_info,
+    _populate_pci_ids_info,
     _vram_amd,
     fetch_graphics_info,
 )
@@ -88,7 +92,7 @@ class TestPcieGen:
 
     def test_pcie_gen_success_gen4(self, monkeypatch):
         device = "0000:01:00.0"
-        path = f"/sys/bus/pci/devices/{device}/current_link_speed"
+        path = f"/sys/bus/pci/devices/{device}/max_link_speed"
 
         monkeypatch.setattr(os.path, "exists", lambda x: x == path)
 
@@ -104,7 +108,7 @@ class TestPcieGen:
 
     def test_pcie_gen_success_gen3(self, monkeypatch):
         device = "0000:01:00.0"
-        path = f"/sys/bus/pci/devices/{device}/current_link_speed"
+        path = f"/sys/bus/pci/devices/{device}/max_link_speed"
 
         monkeypatch.setattr(os.path, "exists", lambda x: x == path)
 
@@ -120,7 +124,7 @@ class TestPcieGen:
 
     def test_pcie_gen_success_gen2(self, monkeypatch):
         device = "0000:01:00.0"
-        path = f"/sys/bus/pci/devices/{device}/current_link_speed"
+        path = f"/sys/bus/pci/devices/{device}/max_link_speed"
 
         monkeypatch.setattr(os.path, "exists", lambda x: x == path)
 
@@ -136,7 +140,7 @@ class TestPcieGen:
 
     def test_pcie_gen_success_gen1(self, monkeypatch):
         device = "0000:01:00.0"
-        path = f"/sys/bus/pci/devices/{device}/current_link_speed"
+        path = f"/sys/bus/pci/devices/{device}/max_link_speed"
 
         monkeypatch.setattr(os.path, "exists", lambda x: x == path)
 
@@ -152,7 +156,7 @@ class TestPcieGen:
 
     def test_pcie_gen_success_gen5(self, monkeypatch):
         device = "0000:01:00.0"
-        path = f"/sys/bus/pci/devices/{device}/current_link_speed"
+        path = f"/sys/bus/pci/devices/{device}/max_link_speed"
 
         monkeypatch.setattr(os.path, "exists", lambda x: x == path)
 
@@ -168,7 +172,7 @@ class TestPcieGen:
 
     def test_pcie_gen_with_suffix(self, monkeypatch):
         device = "0000:01:00.0"
-        path = f"/sys/bus/pci/devices/{device}/current_link_speed"
+        path = f"/sys/bus/pci/devices/{device}/max_link_speed"
 
         monkeypatch.setattr(os.path, "exists", lambda x: x == path)
 
@@ -184,7 +188,7 @@ class TestPcieGen:
 
     def test_pcie_gen_unknown_speed(self, monkeypatch):
         device = "0000:01:00.0"
-        path = f"/sys/bus/pci/devices/{device}/current_link_speed"
+        path = f"/sys/bus/pci/devices/{device}/max_link_speed"
 
         monkeypatch.setattr(os.path, "exists", lambda x: x == path)
 
@@ -207,7 +211,7 @@ class TestPcieGen:
 
     def test_pcie_gen_read_exception(self, monkeypatch):
         device = "0000:01:00.0"
-        path = f"/sys/bus/pci/devices/{device}/current_link_speed"
+        path = f"/sys/bus/pci/devices/{device}/max_link_speed"
 
         monkeypatch.setattr(os.path, "exists", lambda x: x == path)
 
@@ -405,8 +409,113 @@ class TestPopulateLspciInfo:
             pass  # Expected
 
 
+class TestPopulatePciIdsInfo:
+    """Tests for _populate_pci_ids_info function (lspci-avoidance fast path)."""
+
+    def test_populate_pci_ids_info_full(self, monkeypatch):
+        device = "0000:01:00.0"
+        gpu = GPUInfo()
+        gpu.vendor_id = "0x10de"
+        gpu.device_id = "0x1c03"
+
+        def custom_open(path, *args, **kwargs):
+            filename = os.path.basename(path)
+            if filename == "subsystem_vendor":
+                return mock_open(read_data="0x1043")()
+            if filename == "subsystem_device":
+                return mock_open(read_data="0x8595")()
+            raise FileNotFoundError(path)
+
+        monkeypatch.setattr(builtins, "open", custom_open)
+
+        def mock_lookup(vendor_id, device_id, subvendor_id=None, subdevice_id=None, db_path=None):
+            if subvendor_id == "0x1043" and subdevice_id == "0x8595":
+                return PCILookupResult(
+                    vendor_id="10de",
+                    device_id="1c03",
+                    vendor_name="NVIDIA Corporation",
+                    device_name="GP106 [GeForce GTX 1060 6GB]",
+                    subsystem_name="GeForce GTX 1060 Dual",
+                )
+            return PCILookupResult(vendor_id="1043", device_id="0000", vendor_name="ASUSTeK Computer Inc.")
+
+        monkeypatch.setattr("hwprobe.core.linux.graphics.pci_ids_lookup", mock_lookup)
+
+        found = _populate_pci_ids_info(gpu, device)
+
+        assert found is True
+        assert gpu.manufacturer == "NVIDIA Corporation"
+        assert gpu.name == "GP106 [GeForce GTX 1060 6GB]"
+        assert gpu.subsystem_manufacturer == "ASUSTeK Computer Inc."
+        assert gpu.subsystem_model == "GeForce GTX 1060 Dual"
+
+    def test_populate_pci_ids_info_no_subsystem(self, monkeypatch):
+        device = "0000:00:02.0"
+        gpu = GPUInfo()
+        gpu.vendor_id = "0x8086"
+        gpu.device_id = "0x5917"
+
+        monkeypatch.setattr(builtins, "open", lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError()))
+
+        def mock_lookup(vendor_id, device_id, subvendor_id=None, subdevice_id=None, db_path=None):
+            return PCILookupResult(
+                vendor_id="8086", device_id="5917", vendor_name="Intel Corporation", device_name="UHD Graphics 620"
+            )
+
+        monkeypatch.setattr("hwprobe.core.linux.graphics.pci_ids_lookup", mock_lookup)
+
+        found = _populate_pci_ids_info(gpu, device)
+
+        assert found is True
+        assert gpu.manufacturer == "Intel Corporation"
+        assert gpu.name == "UHD Graphics 620"
+        assert gpu.subsystem_manufacturer is None
+        assert gpu.subsystem_model is None
+
+    def test_populate_pci_ids_info_missing_ids(self):
+        gpu = GPUInfo()
+        assert _populate_pci_ids_info(gpu, "0000:01:00.0") is False
+
+    def test_populate_pci_ids_info_lookup_failure_falls_back(self, monkeypatch):
+        device = "0000:01:00.0"
+        gpu = GPUInfo()
+        gpu.vendor_id = "0x10de"
+        gpu.device_id = "0x1c03"
+
+        monkeypatch.setattr(builtins, "open", lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError()))
+
+        def mock_lookup(*args, **kwargs):
+            raise FileNotFoundError("pci.ids not found")
+
+        monkeypatch.setattr("hwprobe.core.linux.graphics.pci_ids_lookup", mock_lookup)
+
+        assert _populate_pci_ids_info(gpu, device) is False
+
+    def test_populate_pci_ids_info_unknown_device_falls_back(self, monkeypatch):
+        device = "0000:01:00.0"
+        gpu = GPUInfo()
+        gpu.vendor_id = "0xffff"
+        gpu.device_id = "0xffff"
+
+        monkeypatch.setattr(builtins, "open", lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError()))
+
+        def mock_lookup(vendor_id, device_id, subvendor_id=None, subdevice_id=None, db_path=None):
+            return PCILookupResult(vendor_id="ffff", device_id="ffff")  # no names found
+
+        monkeypatch.setattr("hwprobe.core.linux.graphics.pci_ids_lookup", mock_lookup)
+
+        assert _populate_pci_ids_info(gpu, device) is False
+
+
 class TestFetchGraphicsInfo:
     """Tests for fetch_graphics_info function."""
+
+    @pytest.fixture(autouse=True)
+    def _force_fallback_path(self, monkeypatch):
+        # These tests exercise the Python sysfs fallback; a locally built
+        # libdevice_info.so would otherwise route fetch_graphics_info through
+        # the native path and skip the mocked sysfs/lspci behavior.
+        monkeypatch.setattr("hwprobe.core.linux.graphics.NATIVE_AVAILABLE", False)
 
     def test_fetch_graphics_info_root_not_found(self, monkeypatch):
         monkeypatch.setattr(os.path, "exists", lambda x: False)
@@ -425,8 +534,8 @@ class TestFetchGraphicsInfo:
             "class": "0x030000",
             "vendor": "0x8086",
             "device": "0x5917",
-            "current_link_width": "0",
-            "current_link_speed": "8.0 GT/s",
+            "max_link_width": "0",
+            "max_link_speed": "8.0 GT/s",
             "firmware_node/path": "\\_SB.PCI0.GFX0",
         }
 
@@ -470,8 +579,8 @@ class TestFetchGraphicsInfo:
             "class": "0x030000",
             "vendor": "0x10de",
             "device": "0x1c03",
-            "current_link_width": "16",
-            "current_link_speed": "8.0 GT/s",
+            "max_link_width": "16",
+            "max_link_speed": "8.0 GT/s",
             "firmware_node/path": "\\_SB.PCI0.PEG0.PEGP",
         }
 
@@ -512,8 +621,8 @@ class TestFetchGraphicsInfo:
             "class": "0x030000",
             "vendor": "0x1002",
             "device": "0x731f",
-            "current_link_width": "16",
-            "current_link_speed": "16.0 GT/s",
+            "max_link_width": "16",
+            "max_link_speed": "16.0 GT/s",
             "firmware_node/path": "\\_SB.PCI0.PEG0.PEGP",
         }
 
@@ -605,8 +714,8 @@ class TestFetchGraphicsInfo:
             "class": "0x030000",
             "vendor": "0x8086",
             "device": "0x5917",
-            "current_link_width": "0",
-            "current_link_speed": "8.0 GT/s",
+            "max_link_width": "0",
+            "max_link_speed": "8.0 GT/s",
         }
 
         def custom_open(path, *args, **kwargs):
@@ -638,8 +747,8 @@ class TestFetchGraphicsInfo:
             "class": "0x030000",
             "vendor": "0x8086",
             "device": "0x5917",
-            "current_link_width": "0",
-            "current_link_speed": "8.0 GT/s",
+            "max_link_width": "0",
+            "max_link_speed": "8.0 GT/s",
             "firmware_node/path": "\\_SB.PCI0.GFX0",
         }
 
@@ -675,8 +784,8 @@ class TestFetchGraphicsInfo:
             "class": "0x030000",
             "vendor": "0x10de",
             "device": "0x1c03",
-            "current_link_width": "16",
-            "current_link_speed": "8.0 GT/s",
+            "max_link_width": "16",
+            "max_link_speed": "8.0 GT/s",
             "firmware_node/path": "\\_SB.PCI0.PEG0.PEGP",
         }
 
@@ -715,8 +824,8 @@ class TestFetchGraphicsInfo:
             "class": "0x030000",
             "vendor": "0x8086",
             "device": "0x5917",
-            "current_link_width": "0",
-            "current_link_speed": "8.0 GT/s",
+            "max_link_width": "0",
+            "max_link_speed": "8.0 GT/s",
             "firmware_node/path": "\\_SB.PCI0.GFX0",
         }
 
@@ -747,14 +856,14 @@ class TestFetchGraphicsInfo:
         assert any("LSPCI" in msg for msg in info.status.messages)
 
     def test_fetch_graphics_info_pcie_gen_failure(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: "/current_link_speed" not in x)
+        monkeypatch.setattr(os.path, "exists", lambda x: "/max_link_speed" not in x)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:00:02.0"])
 
         file_contents = {
             "class": "0x030000",
             "vendor": "0x8086",
             "device": "0x5917",
-            "current_link_width": "0",
+            "max_link_width": "0",
             "firmware_node/path": "\\_SB.PCI0.GFX0",
         }
 

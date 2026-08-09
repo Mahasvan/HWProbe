@@ -1,8 +1,7 @@
-import builtins
-import os
-from unittest.mock import MagicMock
+from typing import List, Optional
 
 from hwprobe.core.linux.memory import (
+    DMIProvider,
     _dimm_capacity,
     _dimm_slot,
     _dimm_speed,
@@ -14,6 +13,19 @@ from hwprobe.core.linux.memory import (
 from hwprobe.models.memory_models import MemoryModuleSlot
 from hwprobe.models.size_models import Kilobyte, Megabyte
 from hwprobe.models.status_models import StatusType
+
+
+class _FakeDMIProvider(DMIProvider):
+    """Test double that returns pre-built raw DMI Type 17 entries."""
+
+    def __init__(self, entries: Optional[List[bytes]] = None, error: Optional[Exception] = None):
+        self._entries = entries or []
+        self._error = error
+
+    def get_entries_by_type(self, t: int) -> List[bytes]:
+        if self._error is not None:
+            raise self._error
+        return self._entries
 
 
 class TestPartNo:
@@ -194,35 +206,28 @@ class TestDimmSpeed:
 
 
 class TestLinuxMemory:
-    def test_fetch_memory_info_no_dmi_dir(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: False)
-
-        memory_info = fetch_memory_info()
+    def test_fetch_memory_info_no_provider(self):
+        memory_info = fetch_memory_info(provider=None)
 
         assert memory_info.status.type == StatusType.FAILED
-        assert memory_info.status.messages is not None
+        assert any("No DMIProvider provided" in msg for msg in memory_info.status.messages)
 
-    def test_fetch_memory_info_permission_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+    def test_fetch_memory_info_provider_raises(self):
+        provider = _FakeDMIProvider(error=PermissionError("Permission denied"))
 
-        mock_entry = MagicMock()
-        mock_entry.path = "/sys/firmware/dmi/entries/17-0"
-        mock_entry.name = "17-0"
-
-        def mock_scandir(path):
-            return [mock_entry]
-
-        monkeypatch.setattr(os, "scandir", mock_scandir)
-
-        def mock_open(*args, **kwargs):
-            raise PermissionError("Permission denied")
-
-        monkeypatch.setattr(builtins, "open", mock_open)
-
-        memory_info = fetch_memory_info()
+        memory_info = fetch_memory_info(provider=provider)
 
         assert memory_info.status.type == StatusType.FAILED
-        assert memory_info.status.messages is not None
+        assert any("Failed to retrieve DMI Type 17 entries" in msg for msg in memory_info.status.messages)
+        assert any("Permission denied" in msg for msg in memory_info.status.messages)
+
+    def test_fetch_memory_info_no_entries(self):
+        provider = _FakeDMIProvider(entries=[])
+
+        memory_info = fetch_memory_info(provider=provider)
+
+        assert memory_info.status.type == StatusType.FAILED
+        assert any("No DMI Type 17 entries provided by DMIProvider" in msg for msg in memory_info.status.messages)
 
     def _create_dmi_blob(
         self,
@@ -243,6 +248,7 @@ class TestLinuxMemory:
         length = 0x5C
 
         data = bytearray(length)
+        data[0x00] = 17  # SMBIOS Type 17 (Memory Device)
         data[0x01] = length
 
         # Strings - include "DIMM" in the data for _part_no check
@@ -289,28 +295,11 @@ class TestLinuxMemory:
 
         return bytes(data) + strings_bytes
 
-    def test_fetch_memory_info_success(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-
-        mock_entry = MagicMock()
-        mock_entry.path = "/sys/firmware/dmi/entries/17-0"
-        mock_entry.name = "17-0"
-
-        def mock_scandir(path):
-            return [mock_entry]
-
-        monkeypatch.setattr(os, "scandir", mock_scandir)
-
+    def test_fetch_memory_info_success(self):
         blob = self._create_dmi_blob()
+        provider = _FakeDMIProvider(entries=[blob])
 
-        def mock_open(*args, **kwargs):
-            from io import BytesIO
-
-            return BytesIO(blob)
-
-        monkeypatch.setattr(builtins, "open", mock_open)
-
-        memory_info = fetch_memory_info()
+        memory_info = fetch_memory_info(provider=provider)
 
         assert memory_info.status.type == StatusType.SUCCESS
         assert len(memory_info.modules) == 1
@@ -328,208 +317,100 @@ class TestLinuxMemory:
         assert module.supports_ecc == True  # 72 - 64 = 8 = 64/8
         assert module.frequency_mhz == 3200
 
-    def test_fetch_memory_info_non_ecc(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        mock_entry = MagicMock()
-        mock_entry.path = "/sys/firmware/dmi/entries/17-0"
-        mock_entry.name = "17-0"
-        monkeypatch.setattr(os, "scandir", lambda x: [mock_entry])
-
+    def test_fetch_memory_info_non_ecc(self):
         blob = self._create_dmi_blob(total_width=64, data_width=64)
+        provider = _FakeDMIProvider(entries=[blob])
 
-        def mock_open(*args, **kwargs):
-            from io import BytesIO
-
-            return BytesIO(blob)
-
-        monkeypatch.setattr(builtins, "open", mock_open)
-
-        memory_info = fetch_memory_info()
+        memory_info = fetch_memory_info(provider=provider)
         assert memory_info.modules[0].supports_ecc == False
 
-    def test_fetch_memory_info_unknown_size(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        mock_entry = MagicMock()
-        mock_entry.path = "/sys/firmware/dmi/entries/17-0"
-        mock_entry.name = "17-0"
-        monkeypatch.setattr(os, "scandir", lambda x: [mock_entry])
-
+    def test_fetch_memory_info_unknown_size(self):
         # Size 0xFFFF means unknown
         blob = self._create_dmi_blob()
         # Manually overwrite size to 0xFFFF
         data = bytearray(blob)
         data[0x0C:0x0E] = (0xFFFF).to_bytes(2, "little")
-        blob = bytes(data)
+        provider = _FakeDMIProvider(entries=[bytes(data)])
 
-        def mock_open(*args, **kwargs):
-            from io import BytesIO
-
-            return BytesIO(blob)
-
-        monkeypatch.setattr(builtins, "open", mock_open)
-
-        memory_info = fetch_memory_info()
-        # Module is still added but with None capacity and PARTIAL status
+        memory_info = fetch_memory_info(provider=provider)
+        # Module is still added, but with unknown (None) capacity
         assert len(memory_info.modules) == 1
         assert memory_info.modules[0].capacity is None
-        assert memory_info.status.type == StatusType.PARTIAL
-        assert any("Could not get DIMM Capacity" in msg for msg in memory_info.status.messages)
+        assert memory_info.status.type == StatusType.SUCCESS
 
-    def test_fetch_memory_info_extended_speed(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        mock_entry = MagicMock()
-        mock_entry.path = "/sys/firmware/dmi/entries/17-0"
-        mock_entry.name = "17-0"
-        monkeypatch.setattr(os, "scandir", lambda x: [mock_entry])
-
+    def test_fetch_memory_info_extended_speed(self):
         blob = self._create_dmi_blob(extended_speed=4800)
+        provider = _FakeDMIProvider(entries=[blob])
 
-        def mock_open(*args, **kwargs):
-            from io import BytesIO
-
-            return BytesIO(blob)
-
-        monkeypatch.setattr(builtins, "open", mock_open)
-
-        memory_info = fetch_memory_info()
+        memory_info = fetch_memory_info(provider=provider)
         assert memory_info.modules[0].frequency_mhz == 4800
 
-    def test_fetch_memory_info_parsing_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        mock_entry = MagicMock()
-        mock_entry.path = "/sys/firmware/dmi/entries/17-0"
-        mock_entry.name = "17-0"
-        monkeypatch.setattr(os, "scandir", lambda x: [mock_entry])
+    def test_fetch_memory_info_parsing_error(self):
+        # Too short / missing SMBIOS Type 17 header, fails to parse entirely
+        provider = _FakeDMIProvider(entries=[b"DIMM"])
 
-        # Return garbage that contains "DIMM" to trigger the parsing logic
-        def mock_open(*args, **kwargs):
-            from io import BytesIO
-
-            return BytesIO(b"DIMM")
-
-        monkeypatch.setattr(builtins, "open", mock_open)
-
-        memory_info = fetch_memory_info()
+        memory_info = fetch_memory_info(provider=provider)
         assert memory_info.status.type == StatusType.PARTIAL
-        # It will fail at value[0x1A] access
-        assert memory_info.status.messages is not None
+        assert any("Failed to parse one or more DMI entries" in msg for msg in memory_info.status.messages)
+        assert len(memory_info.modules) == 0
 
-    def test_fetch_memory_info_kilobyte_capacity(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        mock_entry = MagicMock()
-        mock_entry.path = "/sys/firmware/dmi/entries/17-0"
-        mock_entry.name = "17-0"
-        monkeypatch.setattr(os, "scandir", lambda x: [mock_entry])
-
+    def test_fetch_memory_info_kilobyte_capacity(self):
         # 2048 KB. Bit 15 set means 0x8000. 2048 is 0x0800. Total 0x8800.
-        # 0x8800 in LE is 00 88.
         size_kb_val = 2048 | 0x8000
 
         blob = self._create_dmi_blob()
         data = bytearray(blob)
         data[0x0C:0x0E] = size_kb_val.to_bytes(2, "little")
+        provider = _FakeDMIProvider(entries=[bytes(data)])
 
-        def mock_open(*args, **kwargs):
-            from io import BytesIO
-
-            return BytesIO(bytes(data))
-
-        monkeypatch.setattr(builtins, "open", mock_open)
-
-        memory_info = fetch_memory_info()
+        memory_info = fetch_memory_info(provider=provider)
         module = memory_info.modules[0]
         assert isinstance(module.capacity, Kilobyte)
         # The capacity value stored is the raw value passed to constructor
         assert module.capacity.capacity == size_kb_val
 
-    def test_fetch_memory_info_type_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        mock_entry = MagicMock()
-        mock_entry.path = "/sys/firmware/dmi/entries/17-0"
-        mock_entry.name = "17-0"
-        monkeypatch.setattr(os, "scandir", lambda x: [mock_entry])
-
+    def test_fetch_memory_info_type_error(self):
         blob = self._create_dmi_blob()
         data = bytearray(blob)
         # Set invalid type (0xFF is not in MEMORY_TYPE)
         data[0x12] = 0xFF
+        provider = _FakeDMIProvider(entries=[bytes(data)])
 
-        def mock_open(*args, **kwargs):
-            from io import BytesIO
-
-            return BytesIO(bytes(data))
-
-        monkeypatch.setattr(builtins, "open", mock_open)
-
-        memory_info = fetch_memory_info()
-        assert memory_info.status.type == StatusType.PARTIAL
-        assert any("Could not get DIMM Type" in msg for msg in memory_info.status.messages)
+        memory_info = fetch_memory_info(provider=provider)
+        # An unmapped memory type isn't fatal; the module is still added with type=None
+        assert memory_info.status.type == StatusType.SUCCESS
         assert len(memory_info.modules) == 1
         assert memory_info.modules[0].type is None
 
-    def test_fetch_memory_info_location_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        mock_entry = MagicMock()
-        mock_entry.path = "/sys/firmware/dmi/entries/17-0"
-        mock_entry.name = "17-0"
-        monkeypatch.setattr(os, "scandir", lambda x: [mock_entry])
-
+    def test_fetch_memory_info_location_error(self):
         blob = self._create_dmi_blob()
         data = bytearray(blob)
         # Set invalid string index for location (0x10) - this will cause IndexError in get_string_entry
         data[0x10] = 0xFF
+        provider = _FakeDMIProvider(entries=[bytes(data)])
 
-        def mock_open(*args, **kwargs):
-            from io import BytesIO
-
-            return BytesIO(bytes(data))
-
-        monkeypatch.setattr(builtins, "open", mock_open)
-
-        memory_info = fetch_memory_info()
+        memory_info = fetch_memory_info(provider=provider)
         # The invalid index causes an exception in get_string_entry, caught by the outer except
         assert memory_info.status.type == StatusType.PARTIAL
         assert len(memory_info.status.messages) > 0
+        assert len(memory_info.modules) == 0
 
-    def test_fetch_memory_info_manufacturer_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        mock_entry = MagicMock()
-        mock_entry.path = "/sys/firmware/dmi/entries/17-0"
-        mock_entry.name = "17-0"
-        monkeypatch.setattr(os, "scandir", lambda x: [mock_entry])
-
+    def test_fetch_memory_info_manufacturer_error(self):
         blob = self._create_dmi_blob()
         data = bytearray(blob)
         # Set invalid string index for manufacturer (0x17) - causes IndexError
         data[0x17] = 0xFF
+        provider = _FakeDMIProvider(entries=[bytes(data)])
 
-        def mock_open(*args, **kwargs):
-            from io import BytesIO
-
-            return BytesIO(bytes(data))
-
-        monkeypatch.setattr(builtins, "open", mock_open)
-
-        memory_info = fetch_memory_info()
+        memory_info = fetch_memory_info(provider=provider)
         # Invalid index causes exception caught by outer except block
         assert memory_info.status.type == StatusType.PARTIAL
         assert len(memory_info.status.messages) > 0
+        assert len(memory_info.modules) == 0
 
     def test_fetch_memory_info_capacity_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        mock_entry = MagicMock()
-        mock_entry.path = "/sys/firmware/dmi/entries/17-0"
-        mock_entry.name = "17-0"
-        monkeypatch.setattr(os, "scandir", lambda x: [mock_entry])
-
         blob = self._create_dmi_blob()
-
-        def mock_open(*args, **kwargs):
-            from io import BytesIO
-
-            return BytesIO(blob)
-
-        monkeypatch.setattr(builtins, "open", mock_open)
+        provider = _FakeDMIProvider(entries=[blob])
 
         # Mock Megabyte to raise exception to trigger the except block
         def mock_megabyte(**kwargs):
@@ -537,7 +418,9 @@ class TestLinuxMemory:
 
         monkeypatch.setattr("hwprobe.core.linux.memory.Megabyte", mock_megabyte)
 
-        memory_info = fetch_memory_info()
-        # The exception is caught by outer except block
+        memory_info = fetch_memory_info(provider=provider)
+        # The exception is caught by the per-entry except block in _parse_single_entry
         assert memory_info.status.type == StatusType.PARTIAL
-        assert any("Error while fetching Memory Info" in msg for msg in memory_info.status.messages)
+        assert any("Failed to parse one or more DMI entries" in msg for msg in memory_info.status.messages)
+        assert len(memory_info.modules) == 0
+

@@ -381,11 +381,7 @@ class TestFetchCpuInfo:
             return StringIO(raw)
 
         monkeypatch.setattr(builtins, "open", mock_open)
-
-        def mock_run(*args, **kwargs):
-            return subprocess.CompletedProcess(args, 0, stdout="x86_64")
-
-        monkeypatch.setattr(subprocess, "run", mock_run)
+        monkeypatch.setattr("hwprobe.core.linux.cpu.platform.machine", lambda: "x86_64")
 
         cpu = fetch_cpu_info()
         assert cpu.architecture == "x86"
@@ -400,11 +396,7 @@ class TestFetchCpuInfo:
             return StringIO(raw)
 
         monkeypatch.setattr(builtins, "open", mock_open)
-
-        def mock_run(*args, **kwargs):
-            return subprocess.CompletedProcess(args, 0, stdout="aarch64")
-
-        monkeypatch.setattr(subprocess, "run", mock_run)
+        monkeypatch.setattr("hwprobe.core.linux.cpu.platform.machine", lambda: "aarch64")
 
         monkeypatch.setattr("hwprobe.core.linux.cpu._arm_cpu_cores", lambda: 4)
 
@@ -421,11 +413,7 @@ class TestFetchCpuInfo:
             return StringIO(raw)
 
         monkeypatch.setattr(builtins, "open", mock_open)
-
-        def mock_run(*args, **kwargs):
-            return subprocess.CompletedProcess(args, 0, stdout="armv7l")
-
-        monkeypatch.setattr(subprocess, "run", mock_run)
+        monkeypatch.setattr("hwprobe.core.linux.cpu.platform.machine", lambda: "armv7l")
 
         monkeypatch.setattr("hwprobe.core.linux.cpu._arm_cpu_cores", lambda: 4)
 
@@ -468,11 +456,7 @@ class TestLinuxCPURealWorld:
             return StringIO(raw)
 
         monkeypatch.setattr(builtins, "open", mock_open)
-
-        def mock_run(*args, **kwargs):
-            return subprocess.CompletedProcess(args, 0, stdout="aarch64")
-
-        monkeypatch.setattr(subprocess, "run", mock_run)
+        monkeypatch.setattr("hwprobe.core.linux.cpu.platform.machine", lambda: "aarch64")
 
         monkeypatch.setattr("hwprobe.core.linux.cpu._arm_cpu_cores", lambda: 4)
 
