@@ -54,19 +54,25 @@
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "cfgmgr32.lib")
 
-// Helper: get SMBIOS string by index
-static char *GetSMBIOSString(const uint8_t *strings, uint8_t index)
+// Helper: get SMBIOS string by index. `end` bounds the firmware table buffer so malformed
+// SMBIOS data (missing a terminating double-null) can never cause an out-of-bounds read.
+static char *GetSMBIOSString(const uint8_t *strings, uint8_t index, const uint8_t *end)
 {
-    if (index == 0)
+    if (index == 0 || strings >= end)
         return nullptr;
 
-    const char *p = reinterpret_cast<const char *>(strings);
-    while (--index && *p)
+    const uint8_t *p = strings;
+    while (--index)
     {
-        p += std::strlen(p) + 1;
+        const void *nul = memchr(p, 0, end - p);
+        if (!nul)
+            return nullptr; // no terminator before buffer end; malformed data
+        p = static_cast<const uint8_t *>(nul) + 1;
+        if (p >= end)
+            return nullptr;
     }
 
-    return *p ? const_cast<char *>(p) : nullptr;
+    return (*p != 0) ? const_cast<char *>(reinterpret_cast<const char *>(p)) : nullptr;
 }
 
 // Helper: convert wide string to char buffer
@@ -766,12 +772,19 @@ FetchSMBIOSData(SMBIOSHwInfo *outInfo)
         return STATUS_FAILURE;
 
     const uint8_t *p = buffer.data() + 8; // Skip SMBIOS entry header
+    const uint8_t *end = buffer.data() + buffer.size();
 
     while (true)
     {
+        if (p + sizeof(SMBIOSHeader) > end)
+            break; // truncated/malformed table; stop parsing safely
+
         const auto *hdr = reinterpret_cast<const SMBIOSHeader *>(p);
         if (hdr->Type == 127)
             break;
+
+        if (p + hdr->Length > end)
+            break; // structure claims to extend past the buffer; stop parsing safely
 
         const uint8_t *strings = p + hdr->Length;
 
@@ -782,9 +795,9 @@ FetchSMBIOSData(SMBIOSHwInfo *outInfo)
             const auto *bb = reinterpret_cast<const SMBIOSBaseboard *>(p);
 
             const char *man =
-                GetSMBIOSString(strings, bb->Manufacturer);
+                GetSMBIOSString(strings, bb->Manufacturer, end);
             const char *prod =
-                GetSMBIOSString(strings, bb->Product);
+                GetSMBIOSString(strings, bb->Product, end);
 
             if (man)
                 strncpy_s(outInfo->motherboardManufacturer,
@@ -821,7 +834,7 @@ FetchSMBIOSData(SMBIOSHwInfo *outInfo)
             // Are we dealing with SMBIOS 3.6+ structure?
             if (hdr->Length >= 0x33)
             {
-                const char *socketType = GetSMBIOSString(strings, cpu->SocketType);
+                const char *socketType = GetSMBIOSString(strings, cpu->SocketType, end);
                 if (socketType && strlen(socketType) > 0)
                 {
                     strncpy_s(outInfo->cpuSocket, socketType, _TRUNCATE);
@@ -830,7 +843,7 @@ FetchSMBIOSData(SMBIOSHwInfo *outInfo)
             }
 
             // If not, try SocketDesignation string
-            const char *socketDesignation = GetSMBIOSString(strings, cpu->SocketDesignation);
+            const char *socketDesignation = GetSMBIOSString(strings, cpu->SocketDesignation, end);
             if (socketDesignation && strlen(socketDesignation) > 0)
             {
                 strncpy_s(outInfo->cpuSocket, socketDesignation, _TRUNCATE);
@@ -857,8 +870,10 @@ FetchSMBIOSData(SMBIOSHwInfo *outInfo)
 
         // Advance to next SMBIOS structure
         const uint8_t *next = strings;
-        while (!(next[0] == 0 && next[1] == 0))
+        while (next + 1 < end && !(next[0] == 0 && next[1] == 0))
             ++next;
+        if (next + 1 >= end)
+            break; // no terminator found before buffer end; malformed table, stop safely
         p = next + 2;
     }
 

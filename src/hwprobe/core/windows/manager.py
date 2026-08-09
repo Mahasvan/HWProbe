@@ -67,4 +67,7 @@ class WindowsHardwareManager(HardwareManagerInterface):
         self.fetch_storage_info()
         self.fetch_graphics_info()
         self.fetch_network_info()
+        self.fetch_display_info()
+        self.fetch_audio_info()
+        self.fetch_baseboard_info()
         return self.info
