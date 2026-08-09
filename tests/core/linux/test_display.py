@@ -157,7 +157,7 @@ class TestFetchDisplayInfo:
         )
         monkeypatch.setattr(
             "hwprobe.core.linux.display._fetch_individual_monitor_info",
-            lambda path: DisplayModuleInfo(name=os.path.basename(path)),
+            lambda path: DisplayModuleInfo(name=posixpath.basename(path)),
         )
 
         info = fetch_display_info()
@@ -257,7 +257,7 @@ class TestParseConnectorType:
 
     def test_connector_overrides_edid_interface(self, monkeypatch):
         device_path = "/sys/class/drm/card0/card0-HDMI-A-1"
-        edid_path = os.path.join(device_path, "edid")
+        edid_path = posixpath.join(device_path, "edid")
 
         monkeypatch.setattr(os.path, "exists", lambda p: p == edid_path)
         monkeypatch.setattr(

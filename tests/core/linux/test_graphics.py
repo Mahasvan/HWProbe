@@ -1,5 +1,6 @@
 import builtins
 import os
+import posixpath
 import subprocess
 from unittest.mock import mock_open
 
@@ -431,7 +432,7 @@ class TestFetchGraphicsInfo:
         }
 
         def custom_open(path, *args, **kwargs):
-            filename = os.path.basename(path)
+            filename = posixpath.basename(path)
             if filename == "path" and "firmware_node" in path:
                 return mock_open(read_data=file_contents["firmware_node/path"])()
             if filename in file_contents:
@@ -476,7 +477,7 @@ class TestFetchGraphicsInfo:
         }
 
         def custom_open(path, *args, **kwargs):
-            filename = os.path.basename(path)
+            filename = posixpath.basename(path)
             if filename == "path" and "firmware_node" in path:
                 return mock_open(read_data=file_contents["firmware_node/path"])()
             if filename in file_contents:
@@ -518,7 +519,7 @@ class TestFetchGraphicsInfo:
         }
 
         def custom_open(path, *args, **kwargs):
-            filename = os.path.basename(path)
+            filename = posixpath.basename(path)
             if filename == "path" and "firmware_node" in path:
                 return mock_open(read_data=file_contents["firmware_node/path"])()
             if filename in file_contents:
@@ -559,7 +560,7 @@ class TestFetchGraphicsInfo:
         }
 
         def custom_open(path, *args, **kwargs):
-            filename = os.path.basename(path)
+            filename = posixpath.basename(path)
             if filename in file_contents:
                 return mock_open(read_data=file_contents[filename])()
             raise FileNotFoundError(path)
@@ -576,7 +577,7 @@ class TestFetchGraphicsInfo:
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:01:00.0"])
 
         def custom_open(path, *args, **kwargs):
-            filename = os.path.basename(path)
+            filename = posixpath.basename(path)
             if filename == "class":
                 return mock_open(read_data="0x030000")()
             if filename == "vendor":
@@ -610,7 +611,7 @@ class TestFetchGraphicsInfo:
         }
 
         def custom_open(path, *args, **kwargs):
-            filename = os.path.basename(path)
+            filename = posixpath.basename(path)
             if filename == "path" and "firmware_node" in path:
                 raise FileNotFoundError("No ACPI path")
             if filename in file_contents:
@@ -644,7 +645,7 @@ class TestFetchGraphicsInfo:
         }
 
         def custom_open(path, *args, **kwargs):
-            filename = os.path.basename(path)
+            filename = posixpath.basename(path)
             if filename == "path" and "firmware_node" in path:
                 return mock_open(read_data=file_contents["firmware_node/path"])()
             if filename in file_contents:
@@ -681,7 +682,7 @@ class TestFetchGraphicsInfo:
         }
 
         def custom_open(path, *args, **kwargs):
-            filename = os.path.basename(path)
+            filename = posixpath.basename(path)
             if filename == "path" and "firmware_node" in path:
                 return mock_open(read_data=file_contents["firmware_node/path"])()
             if filename in file_contents:
@@ -721,7 +722,7 @@ class TestFetchGraphicsInfo:
         }
 
         def custom_open(path, *args, **kwargs):
-            filename = os.path.basename(path)
+            filename = posixpath.basename(path)
             if filename == "path" and "firmware_node" in path:
                 return mock_open(read_data=file_contents["firmware_node/path"])()
             if filename in file_contents:
@@ -759,7 +760,7 @@ class TestFetchGraphicsInfo:
         }
 
         def custom_open(path, *args, **kwargs):
-            filename = os.path.basename(path)
+            filename = posixpath.basename(path)
             if filename == "path" and "firmware_node" in path:
                 return mock_open(read_data=file_contents["firmware_node/path"])()
             if filename in file_contents:

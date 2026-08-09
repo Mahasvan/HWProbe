@@ -33,7 +33,7 @@ def _extract_pci_bdf_from_sysfs_path(path: str) -> Optional[str]:
 
 def _parse_connector_type(device_path: str) -> Optional[str]:
     """Extract interface type from a DRM connector directory name like card0-HDMI-A-1."""
-    basename = os.path.basename(device_path)
+    basename = posixpath.basename(device_path)
     m = re.match(r"card\d+-(.+)-\d+$", basename)
     if not m:
         return None

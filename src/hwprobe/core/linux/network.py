@@ -1,5 +1,6 @@
 import json
 import os
+import posixpath
 import subprocess
 
 from hwprobe.core.linux.common import pci_path_linux
@@ -43,7 +44,7 @@ def _enrich_with_sysfs_info(nic: NICInfo, status: Status) -> None:
 
     try:
         # Resolves the symlink to get the BDF address (e.g., 0000:01:00.0)
-        base_name = os.path.basename(os.path.realpath(base_path))
+        base_name = posixpath.basename(os.path.realpath(base_path))
         nic.pci_path = pci_path_linux(base_name)
     except OSError:
         pass
