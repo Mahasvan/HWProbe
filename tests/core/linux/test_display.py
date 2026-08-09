@@ -1,5 +1,6 @@
 import builtins
 import os
+import posixpath
 from unittest.mock import mock_open
 
 import pytest
@@ -33,8 +34,8 @@ class TestExtractPciBdfFromSysfsPath:
 
 class TestFetchIndividualMonitorInfo:
     DEVICE_PATH = "/sys/class/drm/card0/card0-eDP-1"
-    EDID_PATH = os.path.join(DEVICE_PATH, "edid")
-    ACPI_PATH = os.path.join(DEVICE_PATH, "firmware_node", "path")
+    EDID_PATH = posixpath.join(DEVICE_PATH, "edid")
+    ACPI_PATH = posixpath.join(DEVICE_PATH, "firmware_node", "path")
 
     def _patch_exists(self, monkeypatch, paths):
         monkeypatch.setattr(os.path, "exists", lambda p: p in paths)
