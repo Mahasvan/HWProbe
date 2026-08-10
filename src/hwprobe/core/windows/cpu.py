@@ -71,12 +71,20 @@ def fetch_cpu_info() -> CPUInfo:
         return cpu_info
 
     if wmi_data:
-        cpu_info.name = wmi_data[0]["Name"].strip()
-        cpu_info.vendor = "AMD" if "amd" in wmi_data[0]["Manufacturer"].lower() else "Intel" if "intel" in wmi_data[0]["Manufacturer"].lower() else wmi_data[0]["Manufacturer"].strip()
-        cpu_info.architecture = CPU_ARCHITECTURES.get(int(wmi_data[0]["Architecture"]), "Unknown")
-        cpu_info.bitness = int(wmi_data[0]["AddressWidth"])
-        cpu_info.cores = int(wmi_data[0]["NumberOfCores"])
-        cpu_info.threads = int(wmi_data[0]["NumberOfLogicalProcessors"])
+        row = wmi_data[0]
+        cpu_info.name = row["Name"].strip()
+        cpu_info.vendor = "AMD" if "amd" in row["Manufacturer"].lower() else "Intel" if "intel" in row["Manufacturer"].lower() else row["Manufacturer"].strip()
+
+        # WMI returns "" for missing/null properties; int("") raises ValueError.
+        # Guard with .isdigit(), matching memory.py and storage.py.
+        arch = row["Architecture"]
+        cpu_info.architecture = CPU_ARCHITECTURES.get(int(arch), "Unknown") if arch and arch.isdigit() else "Unknown"
+        addr_width = row["AddressWidth"]
+        cpu_info.bitness = int(addr_width) if addr_width and addr_width.isdigit() else None
+        cores = row["NumberOfCores"]
+        cpu_info.cores = int(cores) if cores and cores.isdigit() else None
+        threads = row["NumberOfLogicalProcessors"]
+        cpu_info.threads = int(threads) if threads and threads.isdigit() else None
 
         features = get_features()
         cpu_info.sse_flags = features
