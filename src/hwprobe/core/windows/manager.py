@@ -51,7 +51,6 @@ class WindowsHardwareManager(HardwareManagerInterface):
         self.info.display = fetch_display_info()
         return self.info.display
 
-
     def fetch_hardware_info(self) -> HardwareInfo:
         self.fetch_cpu_info()
         self.fetch_memory_info()

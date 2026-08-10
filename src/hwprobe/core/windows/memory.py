@@ -43,8 +43,15 @@ def fetch_wmi_memory_info() -> MemoryInfo:
     memory_info = MemoryInfo()
 
     fields = [
-        "BankLabel", "Capacity", "Manufacturer", "PartNumber", "Speed",
-        "DeviceLocator", "SMBIOSMemoryType", "DataWidth", "TotalWidth",
+        "BankLabel",
+        "Capacity",
+        "Manufacturer",
+        "PartNumber",
+        "Speed",
+        "DeviceLocator",
+        "SMBIOSMemoryType",
+        "DataWidth",
+        "TotalWidth",
     ]
 
     try:

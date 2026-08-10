@@ -2,9 +2,9 @@ import ctypes
 from ctypes import wintypes
 
 from hwprobe.core.windows.win_enum import CPU_ARCHITECTURES, FEATURE_ID_MAP
+from hwprobe.interops.win.bindings.wmi import get_wmi_data
 from hwprobe.models.cpu_models import CPUInfo
 from hwprobe.models.status_models import StatusType
-from hwprobe.interops.win.bindings.wmi import get_wmi_data
 
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 kernel32.IsProcessorFeaturePresent.argtypes = [wintypes.DWORD]
@@ -12,10 +12,10 @@ kernel32.IsProcessorFeaturePresent.restype = wintypes.BOOL
 
 # ARM processor feature IDs for IsProcessorFeaturePresent.
 # ref: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-isprocessorfeaturepresent
-PF_SSVE_FP8DOT2 = 78   # ARMv9 — FEAT_SSVE_FP8DOT2
-PF_SSVE_FP8DOT4 = 79   # ARMv9 — FEAT_SSVE_FP8DOT4
-PF_SSVE_FP8FMA = 80    # ARMv9 — FEAT_SSVE_FP8FMA
-PF_SME_FA64 = 88       # ARMv8 — FEAT_SME_FA64
+PF_SSVE_FP8DOT2 = 78  # ARMv9 — FEAT_SSVE_FP8DOT2
+PF_SSVE_FP8DOT4 = 79  # ARMv9 — FEAT_SSVE_FP8DOT4
+PF_SSVE_FP8FMA = 80  # ARMv9 — FEAT_SSVE_FP8FMA
+PF_SME_FA64 = 88  # ARMv8 — FEAT_SME_FA64
 
 
 def is_processor_feature_present(feature_id: int) -> bool:
@@ -64,7 +64,18 @@ def fetch_cpu_info() -> CPUInfo:
     cpu_info = CPUInfo()
 
     try:
-        wmi_data = get_wmi_data("Win32_Processor", ["Name", "Manufacturer", "Architecture", "AddressWidth", "MaxClockSpeed", "NumberOfCores", "NumberOfLogicalProcessors"])
+        wmi_data = get_wmi_data(
+            "Win32_Processor",
+            [
+                "Name",
+                "Manufacturer",
+                "Architecture",
+                "AddressWidth",
+                "MaxClockSpeed",
+                "NumberOfCores",
+                "NumberOfLogicalProcessors",
+            ],
+        )
     except Exception as e:
         cpu_info.status.type = StatusType.FAILED
         cpu_info.status.messages.append(f"Unable to obtain CPU Info: WMI query failed: {e}")
@@ -73,7 +84,13 @@ def fetch_cpu_info() -> CPUInfo:
     if wmi_data:
         row = wmi_data[0]
         cpu_info.name = row["Name"].strip()
-        cpu_info.vendor = "AMD" if "amd" in row["Manufacturer"].lower() else "Intel" if "intel" in row["Manufacturer"].lower() else row["Manufacturer"].strip()
+        cpu_info.vendor = (
+            "AMD"
+            if "amd" in row["Manufacturer"].lower()
+            else "Intel"
+            if "intel" in row["Manufacturer"].lower()
+            else row["Manufacturer"].strip()
+        )
 
         # WMI returns "" for missing/null properties; int("") raises ValueError.
         # Guard with .isdigit(), matching memory.py and storage.py.

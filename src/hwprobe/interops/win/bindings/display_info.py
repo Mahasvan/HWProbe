@@ -27,14 +27,14 @@ _LIB_PATH = _HERE / "display_info.dll"
 
 if not _LIB_PATH.exists():
     raise FileNotFoundError(
-        f"display_info.dll not found at {_LIB_PATH}.\n"
-        f"Build the project first:  cmake --build build --config Release"
+        f"display_info.dll not found at {_LIB_PATH}.\nBuild the project first:  cmake --build build --config Release"
     )
 
 _lib = ctypes.WinDLL(str(_LIB_PATH))
 
 
 # ---- mirror the C structs ----
+
 
 class _MonitorDevice(ctypes.Structure):
     _fields_ = [
@@ -71,6 +71,7 @@ _lib.get_edid.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_ubyte), ctype
 
 # ---- Python-facing dataclasses ----
 
+
 @dataclass
 class MonitorDevice:
     device_id: str
@@ -89,7 +90,7 @@ class ConnectorInfo:
 
 # ---- public API ----
 
-_MAX = 8 # mirrors gpu_info.py _MAX_GPU
+_MAX = 8  # mirrors gpu_info.py _MAX_GPU
 
 
 def get_monitor_devices() -> list[MonitorDevice]:

@@ -69,11 +69,13 @@ Programmatic use (the way `core/windows/*.py` calls them):
 ```python
 # GPU
 from hwprobe.interops.win.bindings.gpu_info import get_gpu_info
+
 for g in get_gpu_info():
     print(g.name, f"0x{g.vendor_id:04X}", g.dedicated_video_memory_bytes)
 
 # WMI
 from hwprobe.interops.win.bindings.wmi import get_wmi_data
+
 rows = get_wmi_data(
     "MSFT_PhysicalDisk",
     ["FriendlyName", "MediaType", "BusType", "Size", "Manufacturer", "Model"],
@@ -84,12 +86,16 @@ for r in rows:
 
 # Display
 from hwprobe.interops.win.bindings.display_info import (
-    get_monitor_devices, get_display_connectors, get_gpu_for_display, get_edid,
+    get_monitor_devices,
+    get_display_connectors,
+    get_gpu_for_display,
+    get_edid,
 )
+
 for m in get_monitor_devices():
     print(m.device_id, m.pnp_device_id, f"{m.width}x{m.height}@{m.refresh_rate}")
     print("  GPU:", get_gpu_for_display(m.device_id))
-    edid = get_edid(m.pnp_device_id.split("\\")[1])   # monitor ID segment, see "EDID lookup key" below
+    edid = get_edid(m.pnp_device_id.split("\\")[1])  # monitor ID segment, see "EDID lookup key" below
     if edid:
         print(f"  EDID: {len(edid)} bytes")
 ```

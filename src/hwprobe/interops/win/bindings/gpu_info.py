@@ -32,6 +32,7 @@ _lib = ctypes.WinDLL(str(_LIB_PATH))
 
 # ---- mirror the C struct ----
 
+
 class _WinGPURaw(ctypes.Structure):
     _fields_ = [
         ("name", ctypes.c_char * 256),

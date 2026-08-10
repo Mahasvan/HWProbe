@@ -68,7 +68,9 @@ def fetch_display_info() -> DisplayInfo:
         edid_key = (
             connector.display_path
             if connector and connector.display_path
-            else dev.pnp_device_id.split("\\")[1] if "\\" in dev.pnp_device_id else dev.pnp_device_id
+            else dev.pnp_device_id.split("\\")[1]
+            if "\\" in dev.pnp_device_id
+            else dev.pnp_device_id
         )
         edid_bytes = get_edid(edid_key)
         if edid_bytes:

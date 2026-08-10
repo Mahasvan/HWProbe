@@ -55,6 +55,7 @@ _CR_BUFFER_SMALL = 0x1A
 
 # ---- core: locate devnode + get property (two-call pattern) ----
 
+
 def _locate_devnode(pnp_device_id: str) -> Optional[c_ulong]:
     """Get the device node instance handle from a PNP Device ID string."""
     dev_node = c_ulong()
@@ -80,9 +81,7 @@ def _get_devnode_property(pnp_device_id: str, prop_key: DEVPROPKEY) -> Optional[
     buf_size = c_ulong(0)
 
     # First call: get required buffer size.
-    status = _cfgmgr.CM_Get_DevNode_PropertyW(
-        dn, byref(prop_key), byref(prop_type), None, byref(buf_size), c_ulong(0)
-    )
+    status = _cfgmgr.CM_Get_DevNode_PropertyW(dn, byref(prop_key), byref(prop_type), None, byref(buf_size), c_ulong(0))
     if status == _CR_SUCCESS:
         # Property exists with zero-size payload (rare). Return empty.
         return b""
@@ -91,15 +90,14 @@ def _get_devnode_property(pnp_device_id: str, prop_key: DEVPROPKEY) -> Optional[
 
     # Second call: fill the buffer.
     buf = c_buffer(buf_size.value)
-    status = _cfgmgr.CM_Get_DevNode_PropertyW(
-        dn, byref(prop_key), byref(prop_type), buf, byref(buf_size), c_ulong(0)
-    )
+    status = _cfgmgr.CM_Get_DevNode_PropertyW(dn, byref(prop_key), byref(prop_type), buf, byref(buf_size), c_ulong(0))
     if status != _CR_SUCCESS:
         return None
     return buf.raw
 
 
 # ---- decoders ----
+
 
 def _decode_string_list(raw: bytes) -> list[str]:
     """Decode a REG_MULTI_SZ-style buffer (UTF-16-LE, NUL-separated strings)."""
@@ -115,6 +113,7 @@ def _decode_uint32(raw: bytes) -> Optional[int]:
 
 
 # ---- public API ----
+
 
 def get_location_paths(pnp_device_id: str) -> Optional[list[str]]:
     """Get the location paths for a PNP device. Returns list of raw path

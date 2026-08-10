@@ -30,13 +30,14 @@ _LIB_PATH = _HERE / "wmi.dll"
 if not _LIB_PATH.exists():
     raise FileNotFoundError(
         f"wmi.dll not found at {_LIB_PATH}.\n"
-        f"Build the project first:  cmake -S { _HERE.parent } -B build && cmake --build build --config Release"
+        f"Build the project first:  cmake -S {_HERE.parent} -B build && cmake --build build --config Release"
     )
 
 _lib = ctypes.WinDLL(str(_LIB_PATH))
 
 
 # ---- mirror the C struct ----
+
 
 # ctypes: a fixed 2D char array. Field order matches WmiRow in wmi.h.
 class _WmiRow(ctypes.Structure):
@@ -48,16 +49,17 @@ class _WmiRow(ctypes.Structure):
 # ---- function signature ----
 _lib.get_wmi_data.restype = ctypes.c_int
 _lib.get_wmi_data.argtypes = [
-    ctypes.c_char_p,                       # wmi_class
-    ctypes.POINTER(ctypes.c_char_p),       # fields (array of c_char_p)
-    ctypes.c_int,                          # field_count
-    ctypes.c_char_p,                       # namespace_str
-    ctypes.POINTER(_WmiRow),               # out
-    ctypes.c_int,                          # max_rows
+    ctypes.c_char_p,  # wmi_class
+    ctypes.POINTER(ctypes.c_char_p),  # fields (array of c_char_p)
+    ctypes.c_int,  # field_count
+    ctypes.c_char_p,  # namespace_str
+    ctypes.POINTER(_WmiRow),  # out
+    ctypes.c_int,  # max_rows
 ]
 
 
 # ---- public API ----
+
 
 def get_wmi_data(
     wmi_class: str,
