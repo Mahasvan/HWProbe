@@ -3,6 +3,7 @@ import os
 import posixpath
 from unittest.mock import mock_open
 
+
 import pytest
 
 from hwprobe.core.linux.display import (
@@ -38,7 +39,7 @@ class TestFetchIndividualMonitorInfo:
     ACPI_PATH = posixpath.join(DEVICE_PATH, "firmware_node", "path")
 
     def _patch_exists(self, monkeypatch, paths):
-        monkeypatch.setattr(os.path, "exists", lambda p: p in paths)
+        monkeypatch.setattr(posixpath, "exists", lambda p: p in paths)
 
     def test_returns_none_when_edid_missing(self, monkeypatch):
         self._patch_exists(monkeypatch, set())
@@ -65,7 +66,7 @@ class TestFetchIndividualMonitorInfo:
             lambda _: DisplayModuleInfo(name="Internal Display"),
         )
         monkeypatch.setattr(
-            os.path,
+            posixpath,
             "realpath",
             lambda _: "/sys/devices/pci0000:00/0000:00:02.0/0000:06:00.0/drm/card0",
         )
@@ -94,7 +95,7 @@ class TestFetchIndividualMonitorInfo:
             lambda _: DisplayModuleInfo(name="Panel"),
         )
         monkeypatch.setattr(
-            os.path,
+            posixpath,
             "realpath",
             lambda _: "/sys/devices/platform/simple-framebuffer/drm/card0",
         )
@@ -129,7 +130,7 @@ class TestFetchIndividualMonitorInfo:
             lambda _: DisplayModuleInfo(name="Display"),
         )
         monkeypatch.setattr(
-            os.path,
+            posixpath,
             "realpath",
             lambda _: "/sys/devices/pci0000:00/0000:00:02.0/drm/card0",
         )
@@ -146,7 +147,7 @@ class TestFetchIndividualMonitorInfo:
 
 class TestFetchDisplayInfo:
     def test_collects_monitors_from_drm(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda p: p == "/sys/class/drm")
+        monkeypatch.setattr(posixpath, "isdir", lambda p: p == "/sys/class/drm")
         monkeypatch.setattr(
             os,
             "listdir",
@@ -167,7 +168,7 @@ class TestFetchDisplayInfo:
         assert names == {"card0-eDP-1", "card0-HDMI-A-1"}
 
     def test_skips_monitors_returning_none(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda p: p == "/sys/class/drm")
+        monkeypatch.setattr(posixpath, "isdir", lambda p: p == "/sys/class/drm")
         monkeypatch.setattr(
             os,
             "listdir",
@@ -186,7 +187,7 @@ class TestFetchDisplayInfo:
         assert len(info.modules) == 0
 
     def test_failed_when_drm_root_missing(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda p: False)
+        monkeypatch.setattr(posixpath, "isdir", lambda p: False)
 
         info = fetch_display_info()
 
@@ -195,7 +196,7 @@ class TestFetchDisplayInfo:
         assert info.modules == []
 
     def test_partial_when_monitor_raises(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda p: p == "/sys/class/drm")
+        monkeypatch.setattr(posixpath, "isdir", lambda p: p == "/sys/class/drm")
         monkeypatch.setattr(
             os,
             "listdir",
@@ -259,7 +260,7 @@ class TestParseConnectorType:
         device_path = "/sys/class/drm/card0/card0-HDMI-A-1"
         edid_path = posixpath.join(device_path, "edid")
 
-        monkeypatch.setattr(os.path, "exists", lambda p: p == edid_path)
+        monkeypatch.setattr(posixpath, "exists", lambda p: p == edid_path)
         monkeypatch.setattr(
             builtins,
             "open",
@@ -270,7 +271,7 @@ class TestParseConnectorType:
             lambda _: DisplayModuleInfo(name="Test", interface="DisplayPort"),
         )
         monkeypatch.setattr(
-            os.path,
+            posixpath,
             "realpath",
             lambda _: "/sys/devices/platform/drm/card0",
         )

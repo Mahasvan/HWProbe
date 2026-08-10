@@ -1,5 +1,6 @@
 import builtins
 import os
+import posixpath
 from unittest.mock import MagicMock
 
 from hwprobe.core.linux.storage import fetch_storage_info
@@ -8,7 +9,7 @@ from hwprobe.models.status_models import StatusType
 
 class TestLinuxStorage:
     def test_fetch_storage_info_no_sys_block(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: False)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: False)
 
         storage_info = fetch_storage_info()
 
@@ -16,8 +17,8 @@ class TestLinuxStorage:
         assert "does not exist" in storage_info.status.messages[0]
 
     def test_fetch_storage_info_nvme_success(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        monkeypatch.setattr(os.path, "exists", lambda x: False)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: False)
         monkeypatch.setattr(os, "listdir", lambda x: ["nvme0n1", "loop0"])
 
         def mock_open(path, mode="r"):
@@ -56,8 +57,8 @@ class TestLinuxStorage:
         assert disk.size.capacity == 953869
 
     def test_fetch_storage_info_sd_success(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        monkeypatch.setattr(os.path, "exists", lambda x: False)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: False)
         monkeypatch.setattr(os, "listdir", lambda x: ["sda"])
 
         def mock_open(path, mode="r"):
@@ -94,8 +95,8 @@ class TestLinuxStorage:
         assert disk.size.capacity == 953869
 
     def test_fetch_storage_info_partial_failure(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        monkeypatch.setattr(os.path, "exists", lambda x: False)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: False)
         monkeypatch.setattr(os, "listdir", lambda x: ["sda"])
 
         def mock_open(path, mode="r"):
@@ -125,8 +126,8 @@ class TestLinuxStorage:
         assert len(storage_info.modules) == 1
 
     def test_fetch_storage_info_exception(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        monkeypatch.setattr(os.path, "exists", lambda x: False)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: False)
         monkeypatch.setattr(os, "listdir", lambda x: ["sda"])
 
         def mock_open(path, mode="r"):
@@ -141,8 +142,8 @@ class TestLinuxStorage:
         assert len(storage_info.modules) == 0
 
     def test_fetch_storage_info_emmc_success(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        monkeypatch.setattr(os.path, "exists", lambda x: False)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: False)
         monkeypatch.setattr(os, "listdir", lambda x: ["mmcblk0"])
 
         def mock_open(path, mode="r"):
@@ -181,8 +182,8 @@ class TestLinuxStorage:
         assert disk.size.capacity == 30536
 
     def test_fetch_storage_info_sd_card_success(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        monkeypatch.setattr(os.path, "exists", lambda x: False)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: False)
         monkeypatch.setattr(os, "listdir", lambda x: ["mmcblk1"])
 
         def mock_open(path, mode="r"):
@@ -221,8 +222,8 @@ class TestLinuxStorage:
         assert disk.size.capacity == 61440
 
     def test_fetch_storage_info_emmc_partial_failure(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
-        monkeypatch.setattr(os.path, "exists", lambda x: False)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: False)
         monkeypatch.setattr(os, "listdir", lambda x: ["mmcblk0"])
 
         def mock_open(path, mode="r"):
@@ -254,7 +255,7 @@ class TestLinuxStorage:
         assert len(storage_info.modules) == 1
 
     def test_fetch_storage_info_filters_partitions_and_boot_devices(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
         monkeypatch.setattr(
             os,
             "listdir",
@@ -284,7 +285,7 @@ class TestLinuxStorage:
                 or "nvme0n1p2/partition" in path
             )
 
-        monkeypatch.setattr(os.path, "exists", mock_exists)
+        monkeypatch.setattr(posixpath, "exists", mock_exists)
 
         def mock_open(path, mode="r"):
             mock_file = MagicMock()

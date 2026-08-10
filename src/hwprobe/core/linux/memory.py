@@ -1,4 +1,5 @@
 import os
+import posixpath
 from typing import Optional
 
 from hwprobe.core.linux.dmi_decode import MEMORY_TYPE, get_string_entry
@@ -96,13 +97,13 @@ def _dimm_speed(value: bytes) -> Optional[int]:
 def fetch_memory_info() -> MemoryInfo:
     memory_info = MemoryInfo()
 
-    if not os.path.isdir("/sys/firmware/dmi/entries"):
+    if not posixpath.isdir("/sys/firmware/dmi/entries"):
         memory_info.status.type = StatusType.FAILED
         memory_info.status.messages.append("The /sys/firmware/dmi/entries directory doesn't exist")
         return memory_info
 
     """
-    DMI Documentation: 
+    DMI Documentation:
     SMBIOS Specification - Section 7.18 - Memory Device (Type 17)
     - https://www.dmtf.org/sites/default/files/standards/documents/DSP0134_3.9.0.pdf
     Other noteworthy mentions:

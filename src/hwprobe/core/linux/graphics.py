@@ -36,7 +36,7 @@ def _pcie_gen(device) -> Optional[int]:
     # Path example: /sys/bus/pci/devices/0000:03:00.0/current_link_speed
     path = f"/sys/bus/pci/devices/{device}/current_link_speed"
 
-    if not os.path.exists(path):
+    if not posixpath.exists(path):
         return None
 
     try:
@@ -115,7 +115,7 @@ def _populate_lspci_info(gpu: GPUInfo, device: str) -> GPUInfo:
 def fetch_graphics_info() -> GraphicsInfo:
     graphics_info = GraphicsInfo()
 
-    if not os.path.exists(PCI_ROOT_PATH):
+    if not posixpath.exists(PCI_ROOT_PATH):
         graphics_info.status.type = StatusType.FAILED
         graphics_info.status.messages.append("/sys/bus/pci/devices/ not found")
         return graphics_info

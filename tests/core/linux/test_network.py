@@ -1,6 +1,6 @@
 import builtins
 import json
-import os
+import posixpath
 import subprocess
 from unittest.mock import mock_open
 
@@ -18,7 +18,7 @@ class TestEnrichWithSysfsInfo:
         return NICInfo(interface=interface)
 
     def _patch_exists(self, monkeypatch, paths):
-        monkeypatch.setattr(os.path, "exists", lambda p: p in paths)
+        monkeypatch.setattr(posixpath, "exists", lambda p: p in paths)
 
     def test_no_interface_returns_early(self):
         nic = NICInfo(interface=None)
@@ -48,7 +48,7 @@ class TestEnrichWithSysfsInfo:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: "PciRoot(0x0)/Pci(0x1f,0x6)")
 
         status = Status()
@@ -71,7 +71,7 @@ class TestEnrichWithSysfsInfo:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: None)
 
         status = Status()
@@ -94,7 +94,7 @@ class TestEnrichWithSysfsInfo:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: None)
 
         status = Status()
@@ -119,7 +119,7 @@ class TestEnrichWithSysfsInfo:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: None)
 
         status = Status()
@@ -139,7 +139,7 @@ class TestEnrichWithSysfsInfo:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: None)
 
         status = Status()
@@ -160,7 +160,7 @@ class TestEnrichWithSysfsInfo:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:01:00.0")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:01:00.0")
 
         pci_calls = []
         monkeypatch.setattr(
@@ -189,7 +189,7 @@ class TestFetchIpData:
             }
         ]
         monkeypatch.setattr(subprocess, "check_output", lambda *a, **kw: self._mock_ip_output(rows))
-        monkeypatch.setattr(os.path, "exists", lambda p: False)  # virtual -> skipped enrichment
+        monkeypatch.setattr(posixpath, "exists", lambda p: False)  # virtual -> skipped enrichment
 
         info = _fetch_ip_data()
         assert len(info.modules) == 0  # virtual interface, skipped
@@ -204,7 +204,7 @@ class TestFetchIpData:
             }
         ]
         monkeypatch.setattr(subprocess, "check_output", lambda *a, **kw: self._mock_ip_output(rows))
-        monkeypatch.setattr(os.path, "exists", lambda p: p == "/sys/class/net/eth0/device")
+        monkeypatch.setattr(posixpath, "exists", lambda p: p == "/sys/class/net/eth0/device")
 
         def fake_open(path, *args, **kwargs):
             if path.endswith("/vendor"):
@@ -214,7 +214,7 @@ class TestFetchIpData:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: None)
 
         info = _fetch_ip_data()
@@ -240,7 +240,7 @@ class TestFetchIpData:
             }
         ]
         monkeypatch.setattr(subprocess, "check_output", lambda *a, **kw: self._mock_ip_output(rows))
-        monkeypatch.setattr(os.path, "exists", lambda p: p == "/sys/class/net/eth0/device")
+        monkeypatch.setattr(posixpath, "exists", lambda p: p == "/sys/class/net/eth0/device")
 
         def fake_open(path, *args, **kwargs):
             if path.endswith("/vendor"):
@@ -250,7 +250,7 @@ class TestFetchIpData:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: None)
 
         info = _fetch_ip_data()
@@ -266,7 +266,7 @@ class TestFetchIpData:
             }
         ]
         monkeypatch.setattr(subprocess, "check_output", lambda *a, **kw: self._mock_ip_output(rows))
-        monkeypatch.setattr(os.path, "exists", lambda p: p == "/sys/class/net/eth0/device")
+        monkeypatch.setattr(posixpath, "exists", lambda p: p == "/sys/class/net/eth0/device")
 
         def fake_open(path, *args, **kwargs):
             if path.endswith("/vendor"):
@@ -276,7 +276,7 @@ class TestFetchIpData:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: None)
 
         info = _fetch_ip_data()
@@ -292,7 +292,7 @@ class TestFetchIpData:
             }
         ]
         monkeypatch.setattr(subprocess, "check_output", lambda *a, **kw: self._mock_ip_output(rows))
-        monkeypatch.setattr(os.path, "exists", lambda p: p == "/sys/class/net/eth0/device")
+        monkeypatch.setattr(posixpath, "exists", lambda p: p == "/sys/class/net/eth0/device")
 
         def fake_open(path, *args, **kwargs):
             if path.endswith("/vendor"):
@@ -302,7 +302,7 @@ class TestFetchIpData:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: None)
 
         info = _fetch_ip_data()
@@ -324,7 +324,7 @@ class TestFetchIpData:
             },
         ]
         monkeypatch.setattr(subprocess, "check_output", lambda *a, **kw: self._mock_ip_output(rows))
-        monkeypatch.setattr(os.path, "exists", lambda p: p in {
+        monkeypatch.setattr(posixpath, "exists", lambda p: p in {
             "/sys/class/net/eth0/device",
             "/sys/class/net/wlan0/device",
         })
@@ -337,7 +337,7 @@ class TestFetchIpData:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: None)
 
         info = _fetch_ip_data()
@@ -350,7 +350,7 @@ class TestFetchIpData:
             {"ifname": "docker0", "link_type": "ether", "address": "02:42:00:00:00:00", "addr_info": []},
         ]
         monkeypatch.setattr(subprocess, "check_output", lambda *a, **kw: self._mock_ip_output(rows))
-        monkeypatch.setattr(os.path, "exists", lambda p: False)
+        monkeypatch.setattr(posixpath, "exists", lambda p: False)
 
         info = _fetch_ip_data()
         assert len(info.modules) == 0
@@ -366,7 +366,7 @@ class TestFetchIpData:
             },
         ]
         monkeypatch.setattr(subprocess, "check_output", lambda *a, **kw: self._mock_ip_output(rows))
-        monkeypatch.setattr(os.path, "exists", lambda p: p == "/sys/class/net/eth0/device")
+        monkeypatch.setattr(posixpath, "exists", lambda p: p == "/sys/class/net/eth0/device")
 
         def fake_open(path, *args, **kwargs):
             if path.endswith("/vendor"):
@@ -376,7 +376,7 @@ class TestFetchIpData:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: None)
 
         info = _fetch_ip_data()
@@ -388,7 +388,7 @@ class TestFetchIpData:
             {"link_type": "ether", "address": "aa:bb:cc:dd:ee:ff", "addr_info": []},
         ]
         monkeypatch.setattr(subprocess, "check_output", lambda *a, **kw: self._mock_ip_output(rows))
-        monkeypatch.setattr(os.path, "exists", lambda p: False)
+        monkeypatch.setattr(posixpath, "exists", lambda p: False)
 
         info = _fetch_ip_data()
         assert len(info.modules) == 0
@@ -403,7 +403,7 @@ class TestFetchIpData:
             }
         ]
         monkeypatch.setattr(subprocess, "check_output", lambda *a, **kw: self._mock_ip_output(rows))
-        monkeypatch.setattr(os.path, "exists", lambda p: p == "/sys/class/net/eth0/device")
+        monkeypatch.setattr(posixpath, "exists", lambda p: p == "/sys/class/net/eth0/device")
 
         def fake_open(path, *args, **kwargs):
             if path.endswith("/vendor"):
@@ -413,7 +413,7 @@ class TestFetchIpData:
             raise FileNotFoundError(path)
 
         monkeypatch.setattr(builtins, "open", fake_open)
-        monkeypatch.setattr(os.path, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
+        monkeypatch.setattr(posixpath, "realpath", lambda p: "/sys/devices/pci0000:00/0000:00:1f.6")
         monkeypatch.setattr("hwprobe.core.linux.network.pci_path_linux", lambda s: None)
 
         info = _fetch_ip_data()

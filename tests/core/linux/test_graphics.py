@@ -91,7 +91,7 @@ class TestPcieGen:
         device = "0000:01:00.0"
         path = f"/sys/bus/pci/devices/{device}/current_link_speed"
 
-        monkeypatch.setattr(os.path, "exists", lambda x: x == path)
+        monkeypatch.setattr(posixpath, "exists", lambda x: x == path)
 
         def mock_open_func(file, *args, **kwargs):
             if file == path:
@@ -107,7 +107,7 @@ class TestPcieGen:
         device = "0000:01:00.0"
         path = f"/sys/bus/pci/devices/{device}/current_link_speed"
 
-        monkeypatch.setattr(os.path, "exists", lambda x: x == path)
+        monkeypatch.setattr(posixpath, "exists", lambda x: x == path)
 
         def mock_open_func(file, *args, **kwargs):
             if file == path:
@@ -123,7 +123,7 @@ class TestPcieGen:
         device = "0000:01:00.0"
         path = f"/sys/bus/pci/devices/{device}/current_link_speed"
 
-        monkeypatch.setattr(os.path, "exists", lambda x: x == path)
+        monkeypatch.setattr(posixpath, "exists", lambda x: x == path)
 
         def mock_open_func(file, *args, **kwargs):
             if file == path:
@@ -139,7 +139,7 @@ class TestPcieGen:
         device = "0000:01:00.0"
         path = f"/sys/bus/pci/devices/{device}/current_link_speed"
 
-        monkeypatch.setattr(os.path, "exists", lambda x: x == path)
+        monkeypatch.setattr(posixpath, "exists", lambda x: x == path)
 
         def mock_open_func(file, *args, **kwargs):
             if file == path:
@@ -155,7 +155,7 @@ class TestPcieGen:
         device = "0000:01:00.0"
         path = f"/sys/bus/pci/devices/{device}/current_link_speed"
 
-        monkeypatch.setattr(os.path, "exists", lambda x: x == path)
+        monkeypatch.setattr(posixpath, "exists", lambda x: x == path)
 
         def mock_open_func(file, *args, **kwargs):
             if file == path:
@@ -171,7 +171,7 @@ class TestPcieGen:
         device = "0000:01:00.0"
         path = f"/sys/bus/pci/devices/{device}/current_link_speed"
 
-        monkeypatch.setattr(os.path, "exists", lambda x: x == path)
+        monkeypatch.setattr(posixpath, "exists", lambda x: x == path)
 
         def mock_open_func(file, *args, **kwargs):
             if file == path:
@@ -187,7 +187,7 @@ class TestPcieGen:
         device = "0000:01:00.0"
         path = f"/sys/bus/pci/devices/{device}/current_link_speed"
 
-        monkeypatch.setattr(os.path, "exists", lambda x: x == path)
+        monkeypatch.setattr(posixpath, "exists", lambda x: x == path)
 
         def mock_open_func(file, *args, **kwargs):
             if file == path:
@@ -201,7 +201,7 @@ class TestPcieGen:
 
     def test_pcie_gen_file_not_found(self, monkeypatch):
         device = "0000:01:00.0"
-        monkeypatch.setattr(os.path, "exists", lambda x: False)
+        monkeypatch.setattr(posixpath, "exists", lambda x: False)
 
         gen = _pcie_gen(device)
         assert gen is None
@@ -210,7 +210,7 @@ class TestPcieGen:
         device = "0000:01:00.0"
         path = f"/sys/bus/pci/devices/{device}/current_link_speed"
 
-        monkeypatch.setattr(os.path, "exists", lambda x: x == path)
+        monkeypatch.setattr(posixpath, "exists", lambda x: x == path)
 
         def mock_open_func(file, *args, **kwargs):
             raise OSError("Read error")
@@ -410,7 +410,7 @@ class TestFetchGraphicsInfo:
     """Tests for fetch_graphics_info function."""
 
     def test_fetch_graphics_info_root_not_found(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: False)
+        monkeypatch.setattr(posixpath, "exists", lambda x: False)
 
         info = fetch_graphics_info()
 
@@ -419,7 +419,7 @@ class TestFetchGraphicsInfo:
         assert len(info.modules) == 0
 
     def test_fetch_graphics_info_success_intel(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:00:02.0"])
 
         file_contents = {
@@ -464,7 +464,7 @@ class TestFetchGraphicsInfo:
         assert gpu.pcie_gen == 3
 
     def test_fetch_graphics_info_nvidia(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:01:00.0"])
 
         file_contents = {
@@ -506,7 +506,7 @@ class TestFetchGraphicsInfo:
         assert gpu.vram.capacity == 6144
 
     def test_fetch_graphics_info_amd(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:03:00.0"])
 
         file_contents = {
@@ -552,7 +552,7 @@ class TestFetchGraphicsInfo:
         assert gpu.pcie_gen == 4
 
     def test_fetch_graphics_info_skip_non_display(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:04:00.0"])
 
         file_contents = {
@@ -573,7 +573,7 @@ class TestFetchGraphicsInfo:
         assert info.status.type == StatusType.SUCCESS
 
     def test_fetch_graphics_info_partial_failure(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:01:00.0"])
 
         def custom_open(path, *args, **kwargs):
@@ -599,7 +599,7 @@ class TestFetchGraphicsInfo:
         assert len(info.modules) == 1
 
     def test_fetch_graphics_info_acpi_path_failure(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:00:02.0"])
 
         file_contents = {
@@ -632,7 +632,7 @@ class TestFetchGraphicsInfo:
         assert any("ACPI path" in msg for msg in info.status.messages)
 
     def test_fetch_graphics_info_pci_path_failure(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:00:02.0"])
 
         file_contents = {
@@ -669,7 +669,7 @@ class TestFetchGraphicsInfo:
         assert any("PCI path" in msg for msg in info.status.messages)
 
     def test_fetch_graphics_info_nvidia_failure(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:01:00.0"])
 
         file_contents = {
@@ -709,7 +709,7 @@ class TestFetchGraphicsInfo:
         assert any("Could not get additional GPU info" in msg for msg in info.status.messages)
 
     def test_fetch_graphics_info_lspci_failure(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:00:02.0"])
 
         file_contents = {
@@ -748,7 +748,7 @@ class TestFetchGraphicsInfo:
         assert any("LSPCI" in msg for msg in info.status.messages)
 
     def test_fetch_graphics_info_pcie_gen_failure(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: "/current_link_speed" not in x)
+        monkeypatch.setattr(posixpath, "exists", lambda x: "/current_link_speed" not in x)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:00:02.0"])
 
         file_contents = {
@@ -780,7 +780,7 @@ class TestFetchGraphicsInfo:
         assert any("PCI gen" in msg for msg in info.status.messages)
 
     def test_fetch_graphics_info_class_read_failure(self, monkeypatch):
-        monkeypatch.setattr(os.path, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:00:02.0"])
 
         def custom_open(path, *args, **kwargs):
