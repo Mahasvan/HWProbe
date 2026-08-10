@@ -22,7 +22,10 @@ def check_ecc() -> tuple[bool, str]:
         5 - Single-bit ECC
         6 - Multi-bit ECC
     """
-    rows = get_wmi_data("Win32_PhysicalMemoryArray", ["MemoryErrorCorrection"])
+    try:
+        rows = get_wmi_data("Win32_PhysicalMemoryArray", ["MemoryErrorCorrection"])
+    except RuntimeError:
+        return False, "Unknown"
 
     if not rows:
         return False, "Unknown"
