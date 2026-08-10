@@ -3,8 +3,9 @@ Tests for hwprobe.core.windows.display
 
 All Win32 calls go through display_info.dll, so tests just mock the four
 binding functions. No ctypes patching needed.
-Uses direct-load pattern to bypass core.windows.__init__ which chains
-into broken legacy imports.
+Uses direct-load pattern to bypass core.windows.__init__, which imports
+manager.py → cpu.py → wmi.py, and wmi.py calls ctypes.WinDLL("wmi.dll")
+at import time (fails on non-Windows).
 """
 
 import importlib
@@ -54,7 +55,8 @@ def _load_display_module():
     sys.modules.setdefault("hwprobe.interops.win.bindings.display_info", _binding)
 
     # Stub win_enum — display.py imports DISPLAY_CON_TYPE from it, but
-    # importing the real module triggers core.windows.__init__.
+    # importing the real module triggers core.windows.__init__ (which
+    # chains into manager.py → DLL-loading bindings).
     _win_enum = types.ModuleType("hwprobe.core.windows.win_enum")
     _win_enum.DISPLAY_CON_TYPE = {4: "DVI", 5: "HDMI", 10: "DisplayPort", 11: "eDP"}
     sys.modules.setdefault("hwprobe.core.windows.win_enum", _win_enum)

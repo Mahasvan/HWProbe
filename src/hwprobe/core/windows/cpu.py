@@ -4,7 +4,7 @@ from ctypes import wintypes
 from hwprobe.core.windows.win_enum import CPU_ARCHITECTURES, FEATURE_ID_MAP
 from hwprobe.models.cpu_models import CPUInfo
 from hwprobe.models.status_models import StatusType
-from hwprobe.interops.win.bindings import wmi
+from hwprobe.interops.win.bindings.wmi import get_wmi_data
 
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 kernel32.IsProcessorFeaturePresent.argtypes = [wintypes.DWORD]
@@ -64,7 +64,7 @@ def fetch_cpu_info() -> CPUInfo:
     cpu_info = CPUInfo()
 
     try:
-        wmi_data = wmi.get_wmi_data("Win32_Processor", ["Name", "Manufacturer", "Architecture", "AddressWidth", "MaxClockSpeed", "NumberOfCores", "NumberOfLogicalProcessors"])
+        wmi_data = get_wmi_data("Win32_Processor", ["Name", "Manufacturer", "Architecture", "AddressWidth", "MaxClockSpeed", "NumberOfCores", "NumberOfLogicalProcessors"])
     except Exception as e:
         cpu_info.status.type = StatusType.FAILED
         cpu_info.status.messages.append(f"Unable to obtain CPU Info: WMI query failed: {e}")

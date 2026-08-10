@@ -8,7 +8,8 @@ mock util.location_paths + core.windows.common for location/PCIe formatting.
 The module under test (hwprobe.core.windows.graphics) depends on the binding
 module and util.location_paths, both of which touch Win32-only DLLs. We patch
 both via sys.modules and load graphics.py directly via importlib, bypassing
-the package __init__.
+core.windows.__init__ (which imports manager.py → cpu.py → wmi.py, and
+wmi.py calls ctypes.WinDLL("wmi.dll") at import time — fails on non-Windows).
 """
 
 import importlib
@@ -39,7 +40,7 @@ def _load_graphics_module():
 
 def _load_common_module():
     """Load common.py directly (format_acpi_path / format_pci_path) without
-    triggering core.windows.__init__ which chains into legacy imports."""
+    triggering core.windows.__init__ (which chains into DLL-loading bindings)."""
     mod_name = "hwprobe.core.windows.common"
     if mod_name in sys.modules:
         return sys.modules[mod_name]

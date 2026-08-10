@@ -89,7 +89,7 @@ class ConnectorInfo:
 
 # ---- public API ----
 
-_MAX = 8
+_MAX = 8 # mirrors gpu_info.py _MAX_GPU
 
 
 def get_monitor_devices() -> list[MonitorDevice]:

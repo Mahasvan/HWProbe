@@ -15,7 +15,7 @@ _COMMON_PATH = pathlib.Path(__file__).resolve().parents[3] / "src" / "hwprobe" /
 
 def _load_common_module():
     """Load common.py directly (format_acpi_path / format_pci_path) without
-    triggering core.windows.__init__ which chains into legacy imports."""
+    triggering core.windows.__init__ (which chains into DLL-loading bindings)."""
     mod_name = "hwprobe.core.windows.common"
     if mod_name in sys.modules:
         return sys.modules[mod_name]
@@ -27,7 +27,9 @@ def _load_common_module():
 
 
 def _load_network_module():
-    """Load network.py directly without triggering core.windows.__init__."""
+    """Load network.py directly without triggering core.windows.__init__
+    (which imports manager.py → cpu.py → wmi.py, and wmi.py loads wmi.dll
+    at import time — fails on non-Windows)."""
     # Pre-load common.py so network.py's import doesn't trigger __init__.
     _load_common_module()
 

@@ -78,6 +78,8 @@ static uint64_t FetchVramFromRegistry(const char *device_name, const char *drive
         return 0;
 
     uint64_t result = 0;
+
+    // 100 subkeys is way past any real display class, so we keep it at 100
     for (DWORD i = 0; i < 100; ++i) {
         char sub_key_name[32];
         DWORD name_size = sizeof(sub_key_name);
