@@ -21,6 +21,11 @@
 
 // =====================================================================
 // get_monitor_devices — user32 monitor enumeration
+// ref:
+//   EnumDisplayMonitors  — https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdisplaymonitors
+//   GetMonitorInfoA      — https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getmonitorinfoa
+//   EnumDisplaySettingsA — https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdisplaysettingsa
+//   EnumDisplayDevicesA  — https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdisplaydevicesa
 // =====================================================================
 
 struct MonitorEnumCtx {
@@ -69,6 +74,14 @@ int get_monitor_devices(MonitorDevice *out, int max_count) {
 
 // =====================================================================
 // get_display_connectors — CCD API (QueryDisplayConfig)
+// ref:
+//   GetDisplayConfigBufferSizes   — https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdisplayconfigbuffersizes
+//   QueryDisplayConfig            — https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-querydisplayconfig
+//   DisplayConfigGetDeviceInfo    — https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-displayconfiggetdeviceinfo
+//   DISPLAYCONFIG_PATH_INFO       — https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-displayconfig_path_info
+//   DISPLAYCONFIG_SOURCE_DEVICE_NAME — https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-displayconfig_source_device_name
+//   DISPLAYCONFIG_TARGET_DEVICE_NAME — https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-displayconfig_target_device_name
+//   DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY — https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ne-wingdi-displayconfig_video_output_technology
 // =====================================================================
 
 int get_display_connectors(ConnectorInfo *out, int max_count) {
@@ -127,6 +140,12 @@ int get_display_connectors(ConnectorInfo *out, int max_count) {
 
 // =====================================================================
 // get_gpu_for_display — DXGI output -> adapter name match
+// ref:
+//   CreateDXGIFactory1   — https://learn.microsoft.com/en-us/windows/win32/api/dxgi/nf-dxgi-createdxgifactory1
+//   IDXGIAdapter1        — https://learn.microsoft.com/en-us/windows/win32/api/dxgi/nn-dxgi-idxgiadapter1
+//   IDXGIOutput          — https://learn.microsoft.com/en-us/windows/win32/api/dxgi/nn-dxgi-idxgioutput
+//   DXGI_ADAPTER_DESC1   — https://learn.microsoft.com/en-us/windows/win32/api/dxgi/ns-dxgi-dxgi_adapter_desc1
+//   DXGI_OUTPUT_DESC     — https://learn.microsoft.com/en-us/windows/win32/api/dxgi/ns-dxgi-dxgi_output_desc
 // =====================================================================
 
 int get_gpu_for_display(const char *device_name, char *out_gpu_name, int buf_size) {
@@ -177,9 +196,16 @@ int get_gpu_for_display(const char *device_name, char *out_gpu_name, int buf_siz
 
 // =====================================================================
 // get_edid — SetupAPI + registry EDID lookup
+// ref:
+//   GUID_DEVINTERFACE_MONITOR         — https://learn.microsoft.com/en-us/windows-hardware/drivers/install/guid-devinterface-monitor
+//   SetupDiGetClassDevsW              — https://learn.microsoft.com/en-us/windows/win32/api/setupapi/nf-setupapi-setupdigetclassdevsw
+//   SetupDiEnumDeviceInterfaces       — https://learn.microsoft.com/en-us/windows/win32/api/setupapi/nf-setupapi-setupdienumdeviceinterfaces
+//   SetupDiGetDeviceInterfaceDetailW  — https://learn.microsoft.com/en-us/windows/win32/api/setupapi/nf-setupapi-setupdigetdeviceinterfacedetailw
+//   SetupDiOpenDevRegKey              — https://learn.microsoft.com/en-us/windows/win32/api/setupapi/nf-setupapi-setupdiopendevregkey
+//   RegQueryValueExW                  — https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regqueryvalueexw
 // =====================================================================
 
-// {E6F07B5F-EE97-4A90-B076-33F57B4F4EA7}
+// {E6F07B5F-EE97-4a90-B076-33F57BF4EAA7}
 static const GUID GUID_DEVINTERFACE_MONITOR = {
     0xE6F07B5F, 0xEE97, 0x4A90,
     {0xB0, 0x76, 0x33, 0xF5, 0x7B, 0xF4, 0xEA, 0xA7}
