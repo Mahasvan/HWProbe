@@ -190,7 +190,14 @@ class TestFetchDisplayInfo:
             ),
         ])
         monkeypatch.setattr(display, "get_gpu_for_display", lambda name: "GPU-0")
-        monkeypatch.setattr(display, "get_edid", lambda key: _build_edid())
+
+        # get_edid should be called with the CCD display_path (the key that
+        # matches the SetupAPI device path), NOT the full PNP device ID.
+        captured_key = []
+        def _capture_edid(key):
+            captured_key.append(key)
+            return _build_edid()
+        monkeypatch.setattr(display, "get_edid", _capture_edid)
 
         result = display.fetch_display_info()
 
@@ -206,6 +213,7 @@ class TestFetchDisplayInfo:
         assert mod.serial_number == "SN12345"
         assert mod.manufacturer_code == "ABC"
         assert mod.year == 2023
+        assert captured_key == [r"\\?\DISPLAY#ABC123"]  # display_path, not pnp_device_id
 
     def test_no_edid_still_returns_module(self, monkeypatch):
         monkeypatch.setattr(display, "get_monitor_devices", lambda: [
@@ -213,7 +221,11 @@ class TestFetchDisplayInfo:
         ])
         monkeypatch.setattr(display, "get_display_connectors", lambda: [])
         monkeypatch.setattr(display, "get_gpu_for_display", lambda name: None)
-        monkeypatch.setattr(display, "get_edid", lambda key: None)
+
+        # No connector → fallback to the monitor ID segment (XYZ), not the
+        # full PNP device ID (MONITOR\XYZ\{GUID}).
+        captured_key = []
+        monkeypatch.setattr(display, "get_edid", lambda key: captured_key.append(key) or None)
 
         result = display.fetch_display_info()
 
@@ -223,6 +235,7 @@ class TestFetchDisplayInfo:
         assert mod.gpu_name is None
         assert mod.resolution.width == 1920
         assert mod.acpi_path == r"MONITOR\XYZ\{GUID}"
+        assert captured_key == ["XYZ"]  # split segment, not full pnp_device_id
 
     def test_multiple_monitors(self, monkeypatch):
         monkeypatch.setattr(display, "get_monitor_devices", lambda: [

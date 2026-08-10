@@ -34,9 +34,13 @@ int get_display_connectors(ConnectorInfo *out, int max_count);
 // Returns 0 on success, -1 on failure. Writes a UTF-8 name into out_gpu_name.
 int get_gpu_for_display(const char *device_name, char *out_gpu_name, int buf_size);
 
-// Read raw EDID bytes from the registry for a monitor matching `pnp_device_id`.
+// Read raw EDID bytes from the registry for a monitor whose SetupAPI device
+// path contains `key` (case-insensitive substring match). The device path has
+// the form \\?\DISPLAY#SAMxxxx#5&...#{...}; pass the CCD display path
+// (ConnectorInfo.display_path) or the monitor ID segment (e.g. "SAMxxxx").
+// The full PNP device ID (MONITOR\SAMxxxx\{...}) does NOT match.
 // Returns EDID byte count (>=128 on success), 0 if not found, -1 on error.
-int get_edid(const char *pnp_device_id, unsigned char *out, int max_size);
+int get_edid(const char *key, unsigned char *out, int max_size);
 
 #ifdef __cplusplus
 }

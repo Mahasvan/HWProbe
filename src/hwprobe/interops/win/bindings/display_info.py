@@ -139,11 +139,18 @@ def get_gpu_for_display(device_name: str) -> Optional[str]:
     return name or None
 
 
-def get_edid(pnp_device_id: str) -> Optional[bytes]:
-    """Read raw EDID bytes from the registry for a monitor matching the
-    given PNP device ID or display path. Returns None if not found."""
+def get_edid(key: str) -> Optional[bytes]:
+    """Read raw EDID bytes from the registry for a monitor whose SetupAPI
+    device path contains ``key`` (case-insensitive substring match).
+
+    The device path has the form ``\\\\?\\DISPLAY#SAMxxxx#5&...#{...}``.
+    Pass either the CCD display path (``ConnectorInfo.display_path``, also
+    ``\\\\?\\DISPLAY#...``) or the monitor ID segment (e.g. ``SAMxxxx``).
+    The full PNP device ID (``MONITOR\\SAMxxxx\\{...}``) does NOT match.
+
+    Returns None if not found."""
     buf = (ctypes.c_ubyte * 1024)()
-    count = _lib.get_edid(pnp_device_id.encode("utf-8"), buf, 1024)
+    count = _lib.get_edid(key.encode("utf-8"), buf, 1024)
     if count <= 0:
         return None
     return bytes(buf[:count])

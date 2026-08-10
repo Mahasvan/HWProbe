@@ -121,12 +121,25 @@ do not push escaping into the C++ layer.
 
 ## EDID lookup key
 
-`get_edid` matches on the monitor's **PNP device ID** (e.g.
-`MONITOR\SAMxxxx\{...}`), the same string `get_monitor_devices` writes into
-`MonitorDevice.pnp_device_id`. It does **not** match on the CCD display path
-(`\\?\DISPLAY#...`) returned by `get_display_connectors` — passing that will
-return "not found". The Python and C++ self-tests both call it with
-`pnp_device_id`.
+`get_edid` iterates SetupAPI monitor device interfaces and does a
+case-insensitive **substring match** between the search key and each
+interface's device path, which has the form
+`\\?\DISPLAY#SAMxxxx#5&...#{e6f07b5f-...}`.
+
+Two keys match that path:
+
+1. The **CCD display path** (`\\?\DISPLAY#SAMxxxx#...`) from
+   `get_display_connectors` (`ConnectorInfo.display_path`) — a prefix of the
+   SetupAPI device path. This is the preferred key; `core/windows/display.py`
+   uses it first.
+2. The **monitor ID segment** (e.g. `SAMxxxx`) extracted from the PNP device
+   ID (`MONITOR\SAMxxxx\{...}`) by splitting on `\`. This is the fallback when
+   no connector matched.
+
+The **full PNP device ID** (`MONITOR\SAMxxxx\{...}`) does **not** match —
+`MONITOR\` is not a substring of `\\?\DISPLAY#...`. Do not pass it to
+`get_edid`. `get_monitor_devices` writes it into `MonitorDevice.pnp_device_id`
+for use as `module.acpi_path`, not as an EDID key.
 
 ## Status / scope
 

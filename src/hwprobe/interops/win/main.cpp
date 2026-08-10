@@ -185,18 +185,44 @@ static int test_display() {
         }
 
         // Connector info for this display (matched by GDI device name).
+        // Keep the matched connector — its display_path is the EDID lookup key.
+        const ConnectorInfo *matchedConn = nullptr;
         for (int j = 0; j < nc; ++j) {
             if (std::strcmp(connectors[j].display_id, m.device_id) == 0) {
+                matchedConn = &connectors[j];
                 printf("  Connector:   %s (tech=%d)\n",
-                       connectors[j].display_path, connectors[j].output_technology);
+                       matchedConn->display_path, matchedConn->output_technology);
                 break;
             }
         }
 
-        // EDID via the monitor's PNP device ID (SetupAPI + registry lookup).
-        // get_edid matches on pnp_device_id, NOT the CCD display_path.
+        // EDID lookup key: get_edid matches against the SetupAPI device path
+        // (\\?\DISPLAY#...), so the CCD display_path works. The full PNP device
+        // ID (MONITOR\...) does NOT match. Fall back to the monitor ID segment
+        // (e.g. SAM1234 from MONITOR\SAM1234\{...}) — also a substring of the
+        // device path. Mirrors core/windows/display.py.
+        const char *edidKey = nullptr;
+        char segBuf[128] = {};
+        if (matchedConn && matchedConn->display_path[0]) {
+            edidKey = matchedConn->display_path;
+        } else {
+            // Extract the segment between the first and second backslash.
+            const char *p = m.pnp_device_id;
+            const char *first = std::strchr(p, '\\');
+            if (first) {
+                const char *second = std::strchr(first + 1, '\\');
+                int len = second ? (int)(second - first - 1) : (int)std::strlen(first + 1);
+                if (len > 0 && len < (int)sizeof(segBuf)) {
+                    std::memcpy(segBuf, first + 1, len);
+                    segBuf[len] = '\0';
+                    edidKey = segBuf;
+                }
+            }
+            if (!edidKey && p[0]) edidKey = p;
+        }
+
         unsigned char edidBuf[1024] = {};
-        int edidLen = fnEdid(m.pnp_device_id, edidBuf, sizeof(edidBuf));
+        int edidLen = fnEdid(edidKey, edidBuf, sizeof(edidBuf));
         if (edidLen > 0) {
             printf("  EDID:        %d bytes\n", edidLen);
         } else if (edidLen == 0) {
