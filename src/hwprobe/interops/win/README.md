@@ -13,11 +13,7 @@ Windows interop with C++ consists of three native bindings, each its own DLL, ea
 | `wmi.dll` | `get_wmi_data` | `bindings/wmi.py` | Generic WMI wrapper (COM + WbemLocator). Takes a class name + field list + namespace, returns one dict per row. |
 | `display_info.dll` | `get_monitor_devices`, `get_display_connectors`, `get_gpu_for_display`, `get_edid` | `bindings/display_info.py` | Display enumeration: user32 monitors (resolution/refresh), CCD connectors (output technology + display path), DXGI output→adapter GPU match, SetupAPI + registry EDID lookup. |
 
-All three DLLs land in `bindings/` next to their Python modules. The GPU
-binding is the pre-existing one moved here from `win_old/`; the WMI and
-display bindings are new and replace legacy `hw_helper.dll` exports (now in
-`interops/win_old/`). Once `core/windows/` consumers are fully migrated,
-`win_old/` can be deleted (see `windows-rewrite-llm-plan.md` §5).
+All three DLLs land in `bindings/` next to their Python modules.
 
 ## Why three DLLs
 
@@ -93,7 +89,7 @@ from hwprobe.interops.win.bindings.display_info import (
 for m in get_monitor_devices():
     print(m.device_id, m.pnp_device_id, f"{m.width}x{m.height}@{m.refresh_rate}")
     print("  GPU:", get_gpu_for_display(m.device_id))
-    edid = get_edid(m.pnp_device_id)   # matches on pnp_device_id, not the CCD display path
+    edid = get_edid(m.pnp_device_id.split("\\")[1])   # monitor ID segment, see "EDID lookup key" below
     if edid:
         print(f"  EDID: {len(edid)} bytes")
 ```
@@ -149,5 +145,7 @@ for use as `module.acpi_path`, not as an EDID key.
   `memory.py`, `storage.py`, `network.py` (WMI), `display.py` (display).
 - **Out of scope (separate bindings, later):** audio (MMDevice), baseboard
   (SMBIOS). These do not go through WMI and are not served by these bindings.
-- **Legacy:** `interops/win_old/` still ships `hw_helper.dll` for consumers
-  not yet migrated; delete once the migration is complete.
+  The previous `hw_helper.dll`-based implementations in `core/windows/audio.py`
+  and `core/windows/baseboard.py` are currently disabled (module bodies wrapped
+  in a docstring) and removed from `manager.py`; rewrite them against new
+  bindings before re-enabling.
