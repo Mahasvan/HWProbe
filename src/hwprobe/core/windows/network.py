@@ -55,7 +55,7 @@ def fetch_network_info_fast() -> NetworkInfo:
             network_info.status.messages.append(f"Could not parse Vendor/Device ID from PNPDeviceID: {pnp_device_id}")
 
         loc = get_location_paths(pnp_device_id)
-        if loc is not None:
+        if loc and len(loc) >= 2:
             pci, acpi = loc[:2]
             module.pci_path = format_pci_path(pci)
             module.acpi_path = format_acpi_path(acpi)
