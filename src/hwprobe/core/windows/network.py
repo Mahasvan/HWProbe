@@ -11,7 +11,7 @@ def fetch_network_info_fast() -> NetworkInfo:
     try:
         rows = get_wmi_data(
             "Win32_NetworkAdapter",
-            ["Name", "Manufacturer", "PNPDeviceID", "AdapterType"],
+            ["Name", "Manufacturer", "PNPDeviceID", "PhysicalAdapter"],
         )
     except RuntimeError as e:
         network_info.status.type = StatusType.FAILED
@@ -25,7 +25,9 @@ def fetch_network_info_fast() -> NetworkInfo:
 
     for row in rows:
         # Skip loopback adapters
-        if "Loopback Interface" in row.get("AdapterType", "").strip():
+        if row.get("PhysicalAdapter", "") == "0":
+            # Booleans are represented a "0" and "-1".
+            # "-1" is True, and means this is a physical adapter.
             continue
 
         pnp_device_id = row.get("PNPDeviceID", "").strip()
