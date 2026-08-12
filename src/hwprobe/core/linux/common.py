@@ -21,6 +21,14 @@ def _resolve_acpi_path(device_bdf: str) -> tuple[Optional[str], ACPIResult]:
     :param device_bdf: The BDF identifier (Bus:Device.Function) of the device
 
     :return: The resolved ACPI path if found, else None.
+    
+    The way this function works is:
+    1. It first checks if the device has a direct ACPI path in its sysfs entry.
+    2. If not, it checks the parent device (usually a PCI bridge), and attempts to infer the ACPI path from there.
+        2.1 The parent device should have a firmware_node directory with "device:XX" directory that can be used to match the child device via "adr" file.
+            2.1.1 If the "adr" matches the child device's dev.func, then we can use the parent's ACPI path.
+            2.1.2 If the "adr" is 0xFF, it means the child device is denoted as a "generic" device, and this is likely the closest match we can get
+    3. If neither direct nor inferred ACPI path is found, return None.
     """
     ret_val = (None, ACPIResult.FAILURE)
     device_path = os.path.join(PCI_ROOT_PATH, device_bdf)
