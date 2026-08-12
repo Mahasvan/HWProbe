@@ -214,6 +214,20 @@ class TestMultipleAdaptersAndFormatting:
         assert network_info.modules[0].name == "Broadcom SDIO WiFi"
         assert network_info.modules[1].name == "Intel NIC"
 
+    def test_duplicate_pnp_device_id_deduplicated(self, monkeypatch):
+        """Wifi devices get enumerated multiple times by MSFT_NetAdapter; the
+        second entry with the same PNPDeviceID must be dropped."""
+        rows = [
+            _row("Intel Wi-Fi 6 AX201", r"PCI\VEN_8086&DEV_02F0"),
+            _row("Intel Wi-Fi 6 AX201", r"PCI\VEN_8086&DEV_02F0"),
+        ]
+        _patch_wmi(rows, monkeypatch)
+
+        network_info = network.fetch_network_info_fast()
+
+        assert len(network_info.modules) == 1
+        assert network_info.modules[0].name == "Intel Wi-Fi 6 AX201"
+
 
 # ============================================================
 # Model structure tests
