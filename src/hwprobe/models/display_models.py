@@ -21,6 +21,7 @@ class ResolutionInfo(BaseModel):
 class DisplayModuleInfo(BaseModel):
     """Information for one Display is stored here"""
 
+    #: Brand name/model of the display
     name: Optional[str] = None
 
     #: Year it was manufactured / designed.
@@ -28,9 +29,6 @@ class DisplayModuleInfo(BaseModel):
 
     #: ACPI path of the display device.
     acpi_path: Optional[str] = None
-
-    #: PCI path of the device
-    pci_path: Optional[str] = None
 
     #: Parent GPU driving this display
     gpu_name: Optional[str] = None

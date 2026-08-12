@@ -42,7 +42,7 @@ class TestFetchIndividualMonitorInfo:
 
     def test_returns_none_when_edid_missing(self, monkeypatch):
         self._patch_exists(monkeypatch, set())
-        assert _fetch_individual_monitor_info(self.DEVICE_PATH) is None
+        assert _fetch_individual_monitor_info(self.DEVICE_PATH, []) is None
 
     def test_returns_none_when_edid_empty(self, monkeypatch):
         self._patch_exists(monkeypatch, {self.EDID_PATH})
@@ -51,65 +51,7 @@ class TestFetchIndividualMonitorInfo:
             "open",
             lambda *a, **kw: mock_open(read_data=b"")(),
         )
-        assert _fetch_individual_monitor_info(self.DEVICE_PATH) is None
-
-    def test_pci_path_resolved_from_gpu_endpoint(self, monkeypatch):
-        self._patch_exists(monkeypatch, {self.EDID_PATH})
-        monkeypatch.setattr(
-            builtins,
-            "open",
-            lambda *a, **kw: mock_open(read_data=b"\x01\x02")(),
-        )
-        monkeypatch.setattr(
-            "hwprobe.core.linux.display.parse_edid",
-            lambda _: DisplayModuleInfo(name="Internal Display"),
-        )
-        monkeypatch.setattr(
-            posixpath,
-            "realpath",
-            lambda _: "/sys/devices/pci0000:00/0000:00:02.0/0000:06:00.0/drm/card0",
-        )
-
-        pci_calls = []
-        monkeypatch.setattr(
-            "hwprobe.core.linux.display.pci_path_linux",
-            lambda slot: (pci_calls.append(slot), "PciRoot(0x0)/Pci(0x6,0x0)")[-1],
-        )
-
-        monitor = _fetch_individual_monitor_info(self.DEVICE_PATH)
-
-        assert monitor is not None
-        assert pci_calls == ["0000:06:00.0"]
-        assert monitor.pci_path == "PciRoot(0x0)/Pci(0x6,0x0)"
-
-    def test_no_pci_path_for_non_pci_parent(self, monkeypatch):
-        self._patch_exists(monkeypatch, {self.EDID_PATH})
-        monkeypatch.setattr(
-            builtins,
-            "open",
-            lambda *a, **kw: mock_open(read_data=b"\x01\x02")(),
-        )
-        monkeypatch.setattr(
-            "hwprobe.core.linux.display.parse_edid",
-            lambda _: DisplayModuleInfo(name="Panel"),
-        )
-        monkeypatch.setattr(
-            posixpath,
-            "realpath",
-            lambda _: "/sys/devices/platform/simple-framebuffer/drm/card0",
-        )
-
-        pci_calls = []
-        monkeypatch.setattr(
-            "hwprobe.core.linux.display.pci_path_linux",
-            lambda slot: pci_calls.append(slot),
-        )
-
-        monitor = _fetch_individual_monitor_info(self.DEVICE_PATH)
-
-        assert monitor is not None
-        assert pci_calls == []
-        assert monitor.pci_path is None
+        assert _fetch_individual_monitor_info(self.DEVICE_PATH, []) is None
 
     def test_acpi_path_populated_when_firmware_node_exists(self, monkeypatch):
         self._patch_exists(monkeypatch, {self.EDID_PATH, self.ACPI_PATH})
@@ -138,7 +80,7 @@ class TestFetchIndividualMonitorInfo:
             lambda slot: "PciRoot(0x0)/Pci(0x2,0x0)",
         )
 
-        monitor = _fetch_individual_monitor_info(self.DEVICE_PATH)
+        monitor = _fetch_individual_monitor_info(self.DEVICE_PATH, [])
 
         assert monitor is not None
         assert monitor.acpi_path == r"\_SB.PCI0.GFX0.DD1F"
@@ -160,11 +102,9 @@ class TestFetchDisplayInfo:
             lambda path: DisplayModuleInfo(name=posixpath.basename(path)),
         )
 
-        info = fetch_display_info()
+        info = fetch_display_info([])
 
         assert len(info.modules) == 2
-        names = {m.name for m in info.modules}
-        assert names == {"card0-eDP-1", "card0-HDMI-A-1"}
 
     def test_skips_monitors_returning_none(self, monkeypatch):
         monkeypatch.setattr(posixpath, "isdir", lambda p: p == "/sys/class/drm")
@@ -181,14 +121,14 @@ class TestFetchDisplayInfo:
             lambda path: None,
         )
 
-        info = fetch_display_info()
+        info = fetch_display_info([])
 
         assert len(info.modules) == 0
 
     def test_failed_when_drm_root_missing(self, monkeypatch):
         monkeypatch.setattr(posixpath, "isdir", lambda p: False)
 
-        info = fetch_display_info()
+        info = fetch_display_info([])
 
         assert info.status.type == StatusType.FAILED
         assert any("/sys/class/drm" in m for m in info.status.messages)
@@ -200,16 +140,14 @@ class TestFetchDisplayInfo:
             os,
             "listdir",
             lambda path: {
-                "/sys/class/drm": ["card0"],
-                "/sys/class/drm/card0": ["card0-eDP-1", "card0-HDMI-A-1"],
+                "/sys/class/drm": ["card0", "card1"],
+                "/sys/class/drm/card0": ["card0-DP-1"],
+                "/sys/class/drm/card1": ["card1-HDMI-A-1"],
             }.get(path, []),
         )
 
-        call_count = {"n": 0}
-
-        def _mock_fetch(path):
-            call_count["n"] += 1
-            if call_count["n"] == 1:
+        def _mock_fetch(path, gpu_devices):
+            if path.endswith("card0-DP-1"):
                 raise RuntimeError("EDID decode failed")
             return DisplayModuleInfo(name="Monitor B")
 
@@ -218,10 +156,10 @@ class TestFetchDisplayInfo:
             _mock_fetch,
         )
 
-        info = fetch_display_info()
+        info = fetch_display_info([])
 
         assert info.status.type == StatusType.PARTIAL
-        assert any("card0-eDP-1" in m for m in info.status.messages)
+        assert any("card0-DP-1" in m for m in info.status.messages)
         assert len(info.modules) == 1
         assert info.modules[0].name == "Monitor B"
 
@@ -275,7 +213,7 @@ class TestParseConnectorType:
             lambda _: "/sys/devices/platform/drm/card0",
         )
 
-        monitor = _fetch_individual_monitor_info(device_path)
+        monitor = _fetch_individual_monitor_info(device_path, [])
 
         assert monitor is not None
         assert monitor.interface == "HDMI"

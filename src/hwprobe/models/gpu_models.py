@@ -43,14 +43,23 @@ class GPUInfo(BaseModel):
 
     #: ACPI device path, e.g. ``\\_SB.PC00.RP05.PXSX``.
     acpi_path: Optional[str] = None
+
     #: PCI path from the firmware tree, e.g. ``PciRoot(0x0)/Pci(0x1C,0x5)/Pci(0x0,0x0)``.
     pci_path: Optional[str] = None
 
     #: Number of lanes that the GPU occupies on the PCIe bus.
-    pcie_width: Optional[int] = None
+    current_pcie_width: Optional[int] = None
 
-    #: PCIe generation supported by the GPU.
-    pcie_gen: Optional[int] = None
+    #: PCIe generation currently reported by the GPU.
+    current_pcie_gen: Optional[int] = None
+
+    #: Number of lanes that the GPU is rated to occupy on the PCIe bus.
+    max_pcie_width: Optional[int] = None
+
+    #: PCIe generation that the GPU is rated to support.
+    #: This may be different from ``current_pcie_gen`` if the GPU is running in
+    #: a reduced mode, or if the motherboard does not support the full generation.
+    max_pcie_gen: Optional[int] = None
 
     #: Total VRAM available on the GPU.
     vram: Optional[StorageSize] = None

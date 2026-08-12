@@ -12,6 +12,7 @@ from hwprobe.models.info_models import (
     HardwareManagerInterface,
     LinuxHardwareInfo,
     MemoryInfo,
+    DisplayInfo,
 )
 from hwprobe.models.network_models import NetworkInfo
 from hwprobe.models.storage_models import StorageInfo
@@ -47,16 +48,18 @@ class LinuxHardwareManager(HardwareManagerInterface):
         self.info.graphics = fetch_graphics_info()
         return self.info.graphics
 
+    def fetch_display_info(self) -> DisplayInfo:
+        self.info.display = fetch_display_info(self.info.graphics.modules)
+        return self.info.display
+
     def fetch_hardware_info(self) -> HardwareInfo:
         self.fetch_cpu_info()
         self.fetch_graphics_info()
         self.fetch_memory_info()
         self.fetch_network_info()
         self.fetch_storage_info()
+        self.fetch_display_info()
         return self.info
-
-    def fetch_display_info(self) -> DisplayInfo:
-        return fetch_display_info()
 
     def fetch_network_info(self) -> NetworkInfo:
         return fetch_network_info()

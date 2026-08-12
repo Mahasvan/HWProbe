@@ -2,49 +2,68 @@
 
 import posixpath
 import re
+from typing import Optional
+from pathlib import Path
 
 _PCI_BDF_PATTERN = re.compile(r"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]$")
 
 
+# Linux implemented this very annoyingly
+# - https://tldp.org/LDP/tlk/dd/pci.html
+# - https://wiki.osdev.org/PCI
 def pci_path_linux(device_slot: str):
     """
-    :param device_slot: format: <domain>:<bus>:<slot>.<function>
+    :param device_slot: format: <domain>:<bus>:<device>.<function>
     :return: PCI path, e.g. PciRoot(0x0)/Pci(0x2,0x0)
     """
+    # Invalid fallback value
+    def_val = "PciRoot(0x0)/Pci(0x0,0x0)" 
+    if not device_slot or not _PCI_BDF_PATTERN.match(device_slot):
+        return None
+    
+    raw_path = f"/sys/bus/pci/devices/{device_slot}/"
+
+    path = os.path.realpath(raw_path)
+    if not path:
+        return None
+    
+    pci_root = ""
+    pci_segments = []
+    
+    for part in path.split(os.sep):
+        if part.startswith("pci"):
+            try:
+                root_bus = part.split(":")[0].split("pci")[-1]
+                pci_root = f"PciRoot(0x{int(root_bus, 16):x})"
+            except (ValueError, IndexError) as e:
+                print(f"Error parsing PCI root bus from {part}: {e}")
+                return def_val
+            
+        elif ":" in part and "." in part: # Only the root bridge does not contain a function number
+            try:
+                bdf_segments = part.split(":")[-1]
+                dev, func = bdf_segments.split(".")
+                
+                pci_segments.append(f"Pci(0x{int(dev, 16):x},0x{int(func, 16):x})")
+            except (ValueError, IndexError) as e:
+                print(f"Error parsing PCI device/function from {part}: {e}")
+                return def_val
+
+    if not pci_root or not pci_segments:
+        return def_val
+
+    return f"{pci_root}/{'/'.join(pci_segments)}"
+    
+
+def _read_from_sysfs(base: str, *paths) -> Optional[str]:
+    """Read a string from a sysfs file, return None if not found."""
+    path = os.path.join(base, *paths)
+    
+    if not os.path.exists(path):
+        return None
+    
     try:
-        domain = int(device_slot.split(":")[0], 16)
-    except (IndexError, ValueError):
+        with open(path) as f:
+            return f.read().strip()
+    except Exception:
         return None
-
-    slots = _resolve_device_chain_from_sysfs(device_slot) or [device_slot]
-    pci_components = [_format_pci_component(s) for s in slots]
-    pci_suffix = "".join(f"/Pci({c})" for c in pci_components if c)
-    return f"PciRoot({hex(domain)}){pci_suffix}"
-
-
-def _format_pci_component(slot_name: str):
-    """Return 'slot,func' as hex string, e.g. '0x1f,0x3', or None."""
-    try:
-        device_func = slot_name.split(":")[-1]
-        slot, func = device_func.split(".")
-        return f"{hex(int(slot, 16))},{hex(int(func, 16))}"
-    except (ValueError, IndexError, AttributeError):
-        return None
-
-
-def _resolve_device_chain_from_sysfs(device_slot: str):
-    """Return ordered PCI BDFs from root bridge to endpoint for a device."""
-    sysfs_path = posixpath.realpath(f"/sys/bus/pci/devices/{device_slot}")
-    if not sysfs_path:
-        return None
-
-    bdfs = [p for p in sysfs_path.split(posixpath.sep) if _PCI_BDF_PATTERN.match(p)]
-    if not bdfs:
-        return None
-
-    try:
-        end = next(i for i, b in enumerate(bdfs) if b.lower() == device_slot.lower())
-    except StopIteration:
-        return None
-
-    return bdfs[: end + 1]
