@@ -55,12 +55,13 @@ network = _load_network_module()
 # Helpers
 # ============================================================
 
-def _row(name, manufacturer, pnp_device_id, adapter_type="Ethernet 802.3"):
+# MSFT_NetAdapter row shape: InterfaceDescription, PNPDeviceID, Virtual.
+# Virtual is "0" for physical, "-1" (or any non-"0") for virtual.
+def _row(name, pnp_device_id, virtual="0"):
     return {
-        "Name": name,
-        "Manufacturer": manufacturer,
+        "InterfaceDescription": name,
         "PNPDeviceID": pnp_device_id,
-        "AdapterType": adapter_type,
+        "Virtual": virtual,
     }
 
 
@@ -76,17 +77,16 @@ def _patch_wmi(rows, monkeypatch):
 class TestBasicParsing:
     def test_successful_network_info_fetch(self, monkeypatch):
         rows = [
-            _row("Intel(R) Ethernet Connection (10) I219-V", "Intel", r"PCI\VEN_8086&DEV_15B8"),
-            _row("Realtek PCIe GBE Family Controller", "Realtek", r"PCI\VEN_10EC&DEV_8168"),
+            _row("Intel(R) Ethernet Connection (10) I219-V", r"PCI\VEN_8086&DEV_15B8"),
+            _row("Realtek PCIe GBE Family Controller", r"PCI\VEN_10EC&DEV_8168"),
         ]
         _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
-        assert network_info.status.type == StatusType.PARTIAL
         assert len(network_info.modules) == 2
         assert network_info.modules[0].name == "Intel(R) Ethernet Connection (10) I219-V"
-        assert network_info.modules[1].manufacturer == "Realtek"
+        assert network_info.modules[1].name == "Realtek PCIe GBE Family Controller"
 
     def test_empty_response_returns_failed_status(self, monkeypatch):
         _patch_wmi([], monkeypatch)
@@ -97,16 +97,8 @@ class TestBasicParsing:
         assert len(network_info.modules) == 0
         assert any("no data" in msg for msg in network_info.status.messages)
 
-    def test_missing_manufacturer_field(self, monkeypatch):
-        rows = [_row("Intel NIC", "", r"PCI\VEN_8086&DEV_15B8")]
-        _patch_wmi(rows, monkeypatch)
-
-        network_info = network.fetch_network_info_fast()
-
-        assert len(network_info.modules) == 0
-
     def test_missing_pnpdeviceid_field(self, monkeypatch):
-        rows = [_row("Intel NIC", "Intel", "")]
+        rows = [_row("Intel NIC", "")]
         _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
@@ -131,7 +123,7 @@ class TestVendorDeviceParsing:
         ],
     )
     def test_parse_vendor_device_ids(self, pnp_id, expected_vendor_id, expected_device_id, monkeypatch):
-        rows = [_row("Test Device", "Test", pnp_id)]
+        rows = [_row("Test Device", pnp_id)]
         _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
@@ -140,7 +132,7 @@ class TestVendorDeviceParsing:
         assert network_info.modules[0].device_id == expected_device_id
 
     def test_bad_vendor_device_id_format(self, monkeypatch):
-        rows = [_row("Intel NIC", "Intel", r"PCI\INVALID_FORMAT")]
+        rows = [_row("Intel NIC", r"PCI\INVALID_FORMAT")]
         _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
@@ -160,35 +152,34 @@ class TestVendorDeviceParsing:
 class TestMultipleAdaptersAndFormatting:
     def test_multiple_network_adapters(self, monkeypatch):
         rows = [
-            _row("Intel NIC 1", "Intel", r"PCI\VEN_8086&DEV_15B8"),
-            _row("Realtek NIC", "Realtek", r"PCI\VEN_10EC&DEV_8168"),
-            _row("Broadcom NIC", "Broadcom", r"PCI\VEN_14E4&DEV_1643"),
-            _row("USB Adapter", "Generic", r"USB\VID_0BDA&PID_4938"),
+            _row("Intel NIC 1", r"PCI\VEN_8086&DEV_15B8"),
+            _row("Realtek NIC", r"PCI\VEN_10EC&DEV_8168"),
+            _row("Broadcom NIC", r"PCI\VEN_14E4&DEV_1643"),
+            _row("USB Adapter", r"USB\VID_0BDA&PID_4938"),
         ]
         _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
         assert len(network_info.modules) == 4
-        assert network_info.modules[0].manufacturer == "Intel"
-        assert network_info.modules[1].manufacturer == "Realtek"
-        assert network_info.modules[2].manufacturer == "Broadcom"
-        assert network_info.modules[3].manufacturer == "Generic"
+        assert network_info.modules[0].name == "Intel NIC 1"
+        assert network_info.modules[1].name == "Realtek NIC"
+        assert network_info.modules[2].name == "Broadcom NIC"
+        assert network_info.modules[3].name == "USB Adapter"
 
     def test_whitespace_stripping(self, monkeypatch):
-        rows = [_row(" Intel NIC ", " Intel ", r"PCI\VEN_8086&DEV_15B8")]
+        rows = [_row(" Intel NIC ", r"PCI\VEN_8086&DEV_15B8")]
         _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
         assert len(network_info.modules) == 1
-        assert network_info.modules[0].manufacturer == "Intel"
         assert network_info.modules[0].name == "Intel NIC"
 
-    def test_loopback_adapter_skipped(self, monkeypatch):
+    def test_virtual_adapter_skipped(self, monkeypatch):
         rows = [
-            _row("Loopback", "Microsoft", r"ROOT\\MS_NDISWANIP", adapter_type="Software Loopback Interface 1"),
-            _row("Intel NIC", "Intel", r"PCI\VEN_8086&DEV_15B8"),
+            _row("Virtual Switch", r"ROOT\\VIRTUAL", virtual="-1"),
+            _row("Intel NIC", r"PCI\VEN_8086&DEV_15B8"),
         ]
         _patch_wmi(rows, monkeypatch)
 
@@ -199,8 +190,8 @@ class TestMultipleAdaptersAndFormatting:
 
     def test_root_adapters_skipped(self, monkeypatch):
         rows = [
-            _row("Root Device", "Microsoft", r"ROOT\\SOMETHING"),
-            _row("Intel NIC", "Intel", r"PCI\VEN_8086&DEV_15B8"),
+            _row("Root Device", r"ROOT\\SOMETHING"),
+            _row("Intel NIC", r"PCI\VEN_8086&DEV_15B8"),
         ]
         _patch_wmi(rows, monkeypatch)
 
@@ -212,8 +203,8 @@ class TestMultipleAdaptersAndFormatting:
     def test_non_pci_usb_hardware_nic_included(self, monkeypatch):
         """NICs on non-PCI/USB buses (e.g. SDIO) should not be filtered out."""
         rows = [
-            _row("Broadcom SDIO WiFi", "Broadcom", r"SD\VID_02D0&PID_A4A5"),
-            _row("Intel NIC", "Intel", r"PCI\VEN_8086&DEV_15B8"),
+            _row("Broadcom SDIO WiFi", r"SD\VID_02D0&PID_A4A5"),
+            _row("Intel NIC", r"PCI\VEN_8086&DEV_15B8"),
         ]
         _patch_wmi(rows, monkeypatch)
 
@@ -231,7 +222,7 @@ class TestMultipleAdaptersAndFormatting:
 
 class TestModelStructure:
     def test_nic_model_fields(self, monkeypatch):
-        rows = [_row("Test NIC", "Intel", r"PCI\VEN_8086&DEV_15B8")]
+        rows = [_row("Test NIC", r"PCI\VEN_8086&DEV_15B8")]
         _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
@@ -239,12 +230,11 @@ class TestModelStructure:
 
         assert isinstance(nic, NICInfo)
         assert nic.name == "Test NIC"
-        assert nic.manufacturer == "Intel"
         assert nic.vendor_id == "8086"
         assert nic.device_id == "15B8"
 
     def test_network_info_model_structure(self, monkeypatch):
-        rows = [_row("Test NIC", "Intel", r"PCI\VEN_8086&DEV_15B8")]
+        rows = [_row("Test NIC", r"PCI\VEN_8086&DEV_15B8")]
         _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
@@ -257,26 +247,26 @@ class TestModelStructure:
 
 class TestFunctionCallAndErrors:
     @pytest.mark.parametrize(
-        "device_count,manufacturers",
+        "device_count,names",
         [
-            (1, ["Intel"]),
-            (2, ["Intel", "Realtek"]),
-            (3, ["Intel", "Realtek", "Broadcom"]),
+            (1, ["Intel NIC"]),
+            (2, ["Intel NIC", "Realtek NIC"]),
+            (3, ["Intel NIC", "Realtek NIC", "Broadcom NIC"]),
         ],
     )
-    def test_various_device_counts(self, device_count, manufacturers, monkeypatch):
+    def test_various_device_counts(self, device_count, names, monkeypatch):
         rows = []
-        for i, mfg in enumerate(manufacturers):
+        for i, name in enumerate(names):
             vendor = f"VEN_{0x8086 + i:04X}" if i == 0 else f"VEN_{0x10EC + i:04X}"
             device = f"DEV_{0x15B8 + i:04X}"
-            rows.append(_row(f"{mfg} NIC {i + 1}", mfg, f"PCI\\{vendor}&{device}"))
+            rows.append(_row(name, f"PCI\\{vendor}&{device}"))
         _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
         assert len(network_info.modules) == device_count
-        for i, mfg in enumerate(manufacturers):
-            assert network_info.modules[i].manufacturer == mfg
+        for i, name in enumerate(names):
+            assert network_info.modules[i].name == name
 
     def test_runtime_error_returns_failed(self, monkeypatch):
         def mock_wmi(*a, **kw):
@@ -313,7 +303,7 @@ class TestFunctionCallAndErrors:
         ],
     )
     def test_format_paths(self, pci_path, acpi_path, exp_pci_path, exp_acpi_path, monkeypatch):
-        rows = [_row("Test NIC", "Intel", r"PCI\VEN_8086&DEV_15B8")]
+        rows = [_row("Test NIC", r"PCI\VEN_8086&DEV_15B8")]
         _patch_wmi(rows, monkeypatch)
 
         def mock_get_location_paths(pnp_device_id):

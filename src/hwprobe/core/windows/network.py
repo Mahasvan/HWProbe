@@ -8,10 +8,10 @@ from hwprobe.util.location_paths import get_location_paths
 def fetch_network_info_fast() -> NetworkInfo:
     network_info = NetworkInfo(status=Status(type=StatusType.SUCCESS))
 
+    # MSFT_NetAdapter is present in Windows 8 and above.
     try:
         rows = get_wmi_data(
-            "Win32_NetworkAdapter",
-            ["Name", "Manufacturer", "PNPDeviceID", "PhysicalAdapter"],
+            "MSFT_NetAdapter", ["InterfaceDescription", "PNPDeviceID", "Virtual"], namespace="root/StandardCimv2"
         )
     except RuntimeError as e:
         network_info.status.type = StatusType.FAILED
@@ -25,16 +25,15 @@ def fetch_network_info_fast() -> NetworkInfo:
 
     for row in rows:
         # Skip loopback adapters
-        if row.get("PhysicalAdapter", "") == "0":
+        if row.get("Virtual", "") != "0":
             # Booleans are represented a "0" and "-1".
-            # "-1" is True, and means this is a physical adapter.
+            # if Virtual is -1, then it is not a physical adapter.
             continue
 
         pnp_device_id = row.get("PNPDeviceID", "").strip()
-        manufacturer = row.get("Manufacturer", "").strip()
-        name = row.get("Name", "").strip()
+        name = row.get("InterfaceDescription", "").strip()
 
-        if not pnp_device_id or not manufacturer or not name:
+        if not pnp_device_id or not name:
             network_info.status.type = StatusType.PARTIAL
             network_info.status.messages.append("Missing PNPDeviceID for network interface; skipping")
             continue
@@ -67,7 +66,7 @@ def fetch_network_info_fast() -> NetworkInfo:
                 f"Could not determine location paths for NIC with PNPDeviceID: {pnp_device_id}"
             )
 
-        module.manufacturer = manufacturer
+        # todo: Populate module.manufacturer once pci-ids parsing is implemented
         module.name = name
         network_info.modules.append(module)
 
