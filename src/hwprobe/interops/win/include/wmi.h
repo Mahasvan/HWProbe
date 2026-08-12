@@ -24,7 +24,8 @@ typedef struct {
 
 // Run a WQL query of the form `SELECT f1,f2,... FROM <wmi_class>` against
 // `namespace_str` (e.g. "ROOT\\CIMV2") and fill `out` with up to `max_rows`
-// rows. Returns the number of rows written, or -1 on any COM/WMI failure.
+// rows. Returns the number of rows written, or -1 on any COM/WMI failure —
+// including an invalid namespace, class, or property name.
 //
 // `fields` is an array of `field_count` null-terminated UTF-8 strings, in the
 // order the caller wants the values back. `field_count` must be <=

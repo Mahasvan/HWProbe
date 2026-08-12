@@ -121,6 +121,19 @@ static int test_wmi() {
         printf("\n");
     }
 
+    // Negative cases: a bogus class or field must fail (-1), not silently
+    // return 0 rows. The Python binding raises RuntimeError on -1.
+    const char *one_field[] = {"Name"};
+    const char *bogus_field[] = {"NoSuchProperty"};
+    int bad_class = fn("Win32_NoSuchClass", one_field, 1, "ROOT\\CIMV2", rows, WMI_MAX_ROWS);
+    int bad_field = fn("Win32_Processor", bogus_field, 1, "ROOT\\CIMV2", rows, WMI_MAX_ROWS);
+    if (bad_class >= 0 || bad_field >= 0) {
+        printf("[wmi] bogus class/field query returned %d/%d rows, expected -1\n",
+               bad_class, bad_field);
+        FreeLibrary(hLib);
+        return 1;
+    }
+
     FreeLibrary(hLib);
     return 0;
 }

@@ -82,8 +82,9 @@ def get_wmi_data(
         rows.
 
     Raises:
-        RuntimeError: the C++ side returned -1 (COM init / ConnectServer /
-                      ExecQuery failure).
+        RuntimeError: the C++ side returned -1: COM init / ConnectServer /
+                      query failure, including an invalid namespace, class,
+                      or field name.
         ValueError:   too many fields requested.
     """
     if len(fields) > WMI_MAX_FIELDS:

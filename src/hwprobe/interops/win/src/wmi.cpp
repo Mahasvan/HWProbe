@@ -156,11 +156,19 @@ extern "C" __declspec(dllexport) int get_wmi_data(const char *wmi_class,
         IWbemClassObject *pObj = nullptr;
         ULONG uReturn = 0;
         hr = pEnum->Next(WBEM_INFINITE, 1, &pObj, &uReturn);
-        if (uReturn == 0) break;
         if (FAILED(hr)) {
+            // With WBEM_FLAG_RETURN_IMMEDIATELY, ExecQuery defers query
+            // validation: a bogus class or field (WBEM_E_INVALID_CLASS /
+            // WBEM_E_INVALID_QUERY) surfaces here on the first Next().
+            // Propagate it instead of silently returning partial rows.
             if (pObj) pObj->Release();
-            break;
+            pEnum->Release();
+            pSvc->Release();
+            pLoc->Release();
+            if (did_init) CoUninitialize();
+            return -1;
         }
+        if (uReturn == 0) break;
 
         WmiRow &row = out[rows];
         for (int i = 0; i < field_count; ++i) {
