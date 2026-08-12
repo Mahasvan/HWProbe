@@ -23,7 +23,7 @@ def fetch_network_info_fast() -> NetworkInfo:
         network_info.status.messages.append("Network adapter query returned no data")
         return network_info
 
-    visited_device_ids = set()
+    visited_device_ids: set[str] = set()
 
     for row in rows:
         # Skip loopback adapters
@@ -34,16 +34,17 @@ def fetch_network_info_fast() -> NetworkInfo:
 
         pnp_device_id = row.get("PNPDeviceID", "").strip()
 
-        # Deduplicate entries based on PnP Device ID - Wifi devices get enumerated multiple times
-        if pnp_device_id in visited_device_ids: continue
-        visited_device_ids.add(pnp_device_id)
-
         name = row.get("InterfaceDescription", "").strip()
 
         if not pnp_device_id or not name:
             network_info.status.type = StatusType.PARTIAL
             network_info.status.messages.append("Missing PNPDeviceID for network interface; skipping")
             continue
+
+        # Deduplicate entries based on PnP Device ID - Wifi devices get enumerated multiple times
+        if pnp_device_id in visited_device_ids:
+            continue
+        visited_device_ids.add(pnp_device_id)
 
         # Skip virtual/software adapters (ROOT\ prefix = software-enumerated)
         upper_pnp = pnp_device_id.upper()
