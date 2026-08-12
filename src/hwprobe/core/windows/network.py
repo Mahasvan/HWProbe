@@ -11,7 +11,7 @@ def fetch_network_info_fast() -> NetworkInfo:
     # MSFT_NetAdapter is present in Windows 8 and above.
     try:
         rows = get_wmi_data(
-            "MSFT_NetAdapter", ["InterfaceDescription", "PNPDeviceID", "Virtual"], namespace="root\\StandardCimv2`"
+            "MSFT_NetAdapter", ["InterfaceDescription", "PNPDeviceID", "Virtual"], namespace="root\\StandardCimv2"
         )
     except RuntimeError as e:
         network_info.status.type = StatusType.FAILED
