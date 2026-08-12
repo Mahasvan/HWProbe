@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 
-from hwprobe.core.linux.common import _read_from_sysfs, pci_path_linux
+from hwprobe.core.linux.common import PCI_ROOT_PATH, ACPIResult, _read_from_sysfs, pci_path_linux, _resolve_acpi_path
 from hwprobe.models.gpu_models import GPUInfo, GraphicsInfo
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
@@ -20,7 +20,6 @@ except (ImportError, RuntimeError) as e:
 # https://unix.stackexchange.com/questions/393/how-to-check-how-many-lanes-are-used-by-the-pcie-card
 #  ^ Solution: /sys/bus/pci/devices/{...}/current_link_width
 
-PCI_ROOT_PATH = "/sys/bus/pci/devices/"
 DISPLAY_CONTROLLER_CLASS = 0x03  # Display Controller class code in PCI
 
 def _pcie_gen(raw_speed: str) -> Optional[int]:
@@ -36,54 +35,6 @@ def _pcie_gen(raw_speed: str) -> Optional[int]:
 
     return None
 
-def _resolve_acpi_path(device_bdf: str) -> Optional[str]:
-    """
-    Resolve the ACPI path for a given PCI device.
-
-    :param device_bdf: The BDF identifier (Bus:Device.Function) of the device
-
-    :return: The resolved ACPI path if found, else None.
-    """
-    device_path = os.path.join(PCI_ROOT_PATH, device_bdf)
-    dev, func = device_bdf.split(":")[-1].split(".")
-    if not os.path.exists(device_path):
-        return None
-
-    acpi_path = _read_from_sysfs(device_path, "firmware_node", "path")
-    if acpi_path:
-        return acpi_path
-    
-    # Parent directory should be something like RRRR:BB:DD.F
-    try:
-        parent_node = os.path.dirname(os.path.realpath(device_path))
-    except Exception:
-        return None
-    
-    if not parent_node:
-        return None
-    
-    # A PCI Bridge should ALWAYS be qualified in the DSDT
-    if _read_from_sysfs(parent_node, "firmware_node", "path") is None:
-        return None
-    
-    for entry in os.listdir(os.path.join(parent_node, "firmware_node")):
-        if entry.startswith("device"):
-            if (adr := _read_from_sysfs(parent_node, "firmware_node", entry, "adr")) is None:
-                continue
-            
-            try:
-                acpi_value = _read_from_sysfs("/sys", "bus", "acpi", "devices", entry, "path")
-
-                if int(adr, 16) == ((int(dev, 16) << 16) | int(func, 16)):
-                    return acpi_value
-                
-                if int(adr, 16) == 0xFF and acpi_path is None:
-                    acpi_path = acpi_value
-            except Exception:
-                continue
-
-            
-    return acpi_path
 
 def _check_gpu_class(device: str) -> bool:
     """
@@ -161,8 +112,12 @@ def fetch_graphics_info() -> GraphicsInfo:
             graphics_info.status.messages.append(f"Could not read max link speed for {device}")
 
 
-        if (acpi_path := _resolve_acpi_path(device)) is not None:
+        acpi_path, result = _resolve_acpi_path(device)
+        if result == ACPIResult.SUCCESS or result == ACPIResult.INFERRED:
             gpu.acpi_path = acpi_path
+            
+            if result == ACPIResult.INFERRED:
+                graphics_info.status.messages.append(f"ACPI path for {device} was inferred through parent device (bridge), may be inaccurate")
         else:
             graphics_info.status.type = StatusType.PARTIAL
             graphics_info.status.messages.append(f"Could not read ACPI path for {device}")

@@ -4,8 +4,64 @@ import posixpath
 import re
 from typing import Optional
 from pathlib import Path
+from enum import Enum
 
+PCI_ROOT_PATH = "/sys/bus/pci/devices/"
 _PCI_BDF_PATTERN = re.compile(r"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]$")
+
+class ACPIResult(Enum):
+    SUCCESS = 0
+    INFERRED = 1
+    FAILURE = 2
+
+def _resolve_acpi_path(device_bdf: str) -> tuple[Optional[str], ACPIResult]:
+    """
+    Resolve the ACPI path for a given PCI device.
+
+    :param device_bdf: The BDF identifier (Bus:Device.Function) of the device
+
+    :return: The resolved ACPI path if found, else None.
+    """
+    ret_val = (None, ACPIResult.FAILURE)
+    device_path = os.path.join(PCI_ROOT_PATH, device_bdf)
+    dev, func = device_bdf.split(":")[-1].split(".")
+    if not os.path.exists(device_path):
+        return ret_val
+
+    acpi_path = _read_from_sysfs(device_path, "firmware_node", "path")
+    if acpi_path:
+        return acpi_path, ACPIResult.SUCCESS
+    
+    # Parent directory should be something like RRRR:BB:DD.F
+    try:
+        parent_node = os.path.dirname(os.path.realpath(device_path))
+    except Exception:
+        return ret_val
+    
+    if not parent_node:
+        return ret_val
+    
+    # A PCI Bridge should ALWAYS be qualified in the DSDT
+    if _read_from_sysfs(parent_node, "firmware_node", "path") is None:
+        return ret_val
+    
+    for entry in os.listdir(os.path.join(parent_node, "firmware_node")):
+        if entry.startswith("device"):
+            if (adr := _read_from_sysfs(parent_node, "firmware_node", entry, "adr")) is None:
+                continue
+            
+            try:
+                acpi_value = _read_from_sysfs("/sys", "bus", "acpi", "devices", entry, "path")
+
+                if int(adr, 16) == ((int(dev, 16) << 16) | int(func, 16)):
+                    return acpi_value, ACPIResult.SUCCESS
+                
+                if int(adr, 16) == 0xFF and acpi_path is None:
+                    acpi_path = acpi_value
+            except Exception:
+                continue
+
+    return acpi_path, ACPIResult.INFERRED
 
 
 # Linux implemented this very annoyingly
