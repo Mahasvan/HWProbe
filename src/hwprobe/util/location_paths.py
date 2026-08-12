@@ -3,7 +3,7 @@ Thin ctypes wrapper over cfgmgr32.dll device-node properties.
 
 Public API (used by core/windows/graphics.py and core/windows/network.py):
     get_location_paths(pnp_device_id) -> list[str] | None
-    fetch_pcie_info(pnp_device_id)   -> (speed, width) | None
+    fetch_pcie_info(pnp_device_id)   -> (max_speed, max_width) | None
 
 Internal: one _get_devnode_property(pnp_id, key) -> bytes | None handles the
 two-call buffer sizing pattern. Decoders for string-list and uint32 are
@@ -40,13 +40,15 @@ def _key(data1, data2, data3, data4_bytes, pid) -> DEVPROPKEY:
 
 # ---- DEVPROPKEY constants (module-level, built once) ----
 # Source: DEVPKEY_Device_LocationPaths, DEVPKEY_Device_BusNumber,
-#         DEVPKEY_Device_Address, DEVPKEY_PCIExpress_CurrentLinkSpeed/Width
+#         DEVPKEY_Device_Address, DEVPKEY_PciDevice_MaxLinkSpeed/Width
+# Max link (pid 11/12) = hardware capability, stable. Current link (pid 9/10)
+# = negotiated state at query time, which ASPM downtrains on laptop dGPUs.
 
 _LOCATION_PATHS = _key(0xA45C254E, 0xDF1C, 0x4EFD, [0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0], 37)
 _BUS_NUMBER = _key(0xA45C254E, 0xDF1C, 0x4EFD, [0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0], 23)
 _DEVICE_ADDRESS = _key(0xA45C254E, 0xDF1C, 0x4EFD, [0x80, 0x20, 0x67, 0xD1, 0x46, 0xA8, 0x50, 0xE0], 30)
-_PCIE_LINK_SPEED = _key(0x3AB22E31, 0x8264, 0x4B4E, [0x9A, 0xF5, 0xA8, 0xD2, 0xD8, 0xE3, 0x3E, 0x62], 9)
-_PCIE_LINK_WIDTH = _key(0x3AB22E31, 0x8264, 0x4B4E, [0x9A, 0xF5, 0xA8, 0xD2, 0xD8, 0xE3, 0x3E, 0x62], 10)
+_PCIE_MAX_LINK_SPEED = _key(0x3AB22E31, 0x8264, 0x4B4E, [0x9A, 0xF5, 0xA8, 0xD2, 0xD8, 0xE3, 0x3E, 0x62], 11)
+_PCIE_MAX_LINK_WIDTH = _key(0x3AB22E31, 0x8264, 0x4B4E, [0x9A, 0xF5, 0xA8, 0xD2, 0xD8, 0xE3, 0x3E, 0x62], 12)
 
 # CR_SUCCESS = 0, CR_BUFFER_SMALL = 0x1A, CR_NO_SUCH_DEVNODE = 0x02
 _CR_SUCCESS = 0
@@ -127,11 +129,15 @@ def get_location_paths(pnp_device_id: str) -> Optional[list[str]]:
 
 
 def fetch_pcie_info(pnp_device_id: str) -> Optional[tuple[Optional[int], Optional[int]]]:
-    """Fetch PCIe link speed (gen) and width for a PNP device.
+    """Fetch max PCIe link speed (gen) and width for a PNP device.
     Returns (speed, width) where either may be None if that property is
-    absent. Returns None only if both lookups fail."""
-    speed_raw = _get_devnode_property(pnp_device_id, _PCIE_LINK_SPEED)
-    width_raw = _get_devnode_property(pnp_device_id, _PCIE_LINK_WIDTH)
+    absent. Returns None only if both lookups fail.
+
+    Uses DEVPKEY_PciDevice_MaxLinkSpeed/Width (hardware capability), not
+    CurrentLinkSpeed/Width (negotiated state), because ASPM downtrains the
+    current link on laptop dGPUs — reading current gives Gen 1 x8 at idle."""
+    speed_raw = _get_devnode_property(pnp_device_id, _PCIE_MAX_LINK_SPEED)
+    width_raw = _get_devnode_property(pnp_device_id, _PCIE_MAX_LINK_WIDTH)
     speed = _decode_uint32(speed_raw) if speed_raw is not None else None
     width = _decode_uint32(width_raw) if width_raw is not None else None
     if speed is None and width is None:
