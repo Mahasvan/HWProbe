@@ -1,6 +1,7 @@
 #include "gpu_info.h"
 #include "iokit_helpers.h"
 
+#include <iostream>
 #include <cstdint>
 #include <string>
 #include <cstring>
@@ -256,9 +257,12 @@ int get_gpu_info(GPUProperties *out, int max_count) {
         gpu.vendor_id = readUInt32(props, CFSTR("vendor-id"));
         gpu.device_id = readUInt32(props, CFSTR("device-id"));
 
-#if !defined(__arm64__)
+#ifndef __arm64__
         uint32_t capabilities = readUInt32(props, CFSTR("IOPCIExpressLinkCapabilities"));
         uint32_t negotiated = readUInt32(props, CFSTR("IOPCIExpressLinkStatus"));
+
+        std::cout << "Capable PCIe Link: " << capabilities << "\n";
+        std::cout << "Negotiated PCIe Link: " << negotiated << "\n";
 
         if(capabilities > 0 && negotiated > 0) {
             processPCIeInformationForGpu(&gpu, capabilities, negotiated);
