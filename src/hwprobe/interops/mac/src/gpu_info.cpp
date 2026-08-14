@@ -192,6 +192,23 @@ static void processPCIeInformationForGpu(GPUProperties *gpu, uint32_t capabiliti
     gpu->negotiated_pcie_width = RESOLVE_PCIE_WIDTH_PROPERTY(negotiated);
 }
 
+static bool readRecursiveUInt32Property(io_service_t service, CFStringRef key, uint32_t *value) {
+    if (!service || !value) {
+        return false;
+    }
+
+    CFTypeRef ref = IORegistryEntrySearchCFProperty(
+        service, kIOServicePlane, key,
+        kCFAllocatorDefault, kIORegistryIterateRecursively);
+    if (!ref) {
+        return false;
+    }
+
+    *value = static_cast<uint32_t>(readCFTypeAsUInt64(ref));
+    CFRelease(ref);
+    return true;
+}
+
 // ---- VRAM helper ----
 
 static uint64_t getDiscreteVramMB(io_service_t service) {
@@ -257,17 +274,21 @@ int get_gpu_info(GPUProperties *out, int max_count) {
         gpu.vendor_id = readUInt32(props, CFSTR("vendor-id"));
         gpu.device_id = readUInt32(props, CFSTR("device-id"));
 
-#ifndef __arm64__
-        uint32_t capabilities = readUInt32(props, CFSTR("IOPCIExpressLinkCapabilities"));
-        uint32_t negotiated = readUInt32(props, CFSTR("IOPCIExpressLinkStatus"));
+        if (!is_arm) {
+            uint32_t capabilities = 0;
+            uint32_t negotiated = 0;
+            bool hasCapabilities = readRecursiveUInt32Property(
+                service, CFSTR("IOPCIExpressLinkCapabilities"), &capabilities);
+            bool hasNegotiated = readRecursiveUInt32Property(
+                service, CFSTR("IOPCIExpressLinkStatus"), &negotiated);
 
-        std::cout << "Capable PCIe Link: " << capabilities << "\n";
-        std::cout << "Negotiated PCIe Link: " << negotiated << "\n";
+            std::cout << "Capable PCIe Link: " << capabilities << "\n";
+            std::cout << "Negotiated PCIe Link: " << negotiated << "\n";
 
-        if(capabilities > 0 && negotiated > 0) {
-            processPCIeInformationForGpu(&gpu, capabilities, negotiated);
+            if (hasCapabilities && hasNegotiated) {
+                processPCIeInformationForGpu(&gpu, capabilities, negotiated);
+            }
         }
-#endif
 
         CFTypeRef modelRef = CFDictionaryGetValue(props, CFSTR("model"));
         if (modelRef) {
