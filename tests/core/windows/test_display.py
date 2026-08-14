@@ -15,11 +15,8 @@ import struct
 import sys
 import types
 from dataclasses import dataclass
-from typing import Optional
 
-import pytest
-
-from hwprobe.models.display_models import DisplayInfo, DisplayModuleInfo, ResolutionInfo
+from hwprobe.models.display_models import DisplayModuleInfo, ResolutionInfo
 from hwprobe.models.status_models import StatusType
 
 _MODULE_PATH = pathlib.Path(__file__).resolve().parents[3] / "src" / "hwprobe" / "core" / "windows" / "display.py"
@@ -48,8 +45,8 @@ def _load_display_module():
     _binding = types.ModuleType("hwprobe.interops.win.bindings.display_info")
     _binding.MonitorDevice = MonitorDevice
     _binding.ConnectorInfo = ConnectorInfo
-    _binding.get_monitor_devices = lambda: []
-    _binding.get_display_connectors = lambda: []
+    _binding.get_monitor_devices = list
+    _binding.get_display_connectors = list
     _binding.get_gpu_for_display = lambda name: None
     _binding.get_edid = lambda pnp: None
     sys.modules.setdefault("hwprobe.interops.win.bindings.display_info", _binding)
@@ -162,8 +159,8 @@ class TestEnrichFromEdid:
 
 class TestFetchDisplayInfo:
     def test_no_monitors_returns_failed(self, monkeypatch):
-        monkeypatch.setattr(display, "get_monitor_devices", lambda: [])
-        monkeypatch.setattr(display, "get_display_connectors", lambda: [])
+        monkeypatch.setattr(display, "get_monitor_devices", list)
+        monkeypatch.setattr(display, "get_display_connectors", list)
 
         result = display.fetch_display_info()
         assert result.status.type == StatusType.FAILED
@@ -221,7 +218,7 @@ class TestFetchDisplayInfo:
         monkeypatch.setattr(display, "get_monitor_devices", lambda: [
             _mock_monitor(pnp_id=r"MONITOR\XYZ\{GUID}", w=1920, h=1080, rr=60),
         ])
-        monkeypatch.setattr(display, "get_display_connectors", lambda: [])
+        monkeypatch.setattr(display, "get_display_connectors", list)
         monkeypatch.setattr(display, "get_gpu_for_display", lambda name: None)
 
         # No connector → fallback to the monitor ID segment (XYZ), not the
@@ -244,7 +241,7 @@ class TestFetchDisplayInfo:
             _mock_monitor(device_id=r"\\.\DISPLAY1", pnp_id=r"MONITOR\AAA\{1}", w=2560, h=1440, rr=144),
             _mock_monitor(device_id=r"\\.\DISPLAY2", pnp_id=r"MONITOR\BBB\{2}", w=1920, h=1080, rr=60),
         ])
-        monkeypatch.setattr(display, "get_display_connectors", lambda: [])
+        monkeypatch.setattr(display, "get_display_connectors", list)
         monkeypatch.setattr(display, "get_gpu_for_display", lambda name: "GPU-0")
         monkeypatch.setattr(display, "get_edid", lambda key: None)
 

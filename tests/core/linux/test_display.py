@@ -3,7 +3,6 @@ import os
 import posixpath
 from unittest.mock import mock_open
 
-
 import pytest
 
 from hwprobe.core.linux.display import (

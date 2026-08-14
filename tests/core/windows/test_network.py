@@ -2,7 +2,7 @@ import importlib
 import importlib.util
 import pathlib
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

@@ -17,7 +17,7 @@ from hwprobe.util.nvidia import fetch_gpu_details_nvidia
 PCI_ROOT_PATH = "/sys/bus/pci/devices/"
 
 
-def _vram_amd(device) -> Optional[int]:
+def _vram_amd(device: str) -> Optional[int]:
     ROOT_PATH = "/sys/bus/pci/devices/"
     vram_files = posixpath.join(*[ROOT_PATH, device, "drm", "card*", "device", "mem_info_vram_total"])
     try:
@@ -32,7 +32,7 @@ def _vram_amd(device) -> Optional[int]:
         return None
 
 
-def _pcie_gen(device) -> Optional[int]:
+def _pcie_gen(device: str) -> Optional[int]:
     # Path example: /sys/bus/pci/devices/0000:03:00.0/current_link_speed
     path = f"/sys/bus/pci/devices/{device}/current_link_speed"
 

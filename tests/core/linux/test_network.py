@@ -7,7 +7,7 @@ from unittest.mock import mock_open
 import pytest
 
 from hwprobe.core.linux.network import _enrich_with_sysfs_info, _fetch_ip_data, fetch_network_info
-from hwprobe.models.network_models import NICInfo, NetworkInfo
+from hwprobe.models.network_models import NetworkInfo, NICInfo
 from hwprobe.models.status_models import Status, StatusType
 
 

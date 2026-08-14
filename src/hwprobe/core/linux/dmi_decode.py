@@ -14,7 +14,7 @@
 # This is all thanks to them.
 
 
-def get_string_entry(string, n):
+def get_string_entry(string: list[bytes], n: int) -> str:
     if n == 0:
         return "Unknown"
     else:

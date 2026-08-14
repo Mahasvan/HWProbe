@@ -10,7 +10,7 @@ two-call buffer sizing pattern. Decoders for string-list and uint32 are
 module-level. DEVPROPKEY constants are built once at import, not per call.
 """
 
-from ctypes import Structure, WinDLL, byref, c_buffer, c_char, c_ulong, c_ushort, c_wchar_p, sizeof
+from ctypes import Structure, WinDLL, byref, c_buffer, c_char, c_ulong, c_ushort, c_wchar_p
 from typing import Optional
 
 _cfgmgr = WinDLL("cfgmgr32.dll")

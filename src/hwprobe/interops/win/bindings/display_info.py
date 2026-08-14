@@ -130,7 +130,7 @@ def get_display_connectors() -> list[ConnectorInfo]:
 
 
 def get_gpu_for_display(device_name: str) -> Optional[str]:
-    """Find the GPU name driving a display device (e.g. r'\\.\DISPLAY1').
+    """Find the GPU name driving a display device (e.g. r'\\.\\DISPLAY1').
     Returns None if not found."""
     buf = ctypes.create_string_buffer(256)
     rc = _lib.get_gpu_for_display(device_name.encode("utf-8"), buf, 256)
