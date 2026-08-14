@@ -24,11 +24,7 @@ def _resolve_acpi_path(device_bdf: str) -> tuple[Optional[str], ACPIResult]:
     
     The way this function works is:
     1. It first checks if the device has a direct ACPI path in its sysfs entry.
-    2. If not, it checks the parent device (usually a PCI bridge), and attempts to infer the ACPI path from there.
-        2.1 The parent device should have a firmware_node directory with "device:XX" directory that can be used to match the child device via "adr" file.
-            2.1.1 If the "adr" matches the child device's dev.func, then we can use the parent's ACPI path.
-            2.1.2 If the "adr" is 0xFF, it means the child device is denoted as a "generic" device, and this is likely the closest match we can get
-    3. If neither direct nor inferred ACPI path is found, return None.
+    2. If not, it checks the parent devices recursively until it finds an ACPI path or reaches the root.
     """
     ret_val = (None, ACPIResult.FAILURE)
     device_path = os.path.join(PCI_ROOT_PATH, device_bdf)
@@ -40,35 +36,19 @@ def _resolve_acpi_path(device_bdf: str) -> tuple[Optional[str], ACPIResult]:
     if acpi_path:
         return acpi_path, ACPIResult.SUCCESS
     
+    device_path = os.path.realpath(device_path)
+    
     # Parent directory should be something like RRRR:BB:DD.F
     try:
-        parent_node = os.path.dirname(os.path.realpath(device_path))
+        while (acpi_path := _read_from_sysfs(device_path, "firmware_node", "path")) is None:
+            print(device_path)
+            device_path = os.path.dirname(device_path)
+            
     except Exception:
         return ret_val
     
-    if not parent_node:
-        return ret_val
+    print(acpi_path)
     
-    # A PCI Bridge should ALWAYS be qualified in the DSDT
-    if _read_from_sysfs(parent_node, "firmware_node", "path") is None:
-        return ret_val
-    
-    for entry in os.listdir(os.path.join(parent_node, "firmware_node")):
-        if entry.startswith("device"):
-            if (adr := _read_from_sysfs(parent_node, "firmware_node", entry, "adr")) is None:
-                continue
-            
-            try:
-                acpi_value = _read_from_sysfs("/sys", "bus", "acpi", "devices", entry, "path")
-
-                if int(adr, 16) == ((int(dev, 16) << 16) | int(func, 16)):
-                    return acpi_value, ACPIResult.SUCCESS
-                
-                if int(adr, 16) == 0xFF and acpi_path is None:
-                    acpi_path = acpi_value
-            except Exception:
-                continue
-
     return acpi_path, ACPIResult.INFERRED
 
 
