@@ -1,15 +1,72 @@
+import importlib
+import importlib.util
+import pathlib
+import sys
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from hwprobe.core.windows import network
-from hwprobe.interops.win.legacy.constants import (
-    STATUS_FAILURE,
-)
 from hwprobe.models.network_models import NetworkInfo, NICInfo
 from hwprobe.models.status_models import StatusType
+
+_MODULE_PATH = pathlib.Path(__file__).resolve().parents[3] / "src" / "hwprobe" / "core" / "windows" / "network.py"
+_COMMON_PATH = pathlib.Path(__file__).resolve().parents[3] / "src" / "hwprobe" / "core" / "windows" / "common.py"
+
+
+def _load_common_module():
+    """Load common.py directly (format_acpi_path / format_pci_path) without
+    triggering core.windows.__init__ (which chains into DLL-loading bindings)."""
+    mod_name = "hwprobe.core.windows.common"
+    if mod_name in sys.modules:
+        return sys.modules[mod_name]
+    spec = importlib.util.spec_from_file_location(mod_name, _COMMON_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _load_network_module():
+    """Load network.py directly without triggering core.windows.__init__
+    (which imports manager.py → cpu.py → wmi.py, and wmi.py loads wmi.dll
+    at import time — fails on non-Windows)."""
+    # Pre-load common.py so network.py's import doesn't trigger __init__.
+    _load_common_module()
+
+    # Stub the WMI binding + location_paths — both load DLLs at import time,
+    # which fails on non-Windows. network.py only needs get_wmi_data and
+    # get_location_paths, both of which tests mock anyway.
+    sys.modules.setdefault("hwprobe.interops.win.bindings.wmi", MagicMock(get_wmi_data=lambda *a, **kw: []))
+    sys.modules.setdefault("hwprobe.util.location_paths", MagicMock(get_location_paths=lambda *a, **kw: None))
+
+    mod_name = "hwprobe.core.windows.network"
+    if mod_name in sys.modules:
+        return sys.modules[mod_name]
+    spec = importlib.util.spec_from_file_location(mod_name, _MODULE_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+network = _load_network_module()
 
 # ============================================================
 # Helpers
 # ============================================================
+
+# MSFT_NetAdapter row shape: InterfaceDescription, PNPDeviceID, Virtual.
+# Virtual is "0" for physical, "-1" (or any non-"0") for virtual.
+def _row(name, pnp_device_id, virtual="0"):
+    return {
+        "InterfaceDescription": name,
+        "PNPDeviceID": pnp_device_id,
+        "Virtual": virtual,
+    }
+
+
+def _patch_wmi(rows, monkeypatch):
+    monkeypatch.setattr(network, "get_wmi_data", lambda *a, **kw: rows)
 
 
 # ============================================================
@@ -18,36 +75,21 @@ from hwprobe.models.status_models import StatusType
 
 
 class TestBasicParsing:
-    """Tests for basic parsing of network device output"""
-
     def test_successful_network_info_fetch(self, monkeypatch):
-        """Test successful retrieval and parsing of network hardware info"""
-        mock_output = (
-            "Manufacturer=Intel|PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Intel(R) Ethernet Connection (10) I219-V\n"
-            "Manufacturer=Realtek|PNPDeviceID=PCI\\VEN_10EC&DEV_8168|Name=Realtek PCIe GBE Family Controller\n"
-        )
-
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
+        rows = [
+            _row("Intel(R) Ethernet Connection (10) I219-V", r"PCI\VEN_8086&DEV_15B8"),
+            _row("Realtek PCIe GBE Family Controller", r"PCI\VEN_10EC&DEV_8168"),
+        ]
+        _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
-        assert network_info.status.type == StatusType.PARTIAL
         assert len(network_info.modules) == 2
         assert network_info.modules[0].name == "Intel(R) Ethernet Connection (10) I219-V"
-        assert network_info.modules[1].manufacturer == "Realtek"
+        assert network_info.modules[1].name == "Realtek PCIe GBE Family Controller"
 
     def test_empty_response_returns_failed_status(self, monkeypatch):
-        """Test handling of empty response from GetNetworkHardwareInfo"""
-
-        def mock_func(buf, size):
-            buf.value = b""
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
+        _patch_wmi([], monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
@@ -55,67 +97,9 @@ class TestBasicParsing:
         assert len(network_info.modules) == 0
         assert any("no data" in msg for msg in network_info.status.messages)
 
-    def test_malformed_output_skipped(self, monkeypatch):
-        """Test that malformed lines are skipped"""
-        mock_output = (
-            "Manufacturer=Intel|PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Valid NIC\n"
-            "This is malformed and has no pipe separator\n"
-            "Manufacturer=Realtek|PNPDeviceID=PCI\\VEN_10EC&DEV_8168|Name=Another Valid NIC\n"
-        )
-
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
-
-        network_info = network.fetch_network_info_fast()
-
-        assert len(network_info.modules) == 2
-        assert network_info.modules[0].name == "Valid NIC"
-        assert network_info.modules[1].name == "Another Valid NIC"
-
-    def test_bad_vendor_device_id_format(self, monkeypatch):
-        """Test handling of bad Vendor/Device ID format in PNPDeviceID"""
-        mock_output = "Manufacturer=Intel|PNPDeviceID=PCI\\INVALID_FORMAT|Name=Intel NIC\n"
-
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
-
-        network_info = network.fetch_network_info_fast()
-
-        assert len(network_info.modules) == 1
-        assert network_info.modules[0].vendor_id is None
-        assert network_info.modules[0].device_id is None
-        assert network_info.status.type == StatusType.PARTIAL
-        assert any("Could not parse Vendor/Device ID" in msg for msg in network_info.status.messages)
-
-    def test_missing_manufacturer_field(self, monkeypatch):
-        """Test handling of missing Manufacturer field"""
-        mock_output = "PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Intel NIC\n"
-
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
-
-        network_info = network.fetch_network_info_fast()
-
-        assert len(network_info.modules) == 0
-
     def test_missing_pnpdeviceid_field(self, monkeypatch):
-        """Test handling of missing PNPDeviceID field"""
-        mock_output = "Manufacturer=Intel|Name=Intel NIC\n"
-
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
+        rows = [_row("Intel NIC", "")]
+        _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
@@ -128,32 +112,36 @@ class TestBasicParsing:
 
 
 class TestVendorDeviceParsing:
-    """Tests for vendor and device ID parsing"""
-
     @pytest.mark.parametrize(
         "pnp_id,expected_vendor_id,expected_device_id",
         [
-            ("PCI\\VEN_8086&DEV_15B8", "8086", "15B8"),
-            ("PCI\\VEN_10EC&DEV_8168", "10EC", "8168"),
-            ("PCI\\VEN_14E4&DEV_1643", "14E4", "1643"),
-            ("USB\\VID_0BDA&PID_4938", "0BDA", "4938"),
-            ("USB\\VID_0525&PID_A4A5", "0525", "A4A5"),
+            (r"PCI\VEN_8086&DEV_15B8", "8086", "15B8"),
+            (r"PCI\VEN_10EC&DEV_8168", "10EC", "8168"),
+            (r"PCI\VEN_14E4&DEV_1643", "14E4", "1643"),
+            (r"USB\VID_0BDA&PID_4938", "0BDA", "4938"),
+            (r"USB\VID_0525&PID_A4A5", "0525", "A4A5"),
         ],
     )
     def test_parse_vendor_device_ids(self, pnp_id, expected_vendor_id, expected_device_id, monkeypatch):
-        """Test parsing various vendor/device ID combinations"""
-        mock_output = f"Manufacturer=Test|PNPDeviceID={pnp_id}|Name=Test Device\n"
-
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
+        rows = [_row("Test Device", pnp_id)]
+        _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
         assert network_info.modules[0].vendor_id == expected_vendor_id
         assert network_info.modules[0].device_id == expected_device_id
+
+    def test_bad_vendor_device_id_format(self, monkeypatch):
+        rows = [_row("Intel NIC", r"PCI\INVALID_FORMAT")]
+        _patch_wmi(rows, monkeypatch)
+
+        network_info = network.fetch_network_info_fast()
+
+        assert len(network_info.modules) == 1
+        assert network_info.modules[0].vendor_id is None
+        assert network_info.modules[0].device_id is None
+        assert network_info.status.type == StatusType.PARTIAL
+        assert any("Could not parse Vendor/Device ID" in msg for msg in network_info.status.messages)
 
 
 # ============================================================
@@ -162,66 +150,83 @@ class TestVendorDeviceParsing:
 
 
 class TestMultipleAdaptersAndFormatting:
-    """Tests for multiple adapters and output formatting"""
-
     def test_multiple_network_adapters(self, monkeypatch):
-        """Test parsing multiple network adapters"""
-        mock_output = (
-            "Manufacturer=Intel|PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Intel NIC 1\n"
-            "Manufacturer=Realtek|PNPDeviceID=PCI\\VEN_10EC&DEV_8168|Name=Realtek NIC\n"
-            "Manufacturer=Broadcom|PNPDeviceID=PCI\\VEN_14E4&DEV_1643|Name=Broadcom NIC\n"
-            "Manufacturer=Generic|PNPDeviceID=USB\\VID_0BDA&PID_4938|Name=USB Adapter\n"
-        )
-
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
+        rows = [
+            _row("Intel NIC 1", r"PCI\VEN_8086&DEV_15B8"),
+            _row("Realtek NIC", r"PCI\VEN_10EC&DEV_8168"),
+            _row("Broadcom NIC", r"PCI\VEN_14E4&DEV_1643"),
+            _row("USB Adapter", r"USB\VID_0BDA&PID_4938"),
+        ]
+        _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
         assert len(network_info.modules) == 4
-        assert network_info.modules[0].manufacturer == "Intel"
-        assert network_info.modules[1].manufacturer == "Realtek"
-        assert network_info.modules[2].manufacturer == "Broadcom"
-        assert network_info.modules[3].manufacturer == "Generic"
+        assert network_info.modules[0].name == "Intel NIC 1"
+        assert network_info.modules[1].name == "Realtek NIC"
+        assert network_info.modules[2].name == "Broadcom NIC"
+        assert network_info.modules[3].name == "USB Adapter"
 
     def test_whitespace_stripping(self, monkeypatch):
-        """Test that whitespace is properly stripped from fields"""
-        mock_output = "Manufacturer= Intel |PNPDeviceID= PCI\\VEN_8086&DEV_15B8 |Name= Intel NIC \n"
-
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
+        rows = [_row(" Intel NIC ", r"PCI\VEN_8086&DEV_15B8")]
+        _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
         assert len(network_info.modules) == 1
-        # Whitespace should be stripped
-        assert network_info.modules[0].manufacturer == "Intel"
         assert network_info.modules[0].name == "Intel NIC"
 
-    def test_blank_lines_ignored(self, monkeypatch):
-        """Test that blank lines are properly ignored"""
-        mock_output = (
-            "Manufacturer=Intel|PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Intel NIC\n"
-            "\n"
-            "\n"
-            "Manufacturer=Realtek|PNPDeviceID=PCI\\VEN_10EC&DEV_8168|Name=Realtek NIC\n"
-        )
+    def test_virtual_adapter_skipped(self, monkeypatch):
+        rows = [
+            _row("Virtual Switch", r"ROOT\\VIRTUAL", virtual="-1"),
+            _row("Intel NIC", r"PCI\VEN_8086&DEV_15B8"),
+        ]
+        _patch_wmi(rows, monkeypatch)
 
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
+        network_info = network.fetch_network_info_fast()
 
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
+        assert len(network_info.modules) == 1
+        assert network_info.modules[0].name == "Intel NIC"
+
+    def test_root_adapters_skipped(self, monkeypatch):
+        rows = [
+            _row("Root Device", r"ROOT\\SOMETHING"),
+            _row("Intel NIC", r"PCI\VEN_8086&DEV_15B8"),
+        ]
+        _patch_wmi(rows, monkeypatch)
+
+        network_info = network.fetch_network_info_fast()
+
+        assert len(network_info.modules) == 1
+        assert network_info.modules[0].name == "Intel NIC"
+
+    def test_non_pci_usb_hardware_nic_included(self, monkeypatch):
+        """NICs on non-PCI/USB buses (e.g. SDIO) should not be filtered out."""
+        rows = [
+            _row("Broadcom SDIO WiFi", r"SD\VID_02D0&PID_A4A5"),
+            _row("Intel NIC", r"PCI\VEN_8086&DEV_15B8"),
+        ]
+        _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
         assert len(network_info.modules) == 2
+        assert network_info.modules[0].name == "Broadcom SDIO WiFi"
+        assert network_info.modules[1].name == "Intel NIC"
+
+    def test_duplicate_pnp_device_id_deduplicated(self, monkeypatch):
+        """Wifi devices get enumerated multiple times by MSFT_NetAdapter; the
+        second entry with the same PNPDeviceID must be dropped."""
+        rows = [
+            _row("Intel Wi-Fi 6 AX201", r"PCI\VEN_8086&DEV_02F0"),
+            _row("Intel Wi-Fi 6 AX201", r"PCI\VEN_8086&DEV_02F0"),
+        ]
+        _patch_wmi(rows, monkeypatch)
+
+        network_info = network.fetch_network_info_fast()
+
+        assert len(network_info.modules) == 1
+        assert network_info.modules[0].name == "Intel Wi-Fi 6 AX201"
 
 
 # ============================================================
@@ -230,36 +235,21 @@ class TestMultipleAdaptersAndFormatting:
 
 
 class TestModelStructure:
-    """Tests for data model structure and fields"""
-
     def test_nic_model_fields(self, monkeypatch):
-        """Test that NICInfo model fields are correctly populated"""
-        mock_output = "Manufacturer=Intel|PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Test NIC\n"
-
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
+        rows = [_row("Test NIC", r"PCI\VEN_8086&DEV_15B8")]
+        _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
         nic = network_info.modules[0]
 
         assert isinstance(nic, NICInfo)
         assert nic.name == "Test NIC"
-        assert nic.manufacturer == "Intel"
         assert nic.vendor_id == "8086"
         assert nic.device_id == "15B8"
 
     def test_network_info_model_structure(self, monkeypatch):
-        """Test that NetworkInfo model has correct structure"""
-        mock_output = "Manufacturer=Intel|PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Test NIC\n"
-
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
+        rows = [_row("Test NIC", r"PCI\VEN_8086&DEV_15B8")]
+        _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
@@ -270,84 +260,38 @@ class TestModelStructure:
 
 
 class TestFunctionCallAndErrors:
-    """Tests for function behavior and error conditions"""
-
-    def test_function_call(self, monkeypatch):
-        """Test that GetNetworkHardwareInfo is called successfully"""
-
-        def mock_func(buf, size):
-            buf.value = b""
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
-
-        network.fetch_network_info_fast()
-
     @pytest.mark.parametrize(
-        "device_count,manufacturers",
+        "device_count,names",
         [
-            (1, ["Intel"]),
-            (2, ["Intel", "Realtek"]),
-            (3, ["Intel", "Realtek", "Broadcom"]),
+            (1, ["Intel NIC"]),
+            (2, ["Intel NIC", "Realtek NIC"]),
+            (3, ["Intel NIC", "Realtek NIC", "Broadcom NIC"]),
         ],
     )
-    def test_various_device_counts(self, device_count, manufacturers, monkeypatch):
-        """Test parsing various numbers of network devices"""
-        lines = []
-        for i, mfg in enumerate(manufacturers):
+    def test_various_device_counts(self, device_count, names, monkeypatch):
+        rows = []
+        for i, name in enumerate(names):
             vendor = f"VEN_{0x8086 + i:04X}" if i == 0 else f"VEN_{0x10EC + i:04X}"
             device = f"DEV_{0x15B8 + i:04X}"
-            lines.append(f"Manufacturer={mfg}|PNPDeviceID=PCI\\{vendor}&{device}|Name={mfg} NIC {i + 1}")
-        mock_output = "\n".join(lines) + "\n"
-
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
+            rows.append(_row(name, f"PCI\\{vendor}&{device}"))
+        _patch_wmi(rows, monkeypatch)
 
         network_info = network.fetch_network_info_fast()
 
         assert len(network_info.modules) == device_count
-        for i, mfg in enumerate(manufacturers):
-            assert network_info.modules[i].manufacturer == mfg
+        for i, name in enumerate(names):
+            assert network_info.modules[i].name == name
 
-    def test_multiple_network_adapters(self, monkeypatch):
-        """Test parsing multiple network adapters"""
-        mock_output = (
-            "Manufacturer=Intel|PNPDeviceID=PCI\\VEN_8086&DEV_15B8|Name=Intel NIC 1\n"
-            "Manufacturer=Realtek|PNPDeviceID=PCI\\VEN_10EC&DEV_8168|Name=Realtek NIC\n"
-            "Manufacturer=Broadcom|PNPDeviceID=PCI\\VEN_14E4&DEV_1643|Name=Broadcom NIC\n"
-            "Manufacturer=Generic|PNPDeviceID=USB\\VID_0BDA&PID_4938|Name=USB Adapter\n"
-        )
+    def test_runtime_error_returns_failed(self, monkeypatch):
+        def mock_wmi(*a, **kw):
+            raise RuntimeError("get_wmi_data() failed (C library returned -1)")
 
-        def mock_func(buf, size):
-            buf.value = mock_output.encode("utf-8")
-            return 0
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
-
-        network_info = network.fetch_network_info_fast()
-
-        assert len(network_info.modules) == 4
-        assert network_info.modules[0].manufacturer == "Intel"
-        assert network_info.modules[1].manufacturer == "Realtek"
-        assert network_info.modules[2].manufacturer == "Broadcom"
-        assert network_info.modules[3].manufacturer == "Generic"
-
-    def test_function_call_with_bad_status(self, monkeypatch):
-        """Test handling of non-OK status from GetNetworkHardwareInfo"""
-
-        def mock_func(buf, size):
-            buf.value = b""
-            return STATUS_FAILURE
-
-        monkeypatch.setattr(network, "GetNetworkHardwareInfo", mock_func)
+        monkeypatch.setattr(network, "get_wmi_data", mock_wmi)
 
         network_info = network.fetch_network_info_fast()
 
         assert network_info.status.type == StatusType.FAILED
-        assert any("status code:" in msg for msg in network_info.status.messages)
+        assert any("-1" in msg for msg in network_info.status.messages)
 
     @pytest.mark.parametrize(
         "pci_path, acpi_path, exp_pci_path, exp_acpi_path",
@@ -373,13 +317,11 @@ class TestFunctionCallAndErrors:
         ],
     )
     def test_format_paths(self, pci_path, acpi_path, exp_pci_path, exp_acpi_path, monkeypatch):
-        """Test that format_{pci|acpi}_path returns correct PCI and ACPI path"""
+        rows = [_row("Test NIC", r"PCI\VEN_8086&DEV_15B8")]
+        _patch_wmi(rows, monkeypatch)
 
         def mock_get_location_paths(pnp_device_id):
-            return (
-                pci_path,
-                acpi_path,
-            )
+            return (pci_path, acpi_path)
 
         monkeypatch.setattr(network, "get_location_paths", mock_get_location_paths)
 

@@ -1,23 +1,49 @@
-from hwprobe.interops.win.bindings.gpu_info import GPUProperties, get_gpu_info
+from hwprobe.core.windows.common import format_acpi_path, format_pci_path
+from hwprobe.interops.win.bindings.gpu_info import GPURaw, get_gpu_info
 from hwprobe.models.gpu_models import GPUInfo, GraphicsInfo
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
+from hwprobe.util.location_paths import fetch_pcie_info, get_location_paths
+
+_VENDOR_NAMES = {
+    0x10DE: "NVIDIA",
+    0x1002: "AMD",
+    0x8086: "Intel",
+}
 
 
-def _map_gpu(raw: GPUProperties) -> GPUInfo:
+def _map_gpu(raw: GPURaw) -> GPUInfo:
     gpu = GPUInfo()
     gpu.name = raw.name
-    gpu.manufacturer = raw.manufacturer
+    gpu.manufacturer = _VENDOR_NAMES.get(raw.vendor_id, f"Not Recognized (0x{raw.vendor_id:04X})")
     gpu.vendor_id = f"0x{raw.vendor_id:04X}"
     gpu.device_id = f"0x{raw.device_id:04X}"
-    gpu.subsystem_manufacturer = f"0x{raw.subsystem_vendor_id:04X}"
-    gpu.subsystem_model = f"0x{raw.subsystem_device_id:04X}"
-    gpu.acpi_path = raw.acpi_path
-    gpu.pci_path = raw.pci_path
-    gpu.pcie_gen = raw.pcie_gen if raw.pcie_gen else None
-    gpu.pcie_width = raw.pcie_width if raw.pcie_width else None
-    if raw.vram_mb > 0:
-        gpu.vram = Megabyte(capacity=int(raw.vram_mb))
+
+    # Subsystem ID: DXGI gives a single uint32 — high 16 = vendor, low 16 = device
+    gpu.subsystem_manufacturer = f"0x{(raw.subsystem_id >> 16) & 0xFFFF:04X}"
+    gpu.subsystem_model = f"0x{raw.subsystem_id & 0xFFFF:04X}"
+
+    # Location paths + PCIe: reuse util.location_paths (cfgmgr32 via ctypes)
+    if raw.pnp_device_id:
+        paths = get_location_paths(raw.pnp_device_id)
+        if paths:
+            for path in paths:
+                if path.startswith("ACPI") and not gpu.acpi_path:
+                    gpu.acpi_path = format_acpi_path(path)
+                if path.startswith("PCIROOT") and not gpu.pci_path:
+                    gpu.pci_path = format_pci_path(path)
+
+        pcie = fetch_pcie_info(raw.pnp_device_id)
+        if pcie:
+            speed, width = pcie
+            gpu.pcie_gen = speed
+            gpu.pcie_width = width
+
+    # VRAM: registry fallback wins if present, else DXGI value
+    vram_bytes = raw.vram_bytes or raw.dedicated_video_memory_bytes
+    if vram_bytes > 0:
+        gpu.vram = Megabyte(capacity=int(vram_bytes) // (1024 * 1024))
+
     return gpu
 
 

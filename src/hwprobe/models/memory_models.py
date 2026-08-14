@@ -7,8 +7,8 @@ from hwprobe.models.size_models import StorageSize
 
 
 class MemoryModuleSlot(BaseModel):
-    channel: str = ""
-    bank: str = ""
+    channel: Optional[str] = ""
+    bank: Optional[str] = ""
 
 
 class MemoryModuleInfo(BaseModel):

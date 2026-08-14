@@ -1,3 +1,4 @@
+"""
 from ctypes import byref
 
 # todo: refactor to new bindings
@@ -30,3 +31,4 @@ def fetch_baseboard_info() -> BaseboardInfo:
     baseboard_info.cpu_socket = cpu_socket if cpu_socket else None
 
     return baseboard_info
+"""

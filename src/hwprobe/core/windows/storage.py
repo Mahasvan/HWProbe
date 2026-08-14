@@ -1,9 +1,5 @@
-import ctypes
-
 from hwprobe.core.windows.win_enum import BUS_TYPE, MEDIA_TYPE
-
-# todo: refactor to new bindings
-from hwprobe.interops.win.legacy.signatures import GetWmiInfo
+from hwprobe.interops.win.bindings.wmi import get_wmi_data
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
 from hwprobe.models.storage_models import DiskInfo, StorageInfo
@@ -11,45 +7,39 @@ from hwprobe.models.storage_models import DiskInfo, StorageInfo
 
 def fetch_wmi_storage_info() -> StorageInfo:
     """
-    Fetch storage information via WMI using the GetWmiInfo interop.
-    Returns a StorageInfo object with all detected disks.
+    Fetch storage information via WMI (MSFT_PhysicalDisk from the Storage
+    namespace). Returns a StorageInfo object with all detected disks.
     """
     storage_info = StorageInfo()
 
-    # 256 bytes per property, 6 properties, 10 modules (mostly for NAS systems)
-    buf_size = 256 * 6 * 10
-    buffer = ctypes.create_string_buffer(buf_size)
+    fields = ["FriendlyName", "MediaType", "BusType", "Size", "Manufacturer", "Model"]
 
-    query = b"SELECT FriendlyName, MediaType, BusType, Size, Manufacturer, Model FROM MSFT_PhysicalDisk"
-
-    GetWmiInfo(query, b"ROOT\\Microsoft\\Windows\\Storage", buffer, buf_size)
-
-    raw_data = buffer.value.decode("utf-8", errors="ignore")
-    if not raw_data:
+    try:
+        rows = get_wmi_data(
+            "MSFT_PhysicalDisk",
+            fields,
+            namespace=r"ROOT\Microsoft\Windows\Storage",
+        )
+    except RuntimeError as e:
         storage_info.status.type = StatusType.FAILED
-        storage_info.status.messages.append("WMI query returned no data")
+        storage_info.status.messages.append(str(e))
         return storage_info
 
-    for line in raw_data.split("\n"):
-        if not line or "|" not in line:
-            continue
-
+    for row in rows:
         disk = DiskInfo()
-        props = {x.split("=", 1)[0]: x.split("=", 1)[1] for x in line.split("|") if "=" in x}
 
-        friendly_name = props.get("FriendlyName")
-        media_type = props.get("MediaType")
-        bus_type = props.get("BusType")
-        size = props.get("Size")
-        manufacturer = props.get("Manufacturer")
-        model = props.get("Model")
+        friendly_name = row.get("FriendlyName", "")
+        media_type = row.get("MediaType", "")
+        bus_type = row.get("BusType", "")
+        size = row.get("Size", "")
+        manufacturer = row.get("Manufacturer", "")
+        model = row.get("Model", "")
 
         disk.model = model.strip() if model else friendly_name.strip() if friendly_name else None
         disk.manufacturer = manufacturer.strip() if manufacturer else None
         disk.type = MEDIA_TYPE.get(int(media_type), "Unknown") if media_type and media_type.isdigit() else "Unknown"
         disk.size = Megabyte(capacity=int(size) // (1024 * 1024)) if size and size.isdigit() else None
 
-        # Map bus type
         conn_type, location = None, None
         if bus_type and bus_type.isdigit():
             bt = BUS_TYPE.get(int(bus_type))
@@ -65,7 +55,6 @@ def fetch_wmi_storage_info() -> StorageInfo:
 
         storage_info.modules.append(disk)
 
-    # If at least one module was parsed, mark as success
     if storage_info.modules:
         storage_info.status.type = StatusType.SUCCESS
     else:

@@ -33,7 +33,7 @@ def _extract_pci_bdf_from_sysfs_path(path: str) -> Optional[str]:
 
 def _parse_connector_type(device_path: str) -> Optional[str]:
     """Extract interface type from a DRM connector directory name like card0-HDMI-A-1."""
-    basename = os.path.basename(device_path)
+    basename = posixpath.basename(device_path)
     m = re.match(r"card\d+-(.+)-\d+$", basename)
     if not m:
         return None
@@ -42,7 +42,7 @@ def _parse_connector_type(device_path: str) -> Optional[str]:
 
 def _fetch_individual_monitor_info(device_path: str) -> Optional[DisplayModuleInfo]:
     edid_path = posixpath.join(device_path, "edid")
-    if not os.path.exists(edid_path):
+    if not posixpath.exists(edid_path):
         return None
     parent_path = posixpath.join(device_path, "device")
 
@@ -59,13 +59,13 @@ def _fetch_individual_monitor_info(device_path: str) -> Optional[DisplayModuleIn
     if connector_type := _parse_connector_type(device_path):
         monitor_data.interface = connector_type
 
-    pci_path_full = os.path.realpath(parent_path)
+    pci_path_full = posixpath.realpath(parent_path)
     pci_bdf = _extract_pci_bdf_from_sysfs_path(pci_path_full)
     if pci_bdf:
         monitor_data.pci_path = pci_path_linux(pci_bdf)
 
     acpi_file = posixpath.join(device_path, "firmware_node", "path")
-    if os.path.exists(acpi_file):
+    if posixpath.exists(acpi_file):
         with open(acpi_file) as f:
             monitor_data.acpi_path = f.read().strip()
 
@@ -77,7 +77,7 @@ def fetch_display_info():
     pattern = re.compile(r"^card\d+$")
     root_path = "/sys/class/drm"
 
-    if not os.path.isdir(root_path):
+    if not posixpath.isdir(root_path):
         display_info.status.type = StatusType.FAILED
         display_info.status.messages.append("/sys/class/drm not found")
         return display_info

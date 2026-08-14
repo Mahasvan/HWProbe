@@ -119,3 +119,6 @@ DISPLAY_CON_TYPE = {
     0x80000000: "INTERNAL",
     0xFFFFFFFF: "FORCE_UINT32",
 }
+
+# https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-processor
+CPU_ARCHITECTURES = {0: "x86", 1: "MIPS", 2: "Alpha", 3: "PowerPC", 5: "ARM", 6: "ia64", 9: "x64", 12: "ARM64"}

@@ -1,5 +1,6 @@
 import builtins
 import os
+import posixpath
 from unittest.mock import MagicMock
 
 from hwprobe.core.linux.memory import (
@@ -195,7 +196,7 @@ class TestDimmSpeed:
 
 class TestLinuxMemory:
     def test_fetch_memory_info_no_dmi_dir(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: False)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: False)
 
         memory_info = fetch_memory_info()
 
@@ -203,7 +204,7 @@ class TestLinuxMemory:
         assert memory_info.status.messages is not None
 
     def test_fetch_memory_info_permission_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
 
         mock_entry = MagicMock()
         mock_entry.path = "/sys/firmware/dmi/entries/17-0"
@@ -290,7 +291,7 @@ class TestLinuxMemory:
         return bytes(data) + strings_bytes
 
     def test_fetch_memory_info_success(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
 
         mock_entry = MagicMock()
         mock_entry.path = "/sys/firmware/dmi/entries/17-0"
@@ -329,7 +330,7 @@ class TestLinuxMemory:
         assert module.frequency_mhz == 3200
 
     def test_fetch_memory_info_non_ecc(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
         mock_entry = MagicMock()
         mock_entry.path = "/sys/firmware/dmi/entries/17-0"
         mock_entry.name = "17-0"
@@ -348,7 +349,7 @@ class TestLinuxMemory:
         assert memory_info.modules[0].supports_ecc == False
 
     def test_fetch_memory_info_unknown_size(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
         mock_entry = MagicMock()
         mock_entry.path = "/sys/firmware/dmi/entries/17-0"
         mock_entry.name = "17-0"
@@ -376,7 +377,7 @@ class TestLinuxMemory:
         assert any("Could not get DIMM Capacity" in msg for msg in memory_info.status.messages)
 
     def test_fetch_memory_info_extended_speed(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
         mock_entry = MagicMock()
         mock_entry.path = "/sys/firmware/dmi/entries/17-0"
         mock_entry.name = "17-0"
@@ -395,7 +396,7 @@ class TestLinuxMemory:
         assert memory_info.modules[0].frequency_mhz == 4800
 
     def test_fetch_memory_info_parsing_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
         mock_entry = MagicMock()
         mock_entry.path = "/sys/firmware/dmi/entries/17-0"
         mock_entry.name = "17-0"
@@ -415,7 +416,7 @@ class TestLinuxMemory:
         assert memory_info.status.messages is not None
 
     def test_fetch_memory_info_kilobyte_capacity(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
         mock_entry = MagicMock()
         mock_entry.path = "/sys/firmware/dmi/entries/17-0"
         mock_entry.name = "17-0"
@@ -443,7 +444,7 @@ class TestLinuxMemory:
         assert module.capacity.capacity == size_kb_val
 
     def test_fetch_memory_info_type_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
         mock_entry = MagicMock()
         mock_entry.path = "/sys/firmware/dmi/entries/17-0"
         mock_entry.name = "17-0"
@@ -468,7 +469,7 @@ class TestLinuxMemory:
         assert memory_info.modules[0].type is None
 
     def test_fetch_memory_info_location_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
         mock_entry = MagicMock()
         mock_entry.path = "/sys/firmware/dmi/entries/17-0"
         mock_entry.name = "17-0"
@@ -492,7 +493,7 @@ class TestLinuxMemory:
         assert len(memory_info.status.messages) > 0
 
     def test_fetch_memory_info_manufacturer_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
         mock_entry = MagicMock()
         mock_entry.path = "/sys/firmware/dmi/entries/17-0"
         mock_entry.name = "17-0"
@@ -516,7 +517,7 @@ class TestLinuxMemory:
         assert len(memory_info.status.messages) > 0
 
     def test_fetch_memory_info_capacity_error(self, monkeypatch):
-        monkeypatch.setattr(os.path, "isdir", lambda x: True)
+        monkeypatch.setattr(posixpath, "isdir", lambda x: True)
         mock_entry = MagicMock()
         mock_entry.path = "/sys/firmware/dmi/entries/17-0"
         mock_entry.name = "17-0"

@@ -1,5 +1,6 @@
 import glob
 import os
+import posixpath
 import subprocess
 from typing import Optional
 
@@ -18,7 +19,7 @@ PCI_ROOT_PATH = "/sys/bus/pci/devices/"
 
 def _vram_amd(device) -> Optional[int]:
     ROOT_PATH = "/sys/bus/pci/devices/"
-    vram_files = os.path.join(*[ROOT_PATH, device, "drm", "card*", "device", "mem_info_vram_total"])
+    vram_files = posixpath.join(*[ROOT_PATH, device, "drm", "card*", "device", "mem_info_vram_total"])
     try:
         drm_files = glob.glob(vram_files)
         if drm_files:
@@ -35,7 +36,7 @@ def _pcie_gen(device) -> Optional[int]:
     # Path example: /sys/bus/pci/devices/0000:03:00.0/current_link_speed
     path = f"/sys/bus/pci/devices/{device}/current_link_speed"
 
-    if not os.path.exists(path):
+    if not posixpath.exists(path):
         return None
 
     try:
@@ -57,8 +58,8 @@ def _pcie_gen(device) -> Optional[int]:
 
 
 def _check_gpu_class(device: str) -> bool:
-    path = os.path.join(PCI_ROOT_PATH, device)
-    with open(os.path.join(path, "class")) as f:
+    path = posixpath.join(PCI_ROOT_PATH, device)
+    with open(posixpath.join(path, "class")) as f:
         device_class = f.read().strip()
     """
     The class code is three hex-bytes, where the leftmost hex-byte is the base class
@@ -114,7 +115,7 @@ def _populate_lspci_info(gpu: GPUInfo, device: str) -> GPUInfo:
 def fetch_graphics_info() -> GraphicsInfo:
     graphics_info = GraphicsInfo()
 
-    if not os.path.exists(PCI_ROOT_PATH):
+    if not posixpath.exists(PCI_ROOT_PATH):
         graphics_info.status.type = StatusType.FAILED
         graphics_info.status.messages.append("/sys/bus/pci/devices/ not found")
         return graphics_info
@@ -130,14 +131,14 @@ def fetch_graphics_info() -> GraphicsInfo:
             continue
 
         gpu = GPUInfo()
-        gpu_path = os.path.join(PCI_ROOT_PATH, device)
+        gpu_path = posixpath.join(PCI_ROOT_PATH, device)
 
         try:
-            with open(os.path.join(gpu_path, "vendor")) as f:
+            with open(posixpath.join(gpu_path, "vendor")) as f:
                 gpu.vendor_id = f.read().strip()
-            with open(os.path.join(gpu_path, "device")) as f:
+            with open(posixpath.join(gpu_path, "device")) as f:
                 gpu.device_id = f.read().strip()
-            with open(os.path.join(gpu_path, "current_link_width")) as f:
+            with open(posixpath.join(gpu_path, "current_link_width")) as f:
                 width = f.read().strip()
             if width.isnumeric() and int(width) > 0:
                 gpu.pcie_width = int(width)
@@ -145,7 +146,7 @@ def fetch_graphics_info() -> GraphicsInfo:
             graphics_info.status.type = StatusType.PARTIAL
             graphics_info.status.messages.append(f"Could not get GPU properties: {e}")
         try:
-            with open(os.path.join(gpu_path, "firmware_node", "path")) as f:
+            with open(posixpath.join(gpu_path, "firmware_node", "path")) as f:
                 acpi_path = f.read().strip()
             gpu.acpi_path = acpi_path
         except Exception as e:

@@ -1,4 +1,5 @@
 import os
+import posixpath
 
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import Status, StatusType
@@ -106,7 +107,7 @@ def _fetch_standard_disk_info(folder: str) -> tuple[DiskInfo, Status]:
 def fetch_storage_info() -> StorageInfo:
     storage_info = StorageInfo()
 
-    if not os.path.isdir("/sys/block"):
+    if not posixpath.isdir("/sys/block"):
         storage_info.status.type = StatusType.FAILED
         storage_info.status.messages.append("The /sys/block directory does not exist")
         return storage_info
@@ -116,7 +117,7 @@ def fetch_storage_info() -> StorageInfo:
             path = f"/sys/block/{folder}"
 
             # Skip partitions (they have a 'partition' file)
-            if os.path.exists(f"{path}/partition"):
+            if posixpath.exists(f"{path}/partition"):
                 continue
 
             # Skip eMMC boot and RPMB partitions

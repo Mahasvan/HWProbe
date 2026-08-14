@@ -35,7 +35,7 @@ def _format_pci_component(slot_name: str):
 
 def _resolve_device_chain_from_sysfs(device_slot: str):
     """Return ordered PCI BDFs from root bridge to endpoint for a device."""
-    sysfs_path = os.path.realpath(f"/sys/bus/pci/devices/{device_slot}")
+    sysfs_path = posixpath.realpath(f"/sys/bus/pci/devices/{device_slot}")
     if not sysfs_path:
         return None
 
