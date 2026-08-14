@@ -10,6 +10,9 @@
 #include <IOKit/IOKitLib.h>
 #include <sys/sysctl.h>
 
+#define RESOLVE_PCIE_SPEED_PROPERTY(capability) (capability & 0xF)
+#define RESOLVE_PCIE_WIDTH_PROPERTY(capability) ((capability >> 4) & 0x3F)
+
 // ---- Internal helpers ----
 
 static int getAppleGpuProperty(CFDictionaryRef gpuConfig, CFStringRef key) {
@@ -180,6 +183,14 @@ static std::string parseAcpiPath(CFDictionaryRef props) {
     return result;
 }
 
+static void processPCIeInformationForGpu(GPUProperties *gpu, uint32_t capabilities, uint32_t negotiated) {
+    gpu->capable_pcie_gen = RESOLVE_PCIE_SPEED_PROPERTY(capabilities);
+    gpu->capable_pcie_width = RESOLVE_PCIE_WIDTH_PROPERTY(capabilities);
+
+    gpu->negotiated_pcie_gen = RESOLVE_PCIE_SPEED_PROPERTY(negotiated);
+    gpu->negotiated_pcie_width = RESOLVE_PCIE_WIDTH_PROPERTY(negotiated);
+}
+
 // ---- VRAM helper ----
 
 static uint64_t getDiscreteVramMB(io_service_t service) {
@@ -244,6 +255,15 @@ int get_gpu_info(GPUProperties *out, int max_count) {
         GPUProperties gpu{};
         gpu.vendor_id = readUInt32(props, CFSTR("vendor-id"));
         gpu.device_id = readUInt32(props, CFSTR("device-id"));
+
+#if !defined(__arm64__)
+        uint32_t capabilities = readUInt32(props, CFSTR("IOPCIExpressLinkCapabilities"));
+        uint32_t negotiated = readUInt32(props, CFSTR("IOPCIExpressLinkStatus"));
+
+        if(capabilities > 0 && negotiated > 0) {
+            processPCIeInformationForGpu(&gpu, capabilities, negotiated);
+        }
+#endif
 
         CFTypeRef modelRef = CFDictionaryGetValue(props, CFSTR("model"));
         if (modelRef) {

@@ -34,6 +34,11 @@ int main() {
                 std::cout << "  PCI Path:     " << g.pci_path << "\n";
             if (g.vram_mb > 0)
                 std::cout << "  VRAM:         " << g.vram_mb << " MB\n";
+
+            std::cout << "  PCIe Gen M:   " << g.capable_pcie_gen << "\n";
+            std::cout << "  PCIe Width M: " << g.capable_pcie_width << "\n";
+            std::cout << "  PCIe Gen S:   " << g.negotiated_pcie_gen << "\n";
+            std::cout << "  PCIe Width S: " << g.negotiated_pcie_width << "\n";
             std::cout << "\n";
         }
     }

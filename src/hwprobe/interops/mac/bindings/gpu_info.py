@@ -44,11 +44,15 @@ class _GPUProperties(ctypes.Structure):
         ("name", ctypes.c_char * 256),
         ("vendor_id", ctypes.c_uint32),
         ("device_id", ctypes.c_uint32),
-        ("is_apple_silicon", ctypes.c_int),
-        ("apple_gpu", _AppleGPUProperties),
         ("acpi_path", ctypes.c_char * 512),
         ("pci_path", ctypes.c_char * 512),
         ("vram_mb", ctypes.c_uint64),
+        ("capable_pcie_gen", ctypes.c_uint32),
+        ("capable_pcie_width", ctypes.c_uint32),
+        ("negotiated_pcie_gen", ctypes.c_uint32),
+        ("negotiated_pcie_width", ctypes.c_uint32),
+        ("is_apple_silicon", ctypes.c_int),
+        ("apple_gpu", _AppleGPUProperties),
     ]
 
 
@@ -82,11 +86,15 @@ class GPUProperties:
     name: str
     vendor_id: int
     device_id: int
-    is_apple_silicon: bool
-    apple_gpu: Optional[AppleGPUProperties]  # None for non-Apple GPUs
     acpi_path: Optional[str]
     pci_path: Optional[str]
     vram_mb: int
+    capable_pcie_gen: int
+    capable_pcie_width: int
+    negotiated_pcie_gen: int
+    negotiated_pcie_width: int
+    is_apple_silicon: bool
+    apple_gpu: Optional[AppleGPUProperties]  # None for non-Apple GPUs
 
     def __str__(self) -> str:
         lines = [
@@ -118,7 +126,7 @@ def get_gpu_info() -> list[GPUProperties]:
     if count < 0:
         raise RuntimeError("get_gpu_info() failed (C library returned -1)")
 
-    result = []
+    result: list[GPUProperties] = []
     for i in range(count):
         raw = buf[i]
         apple = None
@@ -137,11 +145,15 @@ def get_gpu_info() -> list[GPUProperties]:
                 name=raw.name.decode("utf-8", errors="replace"),
                 vendor_id=raw.vendor_id,
                 device_id=raw.device_id,
-                is_apple_silicon=bool(raw.is_apple_silicon),
-                apple_gpu=apple,
                 acpi_path=acpi,
                 pci_path=pci,
                 vram_mb=raw.vram_mb,
+                capable_pcie_gen=raw.capable_pcie_gen,
+                capable_pcie_width=raw.capable_pcie_width,
+                negotiated_pcie_gen=raw.negotiated_pcie_gen,
+                negotiated_pcie_width=raw.negotiated_pcie_width,
+                is_apple_silicon=bool(raw.is_apple_silicon),
+                apple_gpu=apple,
             )
         )
     return result

@@ -1,3 +1,4 @@
+from hwprobe.core.common.pcie_link import build_pcie_link
 from hwprobe.models.gpu_models import AppleExtendedGPUInfo, GPUInfo, GraphicsInfo
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
@@ -65,13 +66,21 @@ def fetch_graphics_info() -> GraphicsInfo:
         if gpu.pci_path:
             module.pci_path = gpu.pci_path
 
-        # VRAM for non-Apple-Silicon GPUs
+        # VRAM & PCIe Link for non-Apple-Silicon GPUs
         # Apple Silicon GPUs can use the entire system memory as VRAM
-        if not gpu.is_apple_silicon and gpu.vram_mb:
-            module.vram = Megabyte(capacity=gpu.vram_mb)
+        if not gpu.is_apple_silicon:
+            module.pcie_link = build_pcie_link(
+                max_gen=gpu.capable_pcie_gen, 
+                max_width=gpu.capable_pcie_width, 
+                current_gen=gpu.negotiated_pcie_gen, 
+                current_width=gpu.negotiated_pcie_width
+            )
+                
+            if gpu.vram_mb:
+                module.vram = Megabyte(capacity=gpu.vram_mb)
         elif not gpu.is_apple_silicon:
             # Non-Apple Silicon GPU, and yet VRAM is reported as 0 MB.
-            graphics_info.status.make_partial(f"Could not get VRAM for non-Apple-Silicon GPU: {module.name}")
+            graphics_info.status.make_partial(f"Could not get VRAM/PCIe info for non-Apple-Silicon GPU: {module.name}")
 
         # Apple Silicon extended info
         if gpu.is_apple_silicon:
