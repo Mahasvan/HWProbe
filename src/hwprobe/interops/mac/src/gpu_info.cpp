@@ -1,6 +1,7 @@
 #include "gpu_info.h"
 #include "iokit_helpers.h"
 
+#include <iostream>
 #include <cstdint>
 #include <string>
 #include <cstring>
@@ -9,6 +10,9 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <sys/sysctl.h>
+
+#define RESOLVE_PCIE_SPEED_PROPERTY(capability) (capability & 0xF)
+#define RESOLVE_PCIE_WIDTH_PROPERTY(capability) ((capability >> 4) & 0x3F)
 
 // ---- Internal helpers ----
 
@@ -180,6 +184,31 @@ static std::string parseAcpiPath(CFDictionaryRef props) {
     return result;
 }
 
+static void processPCIeInformationForGpu(GPUProperties *gpu, uint32_t capabilities, uint32_t negotiated) {
+    gpu->capable_pcie_gen = RESOLVE_PCIE_SPEED_PROPERTY(capabilities);
+    gpu->capable_pcie_width = RESOLVE_PCIE_WIDTH_PROPERTY(capabilities);
+
+    gpu->negotiated_pcie_gen = RESOLVE_PCIE_SPEED_PROPERTY(negotiated);
+    gpu->negotiated_pcie_width = RESOLVE_PCIE_WIDTH_PROPERTY(negotiated);
+}
+
+static bool readRecursiveUInt32Property(io_service_t service, CFStringRef key, uint32_t *value) {
+    if (!service || !value) {
+        return false;
+    }
+
+    CFTypeRef ref = IORegistryEntrySearchCFProperty(
+        service, kIOServicePlane, key,
+        kCFAllocatorDefault, kIORegistryIterateRecursively);
+    if (!ref) {
+        return false;
+    }
+
+    *value = static_cast<uint32_t>(readCFTypeAsUInt64(ref));
+    CFRelease(ref);
+    return true;
+}
+
 // ---- VRAM helper ----
 
 static uint64_t getDiscreteVramMB(io_service_t service) {
@@ -244,6 +273,22 @@ int get_gpu_info(GPUProperties *out, int max_count) {
         GPUProperties gpu{};
         gpu.vendor_id = readUInt32(props, CFSTR("vendor-id"));
         gpu.device_id = readUInt32(props, CFSTR("device-id"));
+
+        if (!is_arm) {
+            uint32_t capabilities = 0;
+            uint32_t negotiated = 0;
+            bool hasCapabilities = readRecursiveUInt32Property(
+                service, CFSTR("IOPCIExpressLinkCapabilities"), &capabilities);
+            bool hasNegotiated = readRecursiveUInt32Property(
+                service, CFSTR("IOPCIExpressLinkStatus"), &negotiated);
+
+            std::cout << "Capable PCIe Link: " << capabilities << "\n";
+            std::cout << "Negotiated PCIe Link: " << negotiated << "\n";
+
+            if (hasCapabilities && hasNegotiated) {
+                processPCIeInformationForGpu(&gpu, capabilities, negotiated);
+            }
+        }
 
         CFTypeRef modelRef = CFDictionaryGetValue(props, CFSTR("model"));
         if (modelRef) {

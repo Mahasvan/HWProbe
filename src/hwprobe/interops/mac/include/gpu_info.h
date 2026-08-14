@@ -19,11 +19,19 @@ typedef struct {
     char name[256];
     uint32_t vendor_id;
     uint32_t device_id;
-    int is_apple_silicon;
-    AppleGPUProperties apple_gpu;
+
+    // non-apple-silicon properties
     char acpi_path[512];
     char pci_path[512];
     uint64_t vram_mb;
+    uint32_t capable_pcie_gen;
+    uint32_t capable_pcie_width;
+    uint32_t negotiated_pcie_gen;
+    uint32_t negotiated_pcie_width;
+
+    // exclusively apple-silicon properties
+    int is_apple_silicon;
+    AppleGPUProperties apple_gpu;
 } GPUProperties;
 
 // Fills `out` with GPU entries. Returns number of GPUs found, or -1 on error.

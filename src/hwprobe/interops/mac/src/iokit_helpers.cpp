@@ -18,18 +18,40 @@ std::string readCFString(CFStringRef cfStr) {
     return {};
 }
 
-uint32_t readUInt32(const CFDictionaryRef dict, const CFStringRef key) {
-    const CFTypeRef ref = CFDictionaryGetValue(dict, key);
-    if (!ref || CFGetTypeID(ref) != CFDataGetTypeID())
+uint32_t readUInt32(CFDictionaryRef dict, CFStringRef key) {
+    CFTypeRef ref = CFDictionaryGetValue(dict, key);
+    if (!ref) {
         return 0;
-    uint32_t value = 0;
-    CFIndex len = CFDataGetLength(static_cast<CFDataRef>(ref));
-    if (len > 0) {
-        CFDataGetBytes(static_cast<CFDataRef>(ref),
-                       CFRangeMake(0, std::min(static_cast<CFIndex>(sizeof(value)), len)),
-                       reinterpret_cast<UInt8 *>(&value));
     }
-    return value;
+
+    CFTypeID typeId = CFGetTypeID(ref);
+
+    if (typeId == CFNumberGetTypeID()) {
+        uint32_t value = 0;
+        if (CFNumberGetValue(static_cast<CFNumberRef>(ref), kCFNumberSInt32Type, &value)) {
+            return value;
+        }
+        return 0;
+    }
+
+    if (typeId == CFDataGetTypeID()) {
+        auto data = static_cast<CFDataRef>(ref);
+        CFIndex len = CFDataGetLength(data);
+        if (len <= 0) {
+            return 0;
+        }
+
+        uint32_t value = 0;
+        CFDataGetBytes(
+            data,
+            CFRangeMake(0, std::min<CFIndex>(len, sizeof(value))),
+            reinterpret_cast<UInt8 *>(&value)
+        );
+
+        return value;
+    }
+
+    return 0;
 }
 
 uint64_t readCFTypeAsUInt64(CFTypeRef ref) {

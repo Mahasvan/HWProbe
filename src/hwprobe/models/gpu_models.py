@@ -19,6 +19,17 @@ class AppleExtendedGPUInfo(BaseModel):
     gpu_gen: Optional[int] = None
 
 
+class PCIeLinkValue(BaseModel):
+    """The max/current value distinction for a PCIe Link"""
+    max: Optional[int] = None
+    current: Optional[int] = None
+
+class PCIeLinkInfo(BaseModel):
+    """Information about the PCIe Link for this GPU (gen/width)"""
+    gen: Optional[PCIeLinkValue] = None
+    width: Optional[PCIeLinkValue] = None
+
+
 class GPUInfo(BaseModel):
     """Information for one GPU is stored here"""
 
@@ -47,10 +58,7 @@ class GPUInfo(BaseModel):
     pci_path: Optional[str] = None
 
     #: Number of lanes that the GPU occupies on the PCIe bus.
-    pcie_width: Optional[int] = None
-
-    #: PCIe generation supported by the GPU.
-    pcie_gen: Optional[int] = None
+    pcie_link: Optional[PCIeLinkInfo] = None
 
     #: Total VRAM available on the GPU.
     vram: Optional[StorageSize] = None
