@@ -89,6 +89,19 @@ class TestFetchIndividualMonitorInfo:
 class TestFetchDisplayInfo:
     def test_collects_monitors_from_drm(self, monkeypatch):
         monkeypatch.setattr(posixpath, "isdir", lambda p: p == "/sys/class/drm")
+        monkeypatch.setattr(
+            os,
+            "listdir",
+            lambda path: {
+                "/sys/class/drm": ["card0", "card1"],
+                "/sys/class/drm/card0": ["card0-eDP-1"],
+                "/sys/class/drm/card1": ["card1-HDMI-A-1"],
+            }.get(path, []),
+        )
+        monkeypatch.setattr(
+            "hwprobe.core.linux.display._fetch_individual_monitor_info",
+            lambda path, gpu_devices: DisplayModuleInfo(name=posixpath.basename(path)),
+        )
 
         info = fetch_display_info([])
 

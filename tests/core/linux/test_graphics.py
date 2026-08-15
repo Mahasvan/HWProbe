@@ -1,6 +1,6 @@
 import builtins
 import os
-from pathlib import PosixPath
+import pytest
 import posixpath
 from unittest.mock import mock_open
 
@@ -8,6 +8,23 @@ from hwprobe.core.linux.common import _read_from_sysfs
 from hwprobe.core.linux.graphics import _check_gpu_class, _pcie_gen, fetch_graphics_info
 from hwprobe.models.status_models import StatusType
 
+@pytest.fixture
+def mock_pci_device(tmp_path, monkeypatch):
+    
+    pci_root = tmp_path / "sys" / "bus" / "pci" / "devices"
+    pci_root.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        "hwprobe.core.linux.graphics.PCI_ROOT_PATH",
+        pci_root,
+    )
+    
+    def _create(bdf: str):
+        device_path = pci_root / bdf
+        device_path.mkdir(parents=True, exist_ok=True)
+        return device_path
+    
+    return _create
 
 class TestPcieGen:
     """Tests for _pcie_gen."""
@@ -147,36 +164,25 @@ class TestPcieGen:
         gen = _pcie_gen(_read_from_sysfs(path))
         assert gen is None
 
-
+@pytest.mark.parametrize("bdf", ["0000:01:00.0"])
 class TestCheckGpuClass:
     """Tests for _check_gpu_class."""
 
-    def test_check_gpu_class_display_controller(self, monkeypatch):
-        def mock_open_func(file, *args, **kwargs):
-            if "class" in file:
-                return mock_open(read_data="0x030000")()
-            raise FileNotFoundError(file)
+    def test_check_gpu_class_display_controller(self, mock_pci_device, bdf, monkeypatch):
+        class_path = mock_pci_device(bdf) / "class"
+        class_path.write_text("0x030000")
+        assert _check_gpu_class(bdf) is True
 
-        monkeypatch.setattr(builtins, "open", mock_open_func)
-        assert _check_gpu_class("0000:01:00.0") is True
 
-    def test_check_gpu_class_vga_controller(self, monkeypatch):
-        def mock_open_func(file, *args, **kwargs):
-            if "class" in file:
-                return mock_open(read_data="0x030200")()
-            raise FileNotFoundError(file)
+    def test_check_gpu_class_vga_controller(self, mock_pci_device, bdf, monkeypatch):
+        class_path = mock_pci_device(bdf) / "class"
+        class_path.write_text("0x030200")
+        assert _check_gpu_class(bdf) is True
 
-        monkeypatch.setattr(builtins, "open", mock_open_func)
-        assert _check_gpu_class("0000:01:00.0") is True
-
-    def test_check_gpu_class_network_controller(self, monkeypatch):
-        def mock_open_func(file, *args, **kwargs):
-            if "class" in file:
-                return mock_open(read_data="0x020000")()
-            raise FileNotFoundError(file)
-
-        monkeypatch.setattr(builtins, "open", mock_open_func)
-        assert _check_gpu_class("0000:01:00.0") is False
+    def test_check_gpu_class_network_controller(self, mock_pci_device, bdf, monkeypatch):
+        class_path = mock_pci_device(bdf) / "class"
+        class_path.write_text("0x020000")
+        assert _check_gpu_class(bdf) is False
 
 
 class TestFetchGraphicsInfo:
