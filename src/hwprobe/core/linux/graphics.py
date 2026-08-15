@@ -1,7 +1,8 @@
 import os
+import posixpath
 from typing import Optional
-
-from hwprobe.core.linux.common import PCI_ROOT_PATH, ACPIResult, _read_from_sysfs, pci_path_linux, _resolve_acpi_path
+from hwprobe.core.common.pcie_link import build_pcie_link
+from hwprobe.core.linux.common import PCI_ROOT_PATH, _read_from_sysfs, pci_path_linux, _resolve_acpi_path
 from hwprobe.models.gpu_models import GPUInfo, GraphicsInfo
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
@@ -13,12 +14,6 @@ try:
     NATIVE_AVAILABLE = native_gpu.is_available()
 except (ImportError, RuntimeError) as e:
     NATIVE_AVAILABLE = False
-
-# Currently, the info in /sys/class/drm/cardX is being used.
-# TODO: Check if lspci and lshw -c display can be used
-# Answer: nope, pciutils and lshw are not guaranteed to be installed on all systems.
-# https://unix.stackexchange.com/questions/393/how-to-check-how-many-lanes-are-used-by-the-pcie-card
-#  ^ Solution: /sys/bus/pci/devices/{...}/current_link_width
 
 DISPLAY_CONTROLLER_CLASS = 0x03  # Display Controller class code in PCI
 
@@ -60,8 +55,7 @@ def fetch_graphics_info() -> GraphicsInfo:
             if not _check_gpu_class(device):
                 continue
         except Exception as e:
-            graphics_info.status.type = StatusType.PARTIAL
-            graphics_info.status.messages.append(f"Could not open file for {device}: {e}")
+            graphics_info.status.make_partial(f"Could not open file for {device}: {e}")
             continue
 
         gpu = GPUInfo()
@@ -70,74 +64,77 @@ def fetch_graphics_info() -> GraphicsInfo:
         if (vendor_id := _read_from_sysfs(gpu_path, "vendor")) is not None:
             gpu.vendor_id = vendor_id
         else:
-            graphics_info.status.type = StatusType.PARTIAL
-            graphics_info.status.messages.append(f"Could not read vendor ID for {device}")
+            graphics_info.status.make_partial(f"Could not read vendor ID for {device}")
 
 
         if (device_id := _read_from_sysfs(gpu_path, "device")) is not None:
             gpu.device_id = device_id
         else:
-            graphics_info.status.type = StatusType.PARTIAL
-            graphics_info.status.messages.append(f"Could not read device ID for {device}")
+            graphics_info.status.make_partial(f"Could not read device ID for {device}")
 
 
         if (cur_width := _read_from_sysfs(gpu_path, "current_link_width")) is not None:
             if cur_width.isnumeric() and int(cur_width) > 0:
-                gpu.current_pcie_width = int(cur_width)
+                cur_width = int(cur_width)
         else:
-            graphics_info.status.type = StatusType.PARTIAL
-            graphics_info.status.messages.append(f"Could not read current link width for {device}")
+            graphics_info.status.make_partial(f"Could not read current link width for {device}")
 
         if (max_width := _read_from_sysfs(gpu_path, "max_link_width")) is not None:
             if max_width.isnumeric() and int(max_width) > 0:
-                gpu.max_pcie_width = int(max_width)
+                max_width = int(max_width)
         else:
-            graphics_info.status.type = StatusType.PARTIAL
-            graphics_info.status.messages.append(f"Could not read max link width for {device}")
+            graphics_info.status.make_partial(f"Could not read max link width for {device}")
 
 
         if (cur_pcie_speed := _read_from_sysfs(gpu_path, "current_link_speed")) is not None:
             if cur_pcie_speed:
-                gpu.current_pcie_gen = _pcie_gen(cur_pcie_speed)
+                cur_pcie_speed = _pcie_gen(cur_pcie_speed)
         else:
-            graphics_info.status.type = StatusType.PARTIAL
-            graphics_info.status.messages.append(f"Could not read current link speed for {device}")
+            graphics_info.status.make_partial(f"Could not read current link speed for {device}")
 
 
         if (max_pcie_speed := _read_from_sysfs(gpu_path, "max_link_speed")) is not None:
             if max_pcie_speed:
-                gpu.max_pcie_gen = _pcie_gen(max_pcie_speed)
+                max_pcie_speed = _pcie_gen(max_pcie_speed)
         else:
-            graphics_info.status.type = StatusType.PARTIAL
-            graphics_info.status.messages.append(f"Could not read max link speed for {device}")
+            graphics_info.status.make_partial(f"Could not read max link speed for {device}")
 
 
         acpi_path, result = _resolve_acpi_path(device)
-        if result == ACPIResult.SUCCESS or result == ACPIResult.INFERRED:
+        if acpi_path is not None:
             gpu.acpi_path = acpi_path
             
-            if result == ACPIResult.INFERRED:
-                graphics_info.status.messages.append(f"ACPI path for {device} was inferred through parent device (bridge), may be inaccurate")
+            if not result:
+                graphics_info.status.messages.append(f"ACPI path for {device} was inferred through parent device, device itself was likely found via PCI enumeration")
         else:
-            graphics_info.status.type = StatusType.PARTIAL
-            graphics_info.status.messages.append(f"Could not read ACPI path for {device}")
+            graphics_info.status.make_partial(f"Could not read ACPI path for {device}")
 
 
         if (pci_path := pci_path_linux(device)) is not None:
             gpu.pci_path = pci_path
         else:
-            graphics_info.status.type = StatusType.PARTIAL
-            graphics_info.status.messages.append(f"Could not resolve PCI path for {device}")
-
-        if (
-            vendor_id is not None and 
-            NATIVE_AVAILABLE is True and 
-            (native := native_gpu.get_gpu_info(device, int(gpu.vendor_id, 16))) is not None
-        ):
+            graphics_info.status.make_partial(f"Could not resolve PCI path for {device}")
+            
+        if not NATIVE_AVAILABLE:
+            graphics_info.status.make_partial(f"Native GPU info library not available, cannot fetch GPU name or VRAM for {device}")
+        elif vendor_id is None:
+            graphics_info.status.make_partial(f"Vendor ID not available, cannot fetch GPU name or VRAM for {device}")
+        elif (native := native_gpu.get_gpu_info(device, int(vendor_id, 16))) is None:
+            graphics_info.status.make_partial(f"Native GPU info library could not fetch GPU name or VRAM for {device} with vendor ID {vendor_id}")
+        else:
             gpu.name = native.name
             if native.vram_total_mb > 0:
                 gpu.vram = Megabyte(capacity=int(native.vram_total_mb))
-        
+            else:
+                graphics_info.status.make_partial(f"Native GPU info library returned VRAM size of 0 for {device} with vendor ID {vendor_id}")
+
+        gpu.pcie_link = build_pcie_link(
+            max_gen=max_pcie_speed or 0,
+            current_gen=cur_pcie_speed or 0,
+            max_width=max_width or 0,
+            current_width=cur_width or 0
+        )
+
 
         graphics_info.modules.append(gpu)
 

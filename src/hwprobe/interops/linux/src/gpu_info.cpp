@@ -1,10 +1,11 @@
 #include "../include/gpu_info.h"
 
+#include <stdio.h>
+#include <stdalign.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <dirent.h>
-#include <stdio.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -60,7 +61,7 @@ struct VkPhysDevProps
     uint32_t api, driver, vendorID, deviceID, devType;
     char name[256];
     uint8_t uuid[16];
-    uint8_t _limits[504];
+    alignas(uint64_t) uint8_t _limits[504];
     uint8_t _sparse[20];
 };
 
@@ -239,57 +240,6 @@ static bool icd_matches_vendor(const char *filename, uint32_t vendor_id)
         return strstr(filename, "intel") != NULL;
     default:
         return false;
-    }
-}
-
-static void restrict_vulkan_icds(uint32_t vendor_id)
-{
-    static const char *icd_dirs[] = {"/usr/share/vulkan/icd.d", "/etc/vulkan/icd.d"};
-
-    char matches[2048] = {0};
-    size_t matches_len = 0;
-
-    for (size_t d = 0; d < sizeof(icd_dirs) / sizeof(icd_dirs[0]); d++)
-    {
-        DIR *dir = opendir(icd_dirs[d]);
-        if (!dir)
-            continue;
-
-        struct dirent *entry;
-        while ((entry = readdir(dir)) != NULL)
-        {
-            const char *name = entry->d_name;
-            size_t len = strlen(name);
-            if (len < 6 || strcmp(name + len - 5, ".json") != 0)
-                continue;
-            if (strstr(name, "i686"))
-                continue; // skip 32-bit manifests
-
-            if (!icd_matches_vendor(name, vendor_id))
-                continue;
-
-            char full[768];
-            int n = snprintf(full, sizeof(full), "%s/%s", icd_dirs[d], name);
-            // snprintf returns the length it would have written even if truncated;
-            // reject that case so we never memcpy past the end of `full`.
-            if (n <= 0 || static_cast<size_t>(n) >= sizeof(full))
-                continue;
-            if (matches_len + static_cast<size_t>(n) + 2 > sizeof(matches))
-                continue;
-
-            if (matches_len > 0)
-                matches[matches_len++] = ':';
-            memcpy(matches + matches_len, full, static_cast<size_t>(n));
-            matches_len += static_cast<size_t>(n);
-        }
-        closedir(dir);
-    }
-
-    if (matches_len > 0)
-    {
-        // VK_DRIVER_FILES is the modern name; VK_ICD_FILENAMES is kept for older loaders.
-        setenv("VK_DRIVER_FILES", matches, 1);
-        setenv("VK_ICD_FILENAMES", matches, 1);
     }
 }
 
@@ -502,7 +452,6 @@ int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out)
     {
         PCIAddress pciAddr = parse_bdf_to_pci_addr(bdf);
         VkGPU vk[MAX_GPU_CARDS];
-        restrict_vulkan_icds(vendor_id);
         int vk_n = vulkan_query(vk, &pciAddr);
 
         if (vk_n > 0)

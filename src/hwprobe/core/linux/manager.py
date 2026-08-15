@@ -49,6 +49,9 @@ class LinuxHardwareManager(HardwareManagerInterface):
         return self.info.graphics
 
     def fetch_display_info(self) -> DisplayInfo:
+        if self.info.graphics.modules and len(self.info.graphics.modules):
+            self.fetch_graphics_info()
+            
         self.info.display = fetch_display_info(self.info.graphics.modules)
         return self.info.display
 
@@ -58,7 +61,6 @@ class LinuxHardwareManager(HardwareManagerInterface):
         self.fetch_memory_info()
         self.fetch_network_info()
         self.fetch_storage_info()
-        self.fetch_display_info()
         return self.info
 
     def fetch_network_info(self) -> NetworkInfo:

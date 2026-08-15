@@ -1,8 +1,7 @@
 # LinuxDeviceInfo
 
 A tiny Linux utility and shared library that enumerates GPUs using DRM ioctls (vendor-specific) with a Vulkan
-fallback (universal), reporting model name, vendor/device IDs, VRAM, PCIe generation/width, PCI slot, and driver
-name without relying on external tools like `lspci` or `nvidia-smi`.
+fallback (universal), reporting model name and VRAM without relying on external tools like `lspci` or `nvidia-smi`.
 
 The native library lives in `src/` and `include/`, and is exposed via a command-line tester (`main.c`).
 Also powers a thin Python `ctypes` binding in `bindings/gpu_info.py`.
@@ -57,18 +56,17 @@ cmake --build build
 ## CLI Usage
 
 ```sh
-./build/LinuxDeviceInfo
+./build/LinuxDeviceInfo <bdf> <vendor_id>
 ```
 
 Sample output:
 
 ```
-Found 1 GPU(s):
-
-GPU 0:
+Vulkan fallback: VRAM total not detected for GPU 0000:09:00.0
+GPU at 0000:09:00.0:
   Name:        NVIDIA GeForce RTX 5070 Ti
-  VRAM Total:  16384 MB
-  VRAM Used:   0 MB
+  VRAM Total:  16303 MB
+  VRAM Used:   2721 MB
 ```
 
 The tool exits with code `0` when enumeration succeeds, or `1` if the underlying DRM/Vulkan query fails.
@@ -87,9 +85,8 @@ or programmatically:
 ```python
 from gpu_info import get_gpu_info
 
-for idx, gpu in enumerate(get_gpu_info()):
-    print(f"GPU {idx}:")
-    print(gpu)
+gpu = get_gpu_info("0000:09:00.0", 0x10DE)
+print(gpu)
 ```
 
 On import, the script loads the colocated `libdevice_info.so`; ensure you rebuild the CMake project whenever you make

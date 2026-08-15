@@ -55,6 +55,9 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     )
 endif()
 
+add_executable(LinuxDeviceInfo main.c)
+target_link_libraries(LinuxDeviceInfo PRIVATE device_info)
+
 set_target_properties(
     device_info
     PROPERTIES

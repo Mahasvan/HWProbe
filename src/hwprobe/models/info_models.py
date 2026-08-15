@@ -18,9 +18,6 @@ class HardwareInfo(BaseModel):
     storage: Optional[StorageInfo] = None
     graphics: Optional[GraphicsInfo] = None
     network: Optional[NetworkInfo] = None
-    display: Optional[DisplayInfo] = None
-    audio: Optional[AudioInfo] = None
-    baseboard: Optional[BaseboardInfo] = None
 
 
 class LinuxHardwareInfo(HardwareInfo):

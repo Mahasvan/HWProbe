@@ -197,6 +197,82 @@ class TestAnalogDisplay:
         assert result.resolution.refresh_rate > 0
 
 
+def _build_cta_detailed_timing_descriptor(
+    width=1920,
+    height=1080,
+    h_blank=280,
+    v_blank=45,
+    pixel_clock_10khz=14850,
+):
+    """Create a valid 18-byte CTA/EDID detailed timing descriptor."""
+    descriptor = bytearray(18)
+    descriptor[0] = pixel_clock_10khz & 0xFF
+    descriptor[1] = (pixel_clock_10khz >> 8) & 0xFF
+    descriptor[2] = width & 0xFF
+    descriptor[3] = h_blank & 0xFF
+    descriptor[4] = ((width >> 8) & 0x0F) << 4 | ((h_blank >> 8) & 0x0F)
+    descriptor[5] = height & 0xFF
+    descriptor[6] = v_blank & 0xFF
+    descriptor[7] = ((height >> 8) & 0x0F) << 4 | ((v_blank >> 8) & 0x0F)
+    return bytes(descriptor)
+
+
+def _build_cta_extension(dtd: bytes) -> bytes:
+    """Build a CTA-861 extension block with the DTD starting at byte offset 4."""
+    ext = bytearray(128)
+    ext[0] = 0x02
+    ext[1] = 0x03
+    ext[2] = 0x04
+    ext[4 : 4 + len(dtd)] = dtd
+    return bytes(ext)
+
+
+def _build_displayid_type_i_timing_entry(
+    width=1920,
+    height=1080,
+    h_blank=280,
+    v_blank=45,
+    pixel_clock_10khz=14850,
+):
+    """Build a 20-byte DisplayID Type-I timing entry using the actual-1 encoding."""
+    entry = bytearray(20)
+    entry[0:3] = (pixel_clock_10khz - 1).to_bytes(3, byteorder="little")
+    entry[4:6] = (width - 1).to_bytes(2, byteorder="little")
+    entry[6:8] = (h_blank - 1).to_bytes(2, byteorder="little")
+    entry[8:10] = b"\x00\x00"
+    entry[10:12] = b"\x00\x00"
+    entry[12:14] = (height - 1).to_bytes(2, byteorder="little")
+    entry[14:16] = (v_blank - 1).to_bytes(2, byteorder="little")
+    entry[16:20] = b"\x00\x00\x00\x00"
+    return bytes(entry)
+
+
+def _build_displayid_extension(payload: bytes, *, section_size: int | None = None, truncated: bool = False) -> bytes:
+    """Build a DisplayID extension block with a Type-I timing payload.
+
+    If truncated is True, the payload length is longer than the advertised section size
+    to ensure the parser must stop before overrunning the extension boundary.
+    """
+    ext = bytearray(128)
+    ext[0] = 0x70
+    ext[1] = 0x01
+    ext[2] = section_size if section_size is not None else 5 + len(payload)
+    ext[3] = 0x00
+    ext[4] = 0x00
+
+    if truncated:
+        ext[5] = 0x03
+        ext[6] = 0x01
+        ext[7] = 0x20
+    else:
+        ext[5] = 0x03
+        ext[6] = 0x01
+        ext[7] = len(payload)
+        ext[8 : 8 + len(payload)] = payload
+
+    return bytes(ext)
+
+
 class TestCommonFieldsAcrossVersions:
     def test_year_parsed(self):
         edid = _build_edid(year_offset=25)
@@ -223,3 +299,47 @@ class TestCommonFieldsAcrossVersions:
         result = parse_edid(edid)
         assert result.name == "My Display"
         assert result.serial_number == "ABC123"
+
+
+class TestEdidExtensionFixtures:
+    def test_parse_edid_reads_cta_dtd_from_extension(self):
+        dtd = _build_cta_detailed_timing_descriptor()
+        cta_ext = _build_cta_extension(dtd)
+
+        edid = bytearray(128 * 2)
+        edid[0x7E] = 1
+        edid[128 : 128 + 128] = cta_ext
+
+        result = parse_edid(bytes(edid))
+
+        assert result.resolution.width == 1920
+        assert result.resolution.height == 1080
+        assert result.resolution.refresh_rate == 60.0
+
+    def test_parse_edid_reads_displayid_type_i_timing(self):
+        entry = _build_displayid_type_i_timing_entry()
+        displayid_ext = _build_displayid_extension(entry)
+
+        edid = bytearray(128 * 2)
+        edid[0x7E] = 1
+        edid[128 : 128 + 128] = displayid_ext
+
+        result = parse_edid(bytes(edid))
+
+        assert result.resolution.width == 1920
+        assert result.resolution.height == 1080
+        assert result.resolution.refresh_rate == 60.0
+
+    def test_parse_edid_handles_truncated_displayid_payload(self):
+        entry = _build_displayid_type_i_timing_entry()
+        displayid_ext = _build_displayid_extension(entry, section_size=25, truncated=True)
+
+        edid = bytearray(128 * 2)
+        edid[0x7E] = 1
+        edid[128 : 128 + 128] = displayid_ext
+
+        result = parse_edid(bytes(edid))
+
+        assert result.resolution.width is None
+        assert result.resolution.height is None
+        assert result.resolution.refresh_rate is None

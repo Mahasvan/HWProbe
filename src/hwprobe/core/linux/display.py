@@ -1,12 +1,12 @@
 import os
 import posixpath
 import re
-from typing import List, Optional
+from typing import Optional
 
 from hwprobe.core.common.edid import INTERFACE_ENUM, parse_edid
 from hwprobe.core.linux.common import pci_path_linux
 from hwprobe.models.display_models import DisplayInfo, DisplayModuleInfo
-from hwprobe.models.gpu_models import GraphicsInfo
+from hwprobe.models.gpu_models import GPUInfo
 from hwprobe.models.status_models import StatusType
 
 _PCI_BDF_PATTERN = re.compile(r"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]$")
@@ -24,15 +24,15 @@ DRM_CONNECTOR_TYPE = {
     "DSI": "DSI",
 }
 
-def _resolve_parent_gpu_by_bdf(pci_bdf: str, gpu_devices: List[GraphicsInfo]) -> Optional[str]:
+def _resolve_parent_gpu_by_bdf(pci_bdf: str, gpu_devices: list[GPUInfo]) -> Optional[str]:
     """
     Given a PCI BDF (<domain>:<bus>:<device>.<function>) of a display device, 
-    find the parent GPU in the list of GraphicsInfo objects.
+    find the parent GPU in the list of GPUInfo objects.
     """
+    if pci_bdf is None:
+        return None
+    
     for gpu in gpu_devices:
-        # TODO: This wastes calls, creates additional complexity and may be error-prone.
-        #       A better alternative may be to map direct BDFs to GPUs and pass it here.
-        #       Though, this is a temporary solution until we provide a better design for GPU-Display relationships.
         if gpu.pci_path == pci_path_linux(pci_bdf):
             return gpu.name
         
@@ -57,18 +57,11 @@ def _parse_connector_type(device_path: str) -> Optional[str]:
 
 def _fetch_individual_monitor_info(
     device_path: str,
-    gpu_devices: List[GraphicsInfo]
+    gpu_devices: list[GPUInfo]
 ) -> Optional[DisplayModuleInfo]:
-    edid_path = os.path.join(device_path, "edid")
-    if not os.path.exists(edid_path):
+    edid_path = posixpath.join(device_path, "edid")
+    if not posixpath.exists(edid_path):
         return None
-
-    # For some reason, it's not guaranteed to only have a single "device" directory in the tree/chain
-    # So, we look at how many is necessary until "device" stops being a directory.
-    parent_path = device_path
-
-    while os.path.exists(t := os.path.join(parent_path, "device")) and os.path.isdir(t):
-        parent_path = t
 
     with open(edid_path, "rb") as f:
         edid_data = f.read()
@@ -80,8 +73,9 @@ def _fetch_individual_monitor_info(
     if connector_type := _parse_connector_type(device_path):
         monitor_data.interface = connector_type
 
+    parent_path = posixpath.realpath(device_path)
     if parent_path != device_path:
-        pci_bdf = _extract_pci_bdf_from_sysfs_path(os.path.realpath(parent_path))
+        pci_bdf = _extract_pci_bdf_from_sysfs_path(posixpath.realpath(parent_path))
 
         # Resolve parent GPU based on the PCI BDF
         if (parent_gpu := _resolve_parent_gpu_by_bdf(pci_bdf, gpu_devices)) is not None:
@@ -96,7 +90,7 @@ def _fetch_individual_monitor_info(
 
 
 def fetch_display_info(
-    gpu_devices: List[GraphicsInfo]
+    gpu_devices: list[GPUInfo]
 ):
     display_info = DisplayInfo()
     pattern = re.compile(r"^card\d+$")

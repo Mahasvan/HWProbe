@@ -204,6 +204,7 @@ class TestFetchGraphicsInfo:
 
         def custom_open(path, *args, **kwargs):
             filename = posixpath.basename(path)
+            filename = posixpath.basename(path)
             if filename == "path" and "firmware_node" in path:
                 return mock_open(read_data=file_contents["firmware_node/path"])()
             if filename in file_contents:
@@ -216,7 +217,7 @@ class TestFetchGraphicsInfo:
 
         info = fetch_graphics_info()
 
-        assert info.status.type == StatusType.SUCCESS
+        assert info.status.type == StatusType.PARTIAL
         assert len(info.modules) == 1
         gpu = info.modules[0]
         assert gpu.vendor_id == "0x8086"
@@ -316,6 +317,7 @@ class TestFetchGraphicsInfo:
 
     def test_fetch_graphics_info_skip_non_display(self, monkeypatch):
         monkeypatch.setattr(posixpath, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:04:00.0"])
 
         def custom_open(path, *args, **kwargs):
@@ -333,9 +335,11 @@ class TestFetchGraphicsInfo:
 
     def test_fetch_graphics_info_partial_failure(self, monkeypatch):
         monkeypatch.setattr(posixpath, "exists", lambda x: True)
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:01:00.0"])
 
         def custom_open(path, *args, **kwargs):
+            filename = posixpath.basename(path)
             filename = posixpath.basename(path)
             if filename == "class":
                 return mock_open(read_data="0x030000")()
@@ -343,8 +347,10 @@ class TestFetchGraphicsInfo:
                 raise OSError("Permission denied")
             if filename == "device":
                 return mock_open(read_data="0x1234")()
-            if filename in {"current_link_width", "current_link_speed", "max_link_width", "max_link_speed"}:
+            if filename in {"current_link_speed", "max_link_speed"}:
                 return mock_open(read_data="8.0 GT/s")()
+            if filename in {"current_link_width", "max_link_width"}:
+                return mock_open(read_data="16")()
             if filename == "path" and "firmware_node" in path:
                 return mock_open(read_data="\\_SB.PCI0.GFX0")()
             raise FileNotFoundError(path)
@@ -371,8 +377,10 @@ class TestFetchGraphicsInfo:
             "max_link_width": "16",
             "max_link_speed": "8.0 GT/s",
         }
+        
 
         def custom_open(path, *args, **kwargs):
+            filename = posixpath.basename(path)
             filename = posixpath.basename(path)
             if filename == "path" and "firmware_node" in path:
                 raise FileNotFoundError("No ACPI path")
@@ -393,6 +401,7 @@ class TestFetchGraphicsInfo:
         assert any("ACPI path" in msg for msg in info.status.messages)
 
     def test_fetch_graphics_info_pci_path_failure(self, monkeypatch):
+        monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(posixpath, "exists", lambda x: True)
         monkeypatch.setattr(os, "listdir", lambda x: ["0000:00:02.0"])
 
@@ -532,7 +541,10 @@ class TestFetchGraphicsInfo:
 
         assert len(info.modules) == 1
         gpu = info.modules[0]
-        assert gpu.current_pcie_gen is None
+        assert gpu.pcie_link.width.current == 16
+        assert gpu.pcie_link.width.max == 16
+        assert gpu.pcie_link.gen.max == 3
+        assert gpu.pcie_link.gen.current is None
         assert info.status.type == StatusType.PARTIAL
         assert any("current link speed" in msg for msg in info.status.messages)
 

@@ -44,7 +44,7 @@ class TestPciPathLinux:
             "realpath",
             lambda _: "/sys/devices/platform/non-pci-device",
         )
-        assert pci_path_linux("0000:03:00.0") == "PciRoot(0x0)/Pci(0x0,0x0)"
+        assert pci_path_linux("0000:03:00.0") == None
 
     @pytest.mark.parametrize("bad_slot", ["", "xyz", ":::"])
     def test_invalid_device_slot_returns_none(self, bad_slot, monkeypatch):

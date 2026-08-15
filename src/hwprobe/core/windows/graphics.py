@@ -36,8 +36,8 @@ def _map_gpu(raw: GPURaw) -> GPUInfo:
         pcie = fetch_pcie_info(raw.pnp_device_id)
         if pcie:
             speed, width = pcie
-            gpu.pcie_gen = speed
-            gpu.pcie_width = width
+            gpu.pcie_link.gen.current = speed
+            gpu.pcie_link.width.current = width
 
     # VRAM: registry fallback wins if present, else DXGI value
     vram_bytes = raw.vram_bytes or raw.dedicated_video_memory_bytes
