@@ -19,6 +19,9 @@ DISPLAY_CONTROLLER_CLASS = 0x03  # Display Controller class code in PCI
 
 def _pcie_gen(raw_speed: str) -> Optional[int]:
     # Path example: /sys/bus/pci/devices/0000:03:00.0/max_link_speed
+    
+    if not raw_speed:
+        return None
 
     # Mapping Dictionary
     speed_to_gen = {"2.5 GT/s": 1, "5.0 GT/s": 2, "8.0 GT/s": 3, "16.0 GT/s": 4, "32.0 GT/s": 5, "64.0 GT/s": 6}

@@ -1,4 +1,4 @@
-
+from typing import Optional
 
 from hwprobe.core.common.edid import parse_edid
 
@@ -247,7 +247,7 @@ def _build_displayid_type_i_timing_entry(
     return bytes(entry)
 
 
-def _build_displayid_extension(payload: bytes, *, section_size: int | None = None, truncated: bool = False) -> bytes:
+def _build_displayid_extension(payload: bytes, *, section_size: Optional[int] = None, truncated: bool = False) -> bytes:
     """Build a DisplayID extension block with a Type-I timing payload.
 
     If truncated is True, the payload length is longer than the advertised section size
