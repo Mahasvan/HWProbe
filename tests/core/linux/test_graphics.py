@@ -227,9 +227,8 @@ class TestFetchGraphicsInfo:
         assert gpu.vendor_id == "0x8086"
         assert gpu.device_id == "0x5917"
         assert gpu.acpi_path == "\\_SB.PCI0.GFX0"
-        assert gpu.pcie_link is not None
-        assert gpu.pcie_link.gen.current == 3
-        assert gpu.pcie_link.width.current == 16
+        assert gpu.pcie_gen == 3
+        assert gpu.pcie_width == 16
         # Uncomment this once PCI-IDs parser is implemented
         # assert gpu.manufacturer == "Intel Corporation"
 
@@ -320,8 +319,7 @@ class TestFetchGraphicsInfo:
         assert gpu.name == "Radeon RX 5700 XT"
         assert gpu.vram is not None
         assert gpu.vram.capacity == 8192
-        assert gpu.pcie_link is not None
-        assert gpu.pcie_link.gen.current == 4
+        assert gpu.pcie_gen == 4
 
     def test_fetch_graphics_info_skip_non_display(self, monkeypatch):
         monkeypatch.setattr(posixpath, "exists", lambda x: True)
@@ -545,10 +543,8 @@ class TestFetchGraphicsInfo:
 
         assert len(info.modules) == 1
         gpu = info.modules[0]
-        assert gpu.pcie_link is not None
-        assert gpu.pcie_link.width.current in (0, "0")
-        assert gpu.pcie_link.gen.current is None
-        assert gpu.pcie_link.gen.max in (None, 0)
+        assert gpu.pcie_width is None
+        assert gpu.pcie_gen is None
         assert info.status.type == StatusType.PARTIAL
         assert any("current link speed" in msg for msg in info.status.messages)
 

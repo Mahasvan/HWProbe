@@ -1,7 +1,6 @@
 import os
 import posixpath
 from typing import Optional
-from hwprobe.core.common.pcie_link import build_pcie_link
 from hwprobe.core.linux.common import PCI_ROOT_PATH, _read_from_sysfs, pci_path_linux, _resolve_acpi_path
 from hwprobe.models.gpu_models import GPUInfo, GraphicsInfo
 from hwprobe.models.size_models import Megabyte
@@ -82,25 +81,11 @@ def fetch_graphics_info() -> GraphicsInfo:
         else:
             graphics_info.status.make_partial(f"Could not read current link width for {device}")
 
-        if (max_width := _read_from_sysfs(gpu_path, "max_link_width")) is not None:
-            if max_width.isnumeric() and int(max_width) > 0:
-                max_width = int(max_width)
-        else:
-            graphics_info.status.make_partial(f"Could not read max link width for {device}")
-
-
         if (cur_pcie_speed := _read_from_sysfs(gpu_path, "current_link_speed")) is not None:
             if cur_pcie_speed:
                 cur_pcie_speed = _pcie_gen(cur_pcie_speed)
         else:
             graphics_info.status.make_partial(f"Could not read current link speed for {device}")
-
-
-        if (max_pcie_speed := _read_from_sysfs(gpu_path, "max_link_speed")) is not None:
-            if max_pcie_speed:
-                max_pcie_speed = _pcie_gen(max_pcie_speed)
-        else:
-            graphics_info.status.make_partial(f"Could not read max link speed for {device}")
 
 
         acpi_path, result = _resolve_acpi_path(device)
@@ -131,13 +116,11 @@ def fetch_graphics_info() -> GraphicsInfo:
             else:
                 graphics_info.status.make_partial(f"Native GPU info library returned VRAM size of 0 for {device} with vendor ID {vendor_id}")
 
-        gpu.pcie_link = build_pcie_link(
-            max_gen=max_pcie_speed or 0,
-            current_gen=cur_pcie_speed or 0,
-            max_width=max_width or 0,
-            current_width=cur_width or 0
-        )
+        if isinstance(cur_width, int):
+            gpu.pcie_width = cur_width
 
+        if cur_pcie_speed:
+            gpu.pcie_gen = cur_pcie_speed
 
         graphics_info.modules.append(gpu)
 
