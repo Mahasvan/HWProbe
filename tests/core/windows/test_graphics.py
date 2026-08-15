@@ -172,8 +172,8 @@ class TestHappyPath:
     def test_pcie_fields_populated(self):
         info = _run([_gpu()], pcie=(4, 16))
         gpu = info.modules[0]
-        assert gpu.pcie_gen == 4
-        assert gpu.pcie_width == 16
+        assert gpu.pcie_link.gen.current == 4
+        assert gpu.pcie_link.width.current == 16
 
     def test_acpi_and_pci_paths_populated(self):
         info = _run([_gpu()])
@@ -223,8 +223,7 @@ class TestZeroAndMissingFields:
 
     def test_none_pcie_returns_none(self):
         info = _run([_gpu()], pcie=None)
-        assert info.modules[0].pcie_gen is None
-        assert info.modules[0].pcie_width is None
+        assert info.modules[0].pcie_link is None
 
     def test_no_pnp_device_id_skips_location_lookup(self):
         info = _run([_gpu(pnp_device_id=None)])

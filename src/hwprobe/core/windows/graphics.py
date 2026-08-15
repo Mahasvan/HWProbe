@@ -1,3 +1,4 @@
+from hwprobe.core.common.pcie_link import build_pcie_link
 from hwprobe.core.windows.common import format_acpi_path, format_pci_path
 from hwprobe.interops.win.bindings.gpu_info import GPURaw, get_gpu_info
 from hwprobe.models.gpu_models import GPUInfo, GraphicsInfo
@@ -36,8 +37,7 @@ def _map_gpu(raw: GPURaw) -> GPUInfo:
         pcie = fetch_pcie_info(raw.pnp_device_id)
         if pcie:
             speed, width = pcie
-            gpu.pcie_link.gen.current = speed
-            gpu.pcie_link.width.current = width
+            gpu.pcie_link = build_pcie_link(current_gen=speed, current_width=width)
 
     # VRAM: registry fallback wins if present, else DXGI value
     vram_bytes = raw.vram_bytes or raw.dedicated_video_memory_bytes

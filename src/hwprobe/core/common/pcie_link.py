@@ -5,10 +5,10 @@ from hwprobe.models.gpu_models import PCIeLinkInfo, PCIeLinkValue
 
 def build_pcie_link(
     *,
-    max_gen: int,
-    current_gen: int,
-    max_width: int,
-    current_width: int
+    max_gen: Optional[int] = None,
+    current_gen: Optional[int] = None,
+    max_width: Optional[int] = None,
+    current_width: Optional[int] = None,
 ) -> Optional[PCIeLinkInfo]:
     gen = PCIeLinkValue()
     width = PCIeLinkValue()

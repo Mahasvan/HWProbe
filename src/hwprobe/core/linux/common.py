@@ -69,6 +69,11 @@ def pci_path_linux(device_slot: str):
     pci_segments = []
     
     for part in path.split(posixpath.sep):
+        """
+        The way Linux represents PCI devices in sysfs is according to their BDF (Bus:Device.Function) notation. 
+        The root bridge is represented as "pci<RRRR>:<BB>", and each subsequent device is represented as "<RRRR>:<BB>:<DD>.<F>".
+        """
+        
         if part.startswith("pci"):
             try:
                 root_bus = part.split(":")[0].split("pci")[-1]
