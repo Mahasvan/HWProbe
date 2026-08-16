@@ -168,21 +168,20 @@ class TestPcieGen:
 class TestCheckGpuClass:
     """Tests for _check_gpu_class."""
 
-    def test_check_gpu_class_display_controller(self, mock_pci_device, bdf, monkeypatch):
-        class_path = mock_pci_device(bdf) / "class"
-        class_path.write_text("0x030000")
-        assert _check_gpu_class(bdf) is True
-
-
-    def test_check_gpu_class_vga_controller(self, mock_pci_device, bdf, monkeypatch):
-        class_path = mock_pci_device(bdf) / "class"
-        class_path.write_text("0x030200")
-        assert _check_gpu_class(bdf) is True
-
-    def test_check_gpu_class_network_controller(self, mock_pci_device, bdf, monkeypatch):
-        class_path = mock_pci_device(bdf) / "class"
-        class_path.write_text("0x020000")
-        assert _check_gpu_class(bdf) is False
+    @pytest.mark.parametrize(
+        ("device_class", "expected"),
+        [
+            ("0x030000", True),
+            ("0x030200", True),
+            ("0x020000", False),
+        ],
+    )
+    def test_check_gpu_class(self, bdf, monkeypatch, device_class, expected):
+        monkeypatch.setattr(
+            "hwprobe.core.linux.graphics._read_from_sysfs",
+            lambda *args: device_class,
+        )
+        assert _check_gpu_class(bdf) is expected
 
 
 class TestFetchGraphicsInfo:
