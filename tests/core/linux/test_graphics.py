@@ -8,24 +8,6 @@ from hwprobe.core.linux.common import _read_from_sysfs
 from hwprobe.core.linux.graphics import _check_gpu_class, _pcie_gen, fetch_graphics_info
 from hwprobe.models.status_models import StatusType
 
-@pytest.fixture
-def mock_pci_device(tmp_path, monkeypatch):
-    
-    pci_root = tmp_path / "sys" / "bus" / "pci" / "devices"
-    pci_root.mkdir(parents=True)
-
-    monkeypatch.setattr(
-        "hwprobe.core.linux.graphics.PCI_ROOT_PATH",
-        pci_root,
-    )
-    
-    def _create(bdf: str):
-        device_path = pci_root / bdf
-        device_path.mkdir(parents=True, exist_ok=True)
-        return device_path
-    
-    return _create
-
 class TestPcieGen:
     """Tests for _pcie_gen."""
 
