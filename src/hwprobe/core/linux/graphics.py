@@ -16,9 +16,9 @@ except (ImportError, RuntimeError) as e:
 
 DISPLAY_CONTROLLER_CLASS = 0x03  # Display Controller class code in PCI
 
-def _pcie_gen(raw_speed: str) -> Optional[int]:
+def _pcie_gen(raw_speed: Optional[str]) -> Optional[int]:
     # Path example: /sys/bus/pci/devices/0000:03:00.0/max_link_speed
-    
+
     if not raw_speed:
         return None
 
@@ -91,7 +91,7 @@ def fetch_graphics_info() -> GraphicsInfo:
         acpi_path, result = _resolve_acpi_path(device)
         if acpi_path is not None:
             gpu.acpi_path = acpi_path
-            
+
             if not result:
                 graphics_info.status.messages.append(f"ACPI path for {device} was inferred through parent device, device itself was likely found via PCI enumeration")
         else:
@@ -102,7 +102,7 @@ def fetch_graphics_info() -> GraphicsInfo:
             gpu.pci_path = pci_path
         else:
             graphics_info.status.make_partial(f"Could not resolve PCI path for {device}")
-            
+
         if not NATIVE_AVAILABLE:
             graphics_info.status.make_partial(f"Native GPU info library not available, cannot fetch GPU name or VRAM for {device}")
         elif vendor_id is None:
