@@ -4,7 +4,6 @@ import pytest
 
 from hwprobe.core.linux.common import pci_path_linux
 
-
 class TestPciPathLinux:
     def test_single_device(self, monkeypatch):
         monkeypatch.setattr(
@@ -35,6 +34,14 @@ class TestPciPathLinux:
             posixpath,
             "realpath",
             lambda _: "/sys/devices/pci0001:00/0001:00:00.0",
+        )
+        assert pci_path_linux("0001:00:00.0") == "PciRoot(0x1)/Pci(0x0,0x0)"
+
+    def test_bus_device(self, monkeypatch):
+        monkeypatch.setattr(
+            posixpath,
+            "realpath",
+            lambda _: "/sys/devices/platform/bus@0/14100000.pcie/pci0001:00/0001:00:00.0"
         )
         assert pci_path_linux("0001:00:00.0") == "PciRoot(0x1)/Pci(0x0,0x0)"
 
