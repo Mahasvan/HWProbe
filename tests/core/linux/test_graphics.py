@@ -24,7 +24,10 @@ class TestPcieGen:
 
         monkeypatch.setattr(builtins, "open", mock_open_func)
 
-        gen = _pcie_gen(_read_from_sysfs(path))
+        speed = _read_from_sysfs(path)
+        assert speed is not None
+
+        gen = _pcie_gen(speed)
         assert gen == 4
 
     def test_pcie_gen_success_gen3(self, monkeypatch):
@@ -40,7 +43,10 @@ class TestPcieGen:
 
         monkeypatch.setattr(builtins, "open", mock_open_func)
 
-        gen = _pcie_gen(_read_from_sysfs(path))
+        speed = _read_from_sysfs(path)
+        assert speed is not None
+
+        gen = _pcie_gen(speed)
         assert gen == 3
 
     def test_pcie_gen_success_gen2(self, monkeypatch):
@@ -56,7 +62,10 @@ class TestPcieGen:
 
         monkeypatch.setattr(builtins, "open", mock_open_func)
 
-        gen = _pcie_gen(_read_from_sysfs(path))
+        speed = _read_from_sysfs(path)
+        assert speed is not None
+
+        gen = _pcie_gen(speed)
         assert gen == 2
 
     def test_pcie_gen_success_gen1(self, monkeypatch):
@@ -72,7 +81,10 @@ class TestPcieGen:
 
         monkeypatch.setattr(builtins, "open", mock_open_func)
 
-        gen = _pcie_gen(_read_from_sysfs(path))
+        speed = _read_from_sysfs(path)
+        assert speed is not None
+
+        gen = _pcie_gen(speed)
         assert gen == 1
 
     def test_pcie_gen_success_gen5(self, monkeypatch):
@@ -88,7 +100,10 @@ class TestPcieGen:
 
         monkeypatch.setattr(builtins, "open", mock_open_func)
 
-        gen = _pcie_gen(_read_from_sysfs(path))
+        speed = _read_from_sysfs(path)
+        assert speed is not None
+
+        gen = _pcie_gen(speed)
         assert gen == 5
 
     def test_pcie_gen_with_suffix(self, monkeypatch):
@@ -104,7 +119,10 @@ class TestPcieGen:
 
         monkeypatch.setattr(builtins, "open", mock_open_func)
 
-        gen = _pcie_gen(_read_from_sysfs(path))
+        speed = _read_from_sysfs(path)
+        assert speed is not None
+
+        gen = _pcie_gen(speed)
         assert gen == 3
 
     def test_pcie_gen_unknown_speed(self, monkeypatch):
@@ -120,16 +138,22 @@ class TestPcieGen:
 
         monkeypatch.setattr(builtins, "open", mock_open_func)
 
-        gen = _pcie_gen(_read_from_sysfs(path))
+        speed = _read_from_sysfs(path)
+        assert speed is not None
+
+        gen = _pcie_gen(speed)
         assert gen is None
 
     def test_pcie_gen_file_not_found(self, monkeypatch):
         device = "0000:01:00.0"
         path = f"/sys/bus/pci/devices/{device}/current_link_speed"
-        
+
         monkeypatch.setattr(posixpath, "exists", lambda x: False)
 
-        gen = _pcie_gen(_read_from_sysfs(path))
+        speed = _read_from_sysfs(path)
+        assert speed is None
+
+        gen = _pcie_gen(speed)
         assert gen is None
 
     def test_pcie_gen_read_exception(self, monkeypatch):
@@ -143,7 +167,10 @@ class TestPcieGen:
 
         monkeypatch.setattr(builtins, "open", mock_open_func)
 
-        gen = _pcie_gen(_read_from_sysfs(path))
+        speed = _read_from_sysfs(path)
+        assert speed is None
+
+        gen = _pcie_gen(speed)
         assert gen is None
 
 @pytest.mark.parametrize("bdf", ["0000:01:00.0"])
@@ -368,7 +395,7 @@ class TestFetchGraphicsInfo:
             "max_link_width": "16",
             "max_link_speed": "8.0 GT/s",
         }
-        
+
 
         def custom_open(path, *args, **kwargs):
             filename = posixpath.basename(path)
