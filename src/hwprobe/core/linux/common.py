@@ -4,7 +4,7 @@ from typing import Optional
 
 PCI_ROOT_PATH = "/sys/bus/pci/devices/"
 _PCI_BDF_PATTERN = re.compile(r"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]$")
-_PCI_BDF_PATH_PATTERN = re.compile(r"(pci([0-9a-fA-F]{4}):([0-9a-fA-F]{2}))|(([0-9a-fA-F]{4}):([0-9a-fA-F]{2}):([0-9a-fA-F]{2})\.([0-9a-fA-F]{1}))")
+_PCI_BDF_PATH_PATTERN = re.compile(r"(pci([a-f\d]{4}):([a-f\d]{2}))|(([a-f\d]{4}):([a-f\d]{2}):([a-f\d]{2})\.([a-f\d]{1}))", re.IGNORECASE)
 
 def _resolve_acpi_path(device_bdf: str) -> tuple[Optional[str], bool]:
     """
