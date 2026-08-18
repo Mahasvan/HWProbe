@@ -92,9 +92,6 @@ print(gpu)
 On import, the script loads the colocated `libdevice_info.so`; ensure you rebuild the CMake project whenever you make
 changes to the native code.
 
-Or use the high-level API (automatic fallback to sysfs + `lspci`/`nvidia-smi`/`rocm-smi` when the native library
-isn't available):
-
 ```python
 from hwprobe.core.linux.graphics import fetch_graphics_info
 

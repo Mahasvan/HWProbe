@@ -26,16 +26,17 @@ DRM_CONNECTOR_TYPE = {
 
 def _resolve_parent_gpu_by_bdf(pci_bdf: str, gpu_devices: list[GPUInfo]) -> Optional[str]:
     """
-    Given a PCI BDF (<domain>:<bus>:<device>.<function>) of a display device, 
+    Given a PCI BDF (<domain>:<bus>:<device>.<function>) of a display device,
     find the parent GPU in the list of GPUInfo objects.
     """
     if pci_bdf is None:
         return None
-    
+
     for gpu in gpu_devices:
-        if gpu.pci_path == pci_path_linux(pci_bdf):
+        path = pci_path_linux(pci_bdf)
+        if path and gpu.pci_path == path:
             return gpu.name
-        
+
     return None
 
 
@@ -78,7 +79,7 @@ def _fetch_individual_monitor_info(
         pci_bdf = _extract_pci_bdf_from_sysfs_path(posixpath.realpath(parent_path))
 
         # Resolve parent GPU based on the PCI BDF
-        if (parent_gpu := _resolve_parent_gpu_by_bdf(pci_bdf, gpu_devices)) is not None:
+        if pci_bdf is not None and (parent_gpu := _resolve_parent_gpu_by_bdf(pci_bdf, gpu_devices)) is not None:
             monitor_data.gpu_name = parent_gpu
 
     acpi_file = posixpath.join(device_path, "firmware_node", "path")

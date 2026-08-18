@@ -1,82 +1,25 @@
+#include <stdio.h>
 #include <stdint.h>
-#include <stddef.h>
-#include <stdalign.h>
-#include <vulkan/vulkan.h>
+#include <stdlib.h>
+#include "gpu_info.h"
 
-typedef struct VkPhysDevProps
-{
-    uint32_t api, driver, vendorID, deviceID, devType;
-    char name[256];
-    uint8_t uuid[16];
-    alignas(uint64_t) uint8_t _limits[504];
-    uint8_t _sparse[20];
-} VkPhysDevProps;
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s <bdf> <vendor_id>\n  e.g. %s 0000:01:00.0 0x1002\n",
+                argv[0], argv[0]);
+        return 1;
+    }
 
-_Static_assert(
-    sizeof(VkPhysDevProps) == sizeof(VkPhysicalDeviceProperties),
-    "VkPhysDevProps size mismatch"
-);
+    uint32_t vendor_id = (uint32_t)strtoul(argv[2], NULL, 16);
+    GPUProperties g;
+    if (get_gpu_info(argv[1], vendor_id, &g) < 0) {
+        fprintf(stderr, "Failed to query GPU info for %s\n", argv[1]);
+        return 1;
+    }
 
-_Static_assert(
-    alignof(VkPhysDevProps) == alignof(VkPhysicalDeviceProperties),
-    "VkPhysDevProps alignment mismatch"
-);
-
-_Static_assert(
-    offsetof(VkPhysDevProps, api) ==
-    offsetof(VkPhysicalDeviceProperties, apiVersion),
-    "api offset mismatch"
-);
-
-_Static_assert(
-    offsetof(VkPhysDevProps, driver) ==
-    offsetof(VkPhysicalDeviceProperties, driverVersion),
-    "driver offset mismatch"
-);
-
-_Static_assert(
-    offsetof(VkPhysDevProps, vendorID) ==
-    offsetof(VkPhysicalDeviceProperties, vendorID),
-    "vendorID offset mismatch"
-);
-
-_Static_assert(
-    offsetof(VkPhysDevProps, deviceID) ==
-    offsetof(VkPhysicalDeviceProperties, deviceID),
-    "deviceID offset mismatch"
-);
-
-_Static_assert(
-    offsetof(VkPhysDevProps, devType) ==
-    offsetof(VkPhysicalDeviceProperties, deviceType),
-    "deviceType offset mismatch"
-);
-
-_Static_assert(
-    offsetof(VkPhysDevProps, name) ==
-    offsetof(VkPhysicalDeviceProperties, deviceName),
-    "deviceName offset mismatch"
-);
-
-_Static_assert(
-    offsetof(VkPhysDevProps, uuid) ==
-    offsetof(VkPhysicalDeviceProperties, pipelineCacheUUID),
-    "UUID offset mismatch"
-);
-
-_Static_assert(
-    offsetof(VkPhysDevProps, _limits) ==
-    offsetof(VkPhysicalDeviceProperties, limits),
-    "limits offset mismatch"
-);
-
-_Static_assert(
-    offsetof(VkPhysDevProps, _sparse) ==
-    offsetof(VkPhysicalDeviceProperties, sparseProperties),
-    "sparseProperties offset mismatch"
-);
-
-int main()
-{
+    printf("GPU at %s:\n", argv[1]);
+    printf("  Name:        %s\n", g.name[0] ? g.name : "(unknown)");
+    printf("  VRAM Total:  %lu MB\n", (unsigned long)g.vram_total_mb);
+    printf("  VRAM Used:   %lu MB\n", (unsigned long)g.vram_used_mb);
     return 0;
 }

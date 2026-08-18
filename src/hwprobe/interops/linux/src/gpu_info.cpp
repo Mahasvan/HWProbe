@@ -223,26 +223,6 @@ static void vram_nouveau(int fd, GPUProperties *g)
         g->vram_total_mb = to_mb(p.value);
 }
 
-// By default the Vulkan loader dlopen()s + initializes every installed ICD
-// manifest (a dozen-plus with a typical Mesa install) before it can tell us
-// which ones actually have hardware. Since we already know each GPU's vendor
-// from sysfs, point the loader at only the matching driver(s) so it skips
-// the rest — this is the dominant cost of the fallback path.
-static bool icd_matches_vendor(const char *filename, uint32_t vendor_id)
-{
-    switch (vendor_id)
-    {
-    case 0x10DE:
-        return strstr(filename, "nvidia") || strstr(filename, "nouveau");
-    case 0x1002:
-        return strstr(filename, "radeon") != NULL;
-    case 0x8086:
-        return strstr(filename, "intel") != NULL;
-    default:
-        return false;
-    }
-}
-
 static int vulkan_query(VkGPU *out, const PCIAddress *pciAddr)
 {
     if (pciAddr == NULL)
@@ -393,7 +373,7 @@ int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out)
     char drm_dir_path[160];
     snprintf(drm_dir_path, sizeof(drm_dir_path), "/sys/bus/pci/devices/%s/drm", bdf);
 
-    char card_name[32] = {0};
+    char card_name[256] = {0};
     DIR *drm_dir = opendir(drm_dir_path);
 
     if (drm_dir)
@@ -412,7 +392,7 @@ int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out)
         closedir(drm_dir);
     }
 
-    GPUProperties g = {0};
+    GPUProperties g = {};
 
     if (card_name[0])
     {
@@ -428,7 +408,7 @@ int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out)
         {
             // TODO:    Figure out if there is a vendor-agnostic way to query VRAM usage
             //          without having to fall back to Vulkan.
-            // 
+            //
             //          For now, we use vendor-specific ioctls.
             switch (vendor_id)
             {

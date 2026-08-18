@@ -119,7 +119,7 @@ class TestFetchDisplayInfo:
         )
         monkeypatch.setattr(
             "hwprobe.core.linux.display._fetch_individual_monitor_info",
-            lambda path: None,
+            lambda path, gpu_devices: None,
         )
 
         info = fetch_display_info([])

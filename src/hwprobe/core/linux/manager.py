@@ -49,11 +49,10 @@ class LinuxHardwareManager(HardwareManagerInterface):
         return self.info.graphics
 
     def fetch_display_info(self) -> DisplayInfo:
-        if self.info.graphics.modules and len(self.info.graphics.modules):
+        if not self.info.graphics or not len(self.info.graphics.modules):
             self.fetch_graphics_info()
-            
-        self.info.display = fetch_display_info(self.info.graphics.modules)
-        return self.info.display
+
+        return fetch_display_info(self.info.graphics.modules)
 
     def fetch_hardware_info(self) -> HardwareInfo:
         self.fetch_cpu_info()
