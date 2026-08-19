@@ -13,6 +13,13 @@ extern "C" {
 #define MAX_GPU_CARDS (16u)
 #define BYTES_PER_MB (1024 * 1024)
 
+typedef enum {
+    FAILURE = -1,
+    DRM_SUCCESS = 0,
+    VULKAN_VRAM_FALLBACK,
+    VULKAN_NAME_FALLBACK,
+} GPUInfoQueryStatus;
+
 typedef struct {
   uint16_t domain : 16u;  //!< PCI domain number
   uint8_t  bus : 8u;      //!< PCI bus number
@@ -28,7 +35,7 @@ typedef struct {
                           //!< greater than 0 otherwise.
 } GPUProperties;
 
-int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out);
+GPUInfoQueryStatus get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out);
 
 #ifdef __cplusplus
 }

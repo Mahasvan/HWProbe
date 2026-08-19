@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <stdalign.h>
 #include <unistd.h>
+#include <vector>
 #include <xf86drm.h>
 
 #include <drm/amdgpu_drm.h>
@@ -25,6 +26,15 @@ typedef struct VkGPU {
   char     slot[64];
   char     name[256];
 } VkGPU;
+
+inline GPUInfoQueryStatus operator|(GPUInfoQueryStatus a, GPUInfoQueryStatus b) {
+    return static_cast<GPUInfoQueryStatus>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+}
+
+inline GPUInfoQueryStatus operator|=(GPUInfoQueryStatus a, GPUInfoQueryStatus b) {
+    a = a | b;
+    return a;
+}
 
 static uint64_t to_mb(uint64_t bytes) { return bytes / BYTES_PER_MB; }
 
@@ -145,22 +155,45 @@ static void vram_i915(int fd, GPUProperties *g)
 
 static void vram_xe(int fd, GPUProperties *g)
 {
-  if (g == nullptr) {
-    return;
-  }
-
-  uint64_t                 total_vram = 0u;
-  uint64_t                 used_vram  = 0u;
-  drm_xe_query_mem_regions regions    = {0};
-
-  if (ioctl(fd, DRM_IOCTL_XE_DEVICE_QUERY, &regions) == 0) {
-    for (uint32_t i = 0; i < regions.num_mem_regions; i++) {
-      total_vram += regions.mem_regions[i].total_size;
-      used_vram += regions.mem_regions[i].used;
+    if (g == nullptr || fd < 0) {
+        return;
     }
-  }
-  g->vram_total_mb = to_mb(total_vram);
-  g->vram_used_mb  = to_mb(used_vram);
+
+    struct drm_xe_device_query query = {};
+    query.query = DRM_XE_DEVICE_QUERY_MEM_REGIONS;
+
+    if (ioctl(fd, DRM_IOCTL_XE_DEVICE_QUERY, &query) != 0 || query.size == 0) {
+        g->vram_total_mb = 0;
+        g->vram_used_mb = 0;
+        return;
+    }
+
+    std::vector<uint8_t> buffer(query.size);
+    query.data = reinterpret_cast<uintptr_t>(buffer.data());
+
+    if (ioctl(fd, DRM_IOCTL_XE_DEVICE_QUERY, &query) != 0) {
+        g->vram_total_mb = 0;
+        g->vram_used_mb = 0;
+        return;
+    }
+
+    const auto *regions = reinterpret_cast<const struct drm_xe_query_mem_regions *>(buffer.data());
+
+    uint64_t total_vram = 0;
+    uint64_t used_vram = 0;
+
+    for (uint32_t i = 0; i < regions->num_mem_regions; ++i) {
+        const auto &mem = regions->mem_regions[i];
+
+        // Filter out system memory (SYSMEM) to only aggregate discrete VRAM
+        if (mem.mem_class == DRM_XE_MEM_REGION_CLASS_VRAM) {
+            total_vram += mem.total_size;
+            used_vram += mem.used;
+        }
+    }
+
+    g->vram_total_mb = to_mb(total_vram);
+    g->vram_used_mb = to_mb(used_vram);
 }
 
 static void vram_nouveau(int fd, GPUProperties *g)
@@ -306,11 +339,13 @@ static int vulkan_query(VkGPU *out, const PCIAddress *pciAddr)
  * @param out Pointer to a GPUProperties struct to receive the GPU information.
  * @return 0 on success, -1 on failure.
  */
-int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out)
+GPUInfoQueryStatus get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out)
 {
   if (!bdf || !out) {
-    return -1;
+    return GPUInfoQueryStatus::FAILURE;
   }
+
+  GPUInfoQueryStatus status = GPUInfoQueryStatus::FAILURE;
 
   // Find the DRM card node under /sys/bus/pci/devices/<bdf>/drm/cardN.
   char drm_dir_path[160];
@@ -385,12 +420,19 @@ int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out)
 
         if (!g.vram_total_mb) {
           g.vram_total_mb = vk[v].vram_mb;
+          status = GPUInfoQueryStatus::VULKAN_VRAM_FALLBACK;
         }
         if (!g.vram_used_mb) {
           g.vram_used_mb = vk[v].used_mb;
+          status = GPUInfoQueryStatus::VULKAN_VRAM_FALLBACK;
         }
         if (vk[v].name[0]) {
           snprintf(g.name, sizeof(g.name), "%s", vk[v].name);
+          if (status == GPUInfoQueryStatus::VULKAN_VRAM_FALLBACK) {
+            status |= GPUInfoQueryStatus::VULKAN_NAME_FALLBACK;
+          } else {
+            status = GPUInfoQueryStatus::VULKAN_NAME_FALLBACK;
+          }
         }
         break;
       }
@@ -398,5 +440,5 @@ int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out)
   }
 
   *out = g;
-  return 0;
+  return status;
 }

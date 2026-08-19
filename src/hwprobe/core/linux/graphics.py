@@ -1,10 +1,12 @@
 import os
 import posixpath
 from typing import Optional
-from hwprobe.core.linux.common import PCI_ROOT_PATH, _read_from_sysfs, pci_path_linux, _resolve_acpi_path
+
+from hwprobe.core.linux.common import PCI_ROOT_PATH, _read_from_sysfs, _resolve_acpi_path, pci_path_linux
 from hwprobe.models.gpu_models import GPUInfo, GraphicsInfo
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
+from src.hwprobe.interops.linux.bindings.gpu_info import GPUInfoQueryStatus
 
 # Try to import native C library bindings
 try:
@@ -39,6 +41,10 @@ def _check_gpu_class(device: str) -> bool:
     We want the devices of base class 0x03, which denotes a Display Controller.
     """
     device_class = _read_from_sysfs(PCI_ROOT_PATH, device, "class")
+
+    if device_class is None:
+        return False
+
     class_code = int(device_class, base=16)
     base_class = class_code >> 16
 
@@ -107,19 +113,27 @@ def fetch_graphics_info() -> GraphicsInfo:
             graphics_info.status.make_partial(f"Native GPU info library not available, cannot fetch GPU name or VRAM for {device}")
         elif vendor_id is None:
             graphics_info.status.make_partial(f"Vendor ID not available, cannot fetch GPU name or VRAM for {device}")
-        elif (native := native_gpu.get_gpu_info(device, int(vendor_id, 16))) is None:
+        elif (ret_native := native_gpu.get_gpu_info(device, int(vendor_id, 16))) is None: # pyright: ignore[reportPossiblyUnboundVariable]
             graphics_info.status.make_partial(f"Native GPU info library could not fetch GPU name or VRAM for {device} with vendor ID {vendor_id}")
         else:
-            gpu.name = native.name
-            if native.vram_total_mb > 0:
-                gpu.vram = Megabyte(capacity=int(native.vram_total_mb))
+            ret, native = ret_native
+            if ret == GPUInfoQueryStatus.FAILURE:
+                graphics_info.status.make_partial(f"Native GPU info library could not fetch GPU name or VRAM for {device} with vendor ID {vendor_id}")
             else:
-                graphics_info.status.make_partial(f"Native GPU info library returned VRAM size of 0 for {device} with vendor ID {vendor_id}")
+                if ret & GPUInfoQueryStatus.VULKAN_NAME_FALLBACK:
+                    graphics_info.status.make_partial(f"Native GPU info library used Vulkan fallback to fetch GPU name for {device} with vendor ID {vendor_id}")
+                gpu.name = native.name
+                if native.vram_total_mb > 0:
+                    gpu.vram = Megabyte(capacity=int(native.vram_total_mb))
+                    if ret & GPUInfoQueryStatus.VULKAN_VRAM_FALLBACK:
+                        graphics_info.status.make_partial(f"Native GPU info library used Vulkan fallback to fetch VRAM for {device} with vendor ID {vendor_id}")
+                else:
+                    graphics_info.status.make_partial(f"Native GPU info library returned VRAM size of 0 for {device} with vendor ID {vendor_id}")
 
         if isinstance(cur_width, int):
             gpu.pcie_width = cur_width
 
-        if cur_pcie_speed:
+        if isinstance(cur_pcie_speed, int):
             gpu.pcie_gen = cur_pcie_speed
 
         graphics_info.modules.append(gpu)
