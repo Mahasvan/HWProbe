@@ -31,22 +31,26 @@ static uint64_t to_mb(uint64_t bytes) { return bytes / BYTES_PER_MB; }
 static PCIAddress parse_bdf_to_pci_addr(const char *bdf)
 {
   PCIAddress pciAddr = {0};
-  if (!bdf || strlen(bdf) == 0)
+  if (!bdf || strlen(bdf) == 0) {
     return pciAddr;
+  }
 
   char *endptr = nullptr;
 
   uint16_t domain = strtoll(bdf, &endptr, 16u);
-  if (*endptr != ':')
+  if (*endptr != ':') {
     return pciAddr;
+  }
 
   uint8_t bus = strtoll(endptr + 1, &endptr, 16u);
-  if (*endptr != ':')
+  if (*endptr != ':') {
     return pciAddr;
+  }
 
   uint8_t device = strtoll(endptr + 1, &endptr, 16u);
-  if (*endptr != '.')
+  if (*endptr != '.') {
     return pciAddr;
+  }
 
   uint8_t function = strtoll(endptr + 1, &endptr, 16u);
 
@@ -64,8 +68,9 @@ static PCIAddress parse_bdf_to_pci_addr(const char *bdf)
 
 static void vram_amdgpu(int fd, GPUProperties *g)
 {
-  if (g == nullptr)
+  if (g == nullptr) {
     return;
+  }
 
   drm_amdgpu_info        req = {0};
   drm_amdgpu_memory_info mem;
@@ -82,8 +87,9 @@ static void vram_amdgpu(int fd, GPUProperties *g)
 
 static void vram_radeon(int fd, GPUProperties *g)
 {
-  if (g == nullptr)
+  if (g == nullptr) {
     return;
+  }
 
   drm_radeon_gem_info gem_info = {0};
 
@@ -101,8 +107,9 @@ static void vram_radeon(int fd, GPUProperties *g)
 
 static void vram_i915(int fd, GPUProperties *g)
 {
-  if (g == nullptr)
+  if (g == nullptr) {
     return;
+  }
 
   drm_i915_query_item item = {0};
   item.query_id            = DRM_I915_QUERY_MEMORY_REGIONS;
@@ -111,12 +118,14 @@ static void vram_i915(int fd, GPUProperties *g)
   q.num_items      = 1;
   q.items_ptr      = reinterpret_cast<uint64_t>(&item);
 
-  if (ioctl(fd, DRM_IOCTL_I915_QUERY, &q) != 0 || item.length <= 0)
+  if (ioctl(fd, DRM_IOCTL_I915_QUERY, &q) != 0 || item.length <= 0) {
     return;
+  }
 
   uint8_t *buf = static_cast<uint8_t *>(calloc(1, item.length));
-  if (!buf)
+  if (!buf) {
     return;
+  }
 
   item.data_ptr = reinterpret_cast<uint64_t>(buf);
 
@@ -136,8 +145,9 @@ static void vram_i915(int fd, GPUProperties *g)
 
 static void vram_xe(int fd, GPUProperties *g)
 {
-  if (g == nullptr)
+  if (g == nullptr) {
     return;
+  }
 
   uint64_t                 total_vram = 0u;
   uint64_t                 used_vram  = 0u;
@@ -155,20 +165,23 @@ static void vram_xe(int fd, GPUProperties *g)
 
 static void vram_nouveau(int fd, GPUProperties *g)
 {
-  if (g == nullptr)
+  if (g == nullptr) {
     return;
+  }
 
   drm_nouveau_getparam p = {0};
   p.param                = NOUVEAU_GETPARAM_FB_SIZE;
 
-  if (ioctl(fd, DRM_IOCTL_NOUVEAU_GETPARAM, &p) == 0 && p.value > 0)
+  if (ioctl(fd, DRM_IOCTL_NOUVEAU_GETPARAM, &p) == 0 && p.value > 0) {
     g->vram_total_mb = to_mb(p.value);
+  }
 }
 
 static int vulkan_query(VkGPU *out, const PCIAddress *pciAddr)
 {
-  if (pciAddr == NULL)
+  if (pciAddr == NULL) {
     return -1;
+  }
 
   // Request the get_physical_device_properties2 extension to read PCI bus
   // info.
@@ -193,8 +206,9 @@ static int vulkan_query(VkGPU *out, const PCIAddress *pciAddr)
 
   VkInstance inst = VK_NULL_HANDLE;
   VkResult   r    = vkCreateInstance(&instCreate, NULL, &inst);
-  if (r != VK_SUCCESS || inst == VK_NULL_HANDLE)
+  if (r != VK_SUCCESS || inst == VK_NULL_HANDLE) {
     return -1;
+  }
 
   uint32_t numberOfDevices = 0;
   r = vkEnumeratePhysicalDevices(inst, &numberOfDevices, NULL);
@@ -208,8 +222,9 @@ static int vulkan_query(VkGPU *out, const PCIAddress *pciAddr)
     return 0;
   }
 
-  if (numberOfDevices > MAX_GPU_CARDS)
+  if (numberOfDevices > MAX_GPU_CARDS) {
     numberOfDevices = MAX_GPU_CARDS;
+  }
 
   VkPhysicalDevice devs[MAX_GPU_CARDS];
   r = vkEnumeratePhysicalDevices(inst, &numberOfDevices, devs);
@@ -293,8 +308,9 @@ static int vulkan_query(VkGPU *out, const PCIAddress *pciAddr)
  */
 int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out)
 {
-  if (!bdf || !out)
+  if (!bdf || !out) {
     return -1;
+  }
 
   // Find the DRM card node under /sys/bus/pci/devices/<bdf>/drm/cardN.
   char drm_dir_path[160];
@@ -325,8 +341,9 @@ int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out)
     snprintf(devpath, sizeof(devpath), "/dev/dri/%s", card_name);
 
     int fd = open(devpath, O_RDWR | O_CLOEXEC);
-    if (fd < 0)
+    if (fd < 0) {
       fd = open(devpath, O_RDONLY | O_CLOEXEC);
+    }
 
     if (fd >= 0) {
       drmVersionPtr drm_version = drmGetVersion(fd);
@@ -362,16 +379,19 @@ int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out)
 
     if (vk_n > 0) {
       for (int v = 0; v < vk_n; v++) {
-        if (strcmp(bdf, vk[v].slot) != 0)
+        if (strcmp(bdf, vk[v].slot) != 0) {
           continue;
+        }
 
-        if (!g.vram_total_mb)
+        if (!g.vram_total_mb) {
           g.vram_total_mb = vk[v].vram_mb;
-        if (!g.vram_used_mb)
+        }
+        if (!g.vram_used_mb) {
           g.vram_used_mb = vk[v].used_mb;
-        if (vk[v].name[0])
+        }
+        if (vk[v].name[0]) {
           snprintf(g.name, sizeof(g.name), "%s", vk[v].name);
-
+        }
         break;
       }
     }
