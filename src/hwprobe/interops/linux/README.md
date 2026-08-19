@@ -14,12 +14,12 @@ If you are someone with more know-how, and find lapses in this code, we'd be mor
 
 ## Vendor Coverage
 
-| Vendor | VRAM Source | Notes |
-|--------|-------------|-------|
-| **AMD** | `AMDGPU_INFO_VRAM_GTT` ioctl | Direct kernel interface |
-| **Intel** | `DRM_I915_QUERY_MEMORY_REGIONS` ioctl | Intel Arc + integrated |
-| **NVIDIA** | Nouveau DRM ioctl + Vulkan fallback | Vulkan preferred for proprietary driver |
-| **Any** | Vulkan `VkPhysicalDeviceMemoryProperties` | Universal fallback via `libvulkan.so.1` |
+| Vendor     | VRAM Source                               | Notes                                   |
+| ---------- | ----------------------------------------- | --------------------------------------- |
+| **AMD**    | `AMDGPU_INFO_VRAM_GTT` ioctl              | Direct kernel interface                 |
+| **Intel**  | `DRM_I915_QUERY_MEMORY_REGIONS` ioctl     | Intel Arc + integrated                  |
+| **NVIDIA** | Nouveau DRM ioctl + Vulkan fallback       | Vulkan preferred for proprietary driver |
+| **Any**    | Vulkan `VkPhysicalDeviceMemoryProperties` | Universal fallback via `libvulkan.so.1` |
 
 ## Requirements
 
@@ -28,17 +28,17 @@ If you are someone with more know-how, and find lapses in this code, we'd be mor
 - CMake 3.21+
 - `libdrm` development headers (linked at build time)
 - Python 3.7+ (for the `gpu_info.py` binding) - Assuming you want to compile this to use with HWProbe.
-- `libvulkan.so.1` at runtime (optional; `dlopen`'d for the universal fallback path, no SDK headers needed to build)
+- `libvulkan.so.1` at runtime and other Vulkan-related packages
 
 ```bash
 # Debian/Ubuntu
-sudo apt install build-essential cmake libdrm-dev
+sudo apt install build-essential cmake pkg-config libdrm-dev libvulkan-dev vulkan-headers
 
 # Fedora/RHEL
-sudo dnf install gcc-c++ cmake libdrm-devel
+sudo dnf install gcc-c++ cmake pkgconf-pkg-config libdrm-devel vulkan-loader-devel vulkan-headers
 
 # Arch
-sudo pacman -S base-devel cmake libdrm
+sudo pacman -S base-devel cmake pkgconf libdrm vulkan-headers vulkan-icd-loader
 ```
 
 ## Build
@@ -75,13 +75,6 @@ The tool exits with code `0` when enumeration succeeds, or `1` if the underlying
 
 After building the project once (so that `bindings/libdevice_info.so` exists), you can inspect GPUs from Python:
 
-```sh
-cd bindings
-python3 gpu_info.py
-```
-
-or programmatically:
-
 ```python
 from gpu_info import get_gpu_info
 
@@ -103,13 +96,12 @@ for gpu in info.modules:
 ## Why C++ Instead of Pure Python?
 
 1. **No external dependencies** — `lspci`, `nvidia-smi`, `rocm-smi` may not be installed
-2. **Vendor-neutral VRAM** — DRM ioctls work for all vendors without proprietary tools
+2. **Efficient VRAM detection** — DRM ioctls work for all vendors without proprietary tools
 3. **Faster** — Direct kernel interface, no subprocess overhead
-4. **Unified Vulkan fallback** — When DRM doesn't provide VRAM, Vulkan fills the gap
+4. **Unified Vulkan fallback**
 
 ## Limitations
 
-- **ACPI path**: Optional, requires `firmware_node` in sysfs (not all systems)
 - **Intel Arc VRAM**: Requires kernel 5.16+ for `DRM_I915_QUERY_MEMORY_REGIONS`
 - **Nouveau VRAM**: Requires open Nouveau driver (proprietary NVIDIA driver uses Vulkan path)
 
@@ -119,5 +111,3 @@ for gpu in info.modules:
 - **`get_gpu_info` returns -1**: verify that `/sys/class/drm` is populated and that DRM/Vulkan drivers are installed.
 - **VRAM shows 0 MB**: the Vulkan fallback requires `libvulkan.so.1` to be installed; without it, VRAM is only
   reported for vendors with a supported DRM ioctl (AMD, Intel, open-source Nouveau).
-- **PCIe gen/width shows 0**: the sysfs link-status attributes may not be exposed by all drivers. This is
-  driver-dependent and not a bug in the library.

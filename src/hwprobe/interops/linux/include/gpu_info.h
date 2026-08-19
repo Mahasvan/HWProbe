@@ -11,12 +11,14 @@ extern "C"
 #define INTEL_VENDOR_ID 0x8086
 #define NVIDIA_VENDOR_ID 0x10DE
 
-typedef struct
-{
-    uint16_t domain;    //!< PCI domain number
-    uint8_t bus;        //!< PCI bus number
-    uint8_t device;     //!< PCI device number
-    uint8_t function;   //!< PCI function number
+#define MAX_GPU_CARDS (16u)
+#define BYTES_PER_MB (1024 * 1024)
+
+typedef struct {
+  uint16_t domain : 16u; //!< PCI domain number
+  uint8_t bus : 8u;      //!< PCI bus number
+  uint8_t device : 5u;   //!< PCI device number
+  uint8_t function : 3u; //!< PCI function number
 } PCIAddress;
 
 typedef struct
