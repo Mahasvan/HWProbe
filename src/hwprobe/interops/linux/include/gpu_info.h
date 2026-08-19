@@ -3,8 +3,7 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 #define AMD_VENDOR_ID 0x1002
@@ -15,17 +14,18 @@ extern "C"
 #define BYTES_PER_MB (1024 * 1024)
 
 typedef struct {
-  uint16_t domain : 16u; //!< PCI domain number
-  uint8_t bus : 8u;      //!< PCI bus number
-  uint8_t device : 5u;   //!< PCI device number
-  uint8_t function : 3u; //!< PCI function number
+  uint16_t domain : 16u;  //!< PCI domain number
+  uint8_t  bus : 8u;      //!< PCI bus number
+  uint8_t  device : 5u;   //!< PCI device number
+  uint8_t  function : 3u; //!< PCI function number
 } PCIAddress;
 
-typedef struct
-{
-    char name[256];         //!< GPU name or description, if available.
-    uint64_t vram_total_mb; //!< Total VRAM capacity in MB: 0 if unavailable, greater than 0 otherwise.
-    uint64_t vram_used_mb;  //!< Total VRAM used by all processes: 0 if available, greater than 0 otherwise.
+typedef struct {
+  char     name[256];     //!< GPU name or description, if available.
+  uint64_t vram_total_mb; //!< Total VRAM capacity in MB: 0 if unavailable,
+                          //!< greater than 0 otherwise.
+  uint64_t vram_used_mb;  //!< Total VRAM used by all processes: 0 if available,
+                          //!< greater than 0 otherwise.
 } GPUProperties;
 
 int get_gpu_info(const char *bdf, uint32_t vendor_id, GPUProperties *out);
