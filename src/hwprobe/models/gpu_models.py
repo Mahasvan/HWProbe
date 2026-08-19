@@ -43,6 +43,7 @@ class GPUInfo(BaseModel):
 
     #: ACPI device path, e.g. ``\\_SB.PC00.RP05.PXSX``.
     acpi_path: Optional[str] = None
+
     #: PCI path from the firmware tree, e.g. ``PciRoot(0x0)/Pci(0x1C,0x5)/Pci(0x0,0x0)``.
     pci_path: Optional[str] = None
 

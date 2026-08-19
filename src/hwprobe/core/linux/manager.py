@@ -4,7 +4,6 @@ from hwprobe.core.linux.graphics import fetch_graphics_info
 from hwprobe.core.linux.memory import fetch_memory_info
 from hwprobe.core.linux.network import fetch_network_info
 from hwprobe.core.linux.storage import fetch_storage_info
-from hwprobe.models.display_models import DisplayInfo
 from hwprobe.models.gpu_models import GraphicsInfo
 from hwprobe.models.info_models import (
     CPUInfo,
@@ -12,6 +11,7 @@ from hwprobe.models.info_models import (
     HardwareManagerInterface,
     LinuxHardwareInfo,
     MemoryInfo,
+    DisplayInfo,
 )
 from hwprobe.models.network_models import NetworkInfo
 from hwprobe.models.storage_models import StorageInfo
@@ -47,6 +47,17 @@ class LinuxHardwareManager(HardwareManagerInterface):
         self.info.graphics = fetch_graphics_info()
         return self.info.graphics
 
+    def fetch_display_info(self) -> DisplayInfo:
+        if not self.info.graphics or not len(self.info.graphics.modules):
+            self.fetch_graphics_info()
+
+        # Both 'ty' and 'pyright' complain for two reasons:
+        # 1. The attribute 'graphics' is optional and may not be present
+        # 2. The attribute 'modules' is attached to the 'graphics' attribute, which is optional
+        #
+        # However, with all of our checks in this method, we know that 'graphics' is present and 'modules' is not empty.
+        return fetch_display_info(self.info.graphics.modules) # ty: ignore[unresolved-attribute] # pyright: ignore[reportOptionalMemberAccess]
+
     def fetch_hardware_info(self) -> HardwareInfo:
         self.fetch_cpu_info()
         self.fetch_graphics_info()
@@ -54,9 +65,6 @@ class LinuxHardwareManager(HardwareManagerInterface):
         self.fetch_network_info()
         self.fetch_storage_info()
         return self.info
-
-    def fetch_display_info(self) -> DisplayInfo:
-        return fetch_display_info()
 
     def fetch_network_info(self) -> NetworkInfo:
         return fetch_network_info()
