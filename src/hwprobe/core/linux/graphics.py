@@ -3,17 +3,17 @@ import posixpath
 from typing import Optional
 
 from hwprobe.core.linux.common import PCI_ROOT_PATH, _read_from_sysfs, _resolve_acpi_path, pci_path_linux
+from hwprobe.interops.linux.bindings.gpu_info import GPUInfoQueryStatus
 from hwprobe.models.gpu_models import GPUInfo, GraphicsInfo
 from hwprobe.models.size_models import Megabyte
 from hwprobe.models.status_models import StatusType
-from src.hwprobe.interops.linux.bindings.gpu_info import GPUInfoQueryStatus
 
 # Try to import native C library bindings
 try:
     from hwprobe.interops.linux.bindings import gpu_info as native_gpu
 
     NATIVE_AVAILABLE = native_gpu.is_available()
-except (ImportError, RuntimeError) as e:
+except (ImportError, RuntimeError):
     NATIVE_AVAILABLE = False
 
 DISPLAY_CONTROLLER_CLASS = 0x03  # Display Controller class code in PCI
@@ -59,11 +59,7 @@ def fetch_graphics_info() -> GraphicsInfo:
         return graphics_info
 
     for device in os.listdir(PCI_ROOT_PATH):
-        try:
-            if not _check_gpu_class(device):
-                continue
-        except Exception as e:
-            graphics_info.status.make_partial(f"Could not open file for {device}: {e}")
+        if not _check_gpu_class(device):
             continue
 
         gpu = GPUInfo()
@@ -137,5 +133,9 @@ def fetch_graphics_info() -> GraphicsInfo:
             gpu.pcie_gen = cur_pcie_speed
 
         graphics_info.modules.append(gpu)
+
+    if not graphics_info.modules:
+        graphics_info.status.type = StatusType.FAILED
+        graphics_info.status.messages.append("No GPU modules found")
 
     return graphics_info

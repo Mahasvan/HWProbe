@@ -6,6 +6,7 @@ from unittest.mock import mock_open
 
 from hwprobe.core.linux.common import _read_from_sysfs
 from hwprobe.core.linux.graphics import _check_gpu_class, _pcie_gen, fetch_graphics_info
+from hwprobe.interops.linux.bindings.gpu_info import GPUInfoQueryStatus, GPUProperties
 from hwprobe.models.status_models import StatusType
 
 class TestPcieGen:
@@ -274,11 +275,14 @@ class TestFetchGraphicsInfo:
         monkeypatch.setattr("hwprobe.core.linux.graphics.NATIVE_AVAILABLE", True)
         monkeypatch.setattr(
             "hwprobe.core.linux.graphics.native_gpu.get_gpu_info",
-            lambda *args, **kwargs: type(
-                "Native",
-                (),
-                {"name": "GeForce GTX 1060", "vram_total_mb": 6144, "vram_used_mb": 0},
-            )(),
+            lambda *args, **kwargs: (
+                GPUInfoQueryStatus.DRM_SUCCESS,
+                GPUProperties(
+                    name="GeForce GTX 1060",
+                    vram_total_mb=6144,
+                    vram_used_mb=0,
+                ),
+            ),
         )
 
         info = fetch_graphics_info()
@@ -318,11 +322,14 @@ class TestFetchGraphicsInfo:
         monkeypatch.setattr("hwprobe.core.linux.graphics.NATIVE_AVAILABLE", True)
         monkeypatch.setattr(
             "hwprobe.core.linux.graphics.native_gpu.get_gpu_info",
-            lambda *args, **kwargs: type(
-                "Native",
-                (),
-                {"name": "Radeon RX 5700 XT", "vram_total_mb": 8192, "vram_used_mb": 0},
-            )(),
+            lambda *args, **kwargs: (
+                GPUInfoQueryStatus.DRM_SUCCESS,
+                GPUProperties(
+                    name="Radeon RX 5700 XT",
+                    vram_total_mb=8192,
+                    vram_used_mb=0,
+                ),
+            )
         )
 
         info = fetch_graphics_info()
@@ -349,7 +356,7 @@ class TestFetchGraphicsInfo:
         info = fetch_graphics_info()
 
         assert len(info.modules) == 0
-        assert info.status.type == StatusType.SUCCESS
+        assert info.status.type == StatusType.FAILED
 
     def test_fetch_graphics_info_partial_failure(self, monkeypatch):
         monkeypatch.setattr(posixpath, "exists", lambda x: True)
@@ -479,11 +486,14 @@ class TestFetchGraphicsInfo:
         monkeypatch.setattr("hwprobe.core.linux.graphics.NATIVE_AVAILABLE", True)
         monkeypatch.setattr(
             "hwprobe.core.linux.graphics.native_gpu.get_gpu_info",
-            lambda *args, **kwargs: type(
-                "Native",
-                (),
-                {"name": "GeForce GTX 1060", "vram_total_mb": 6144, "vram_used_mb": 0},
-            )(),
+            lambda *args, **kwargs: (
+                GPUInfoQueryStatus.DRM_SUCCESS,
+                GPUProperties(
+                    name="GeForce GTX 1060",
+                    vram_total_mb=6144,
+                    vram_used_mb=0,
+                ),
+            ),
         )
 
         info = fetch_graphics_info()
@@ -576,5 +586,4 @@ class TestFetchGraphicsInfo:
         info = fetch_graphics_info()
 
         assert len(info.modules) == 0
-        assert info.status.type == StatusType.PARTIAL
-        assert any("Could not open file" in msg for msg in info.status.messages)
+        assert info.status.type == StatusType.FAILED
