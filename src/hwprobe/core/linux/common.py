@@ -29,21 +29,13 @@ def _resolve_acpi_path(device_bdf: str) -> tuple[Optional[str], bool]:
 
     device_path = posixpath.realpath(device_path)
 
-    # Parent directory should be something like RRRR:BB:DD.F
-    try:
-        while (acpi_path := _read_from_sysfs(device_path, "firmware_node", "path")) is None:
-            if device_path == posixpath.dirname(device_path):
-                # We've reached the root of the filesystem without finding an ACPI path
-                return ret_val
+    # Walk parent directories until an ACPI path is found or we hit filesystem root
+    while (parent := posixpath.dirname(device_path)) != device_path:
+        device_path = parent
+        if acpi_path := _read_from_sysfs(device_path, "firmware_node", "path"):
+            return acpi_path, False
 
-            device_path = posixpath.dirname(device_path)
-
-    except Exception:
-        return ret_val
-
-    # Device has no ACPI path, it is found via PCI enumeration
-    # Return parent ACPI path instead.
-    return acpi_path, False
+    return ret_val
 
 
 # Linux implemented this very annoyingly
