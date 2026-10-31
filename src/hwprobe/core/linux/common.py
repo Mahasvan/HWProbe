@@ -3,8 +3,8 @@ import re
 from typing import Optional
 
 PCI_ROOT_PATH = "/sys/bus/pci/devices/"
-_PCI_BDF_PATTERN = re.compile(r"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]$")
-_PCI_BDF_PATH_PATTERN = re.compile(r"(pci([a-f\d]{4}):([a-f\d]{2}))|(([a-f\d]{4}):([a-f\d]{2}):([a-f\d]{2})\.([a-f\d]{1}))", re.IGNORECASE)
+_PCI_BDF_PATTERN = re.compile(r"^[0-9a-f]{4}:[0-9a-f]{2}:([0-9a-f]{2})\.([0-7])$", re.IGNORECASE)
+
 
 def _resolve_acpi_path(device_bdf: str) -> tuple[Optional[str], bool]:
     """
@@ -29,21 +29,13 @@ def _resolve_acpi_path(device_bdf: str) -> tuple[Optional[str], bool]:
 
     device_path = posixpath.realpath(device_path)
 
-    # Parent directory should be something like RRRR:BB:DD.F
-    try:
-        while (acpi_path := _read_from_sysfs(device_path, "firmware_node", "path")) is None:
-            if device_path == posixpath.dirname(device_path):
-                # We've reached the root of the filesystem without finding an ACPI path
-                return ret_val
+    # Walk parent directories until an ACPI path is found or we hit filesystem root
+    while (parent := posixpath.dirname(device_path)) != device_path:
+        device_path = parent
+        if acpi_path := _read_from_sysfs(device_path, "firmware_node", "path"):
+            return acpi_path, False
 
-            device_path = posixpath.dirname(device_path)
-
-    except Exception:
-        return ret_val
-
-    # Device has no ACPI path, it is found via PCI enumeration
-    # Return parent ACPI path instead.
-    return acpi_path, False
+    return ret_val
 
 
 # Linux implemented this very annoyingly
@@ -58,62 +50,23 @@ def pci_path_linux(device_slot: str) -> Optional[str]:
     if not device_slot or not _PCI_BDF_PATTERN.match(device_slot):
         return None
 
-    raw_path = f"/sys/bus/pci/devices/{device_slot}/"
-
-    path = posixpath.realpath(raw_path)
-    if not path:
-        return None
-
-    pci_root = ""
-    pci_segments = []
-
-    r"""
-    On Linux, PCI devices are described directly in their sysfs path structure.
-    I.e: /sys/devices/<PCIROOT>/<PCI_DEVICE>/<PCI_DEVICE>/...
-
-    We are trying to extract the PCI root value, and the PCI function segments from this path.
-    This is done by finding all matches of the PCI BDF PATH PATTERN in the path,
-    and using the match groups to determine if it's a root or segment path.
-
-    The base regex contains two distinct capture groups:
-            pci([0-9a-fA-F]{4}):([0-9a-fA-F]{2}))
-            ([0-9a-fA-F]{4}):([0-9a-fA-F]{2}):([0-9a-fA-F]{2})\.([0-9a-fA-F]{1}))
-
-    This will then allow us to determine if a match is a root or segment path
-    by checking match[0], if it's an empty string: it's a segment path, otherwise it's a root path.
-
-    Given a path: '/sys/devices/pci0000:00/0000:00:03.1/0000:09:00.0'
-
-    This would make the PCI hierarchy: PciRoot(0x0)/Pci(0x3,0x1)/Pci(0x0,0x0)
-
-    Then, when matching, we'd get a result like so:
-    matches = [
-        ('pci0000:00', '0000', '00', '', '', '', '', ''),
-        ('', '', '', '0000:00:03.1', '0000', '00', '03', '1'),
-        ('', '', '', '0000:09:00.0', '0000', '09', '00', '0')P
-    ]
-
-    Structure of a single match:
-
-                         PCI Root                      PCI function (segment)
-                   _ _ _ _ _|_ _ _ _ _             _ _ _ _ _ _ _ | _ _ _ _ _ _ _
-                  |         |         |           |          |       |     |    |
-        (   'pciXXXX:YY', 'XXXX',   'YY',  'XXXX:YY:ZZ.F', 'XXXX', 'YY', 'ZZ', 'F'   )
     """
-    matches = _PCI_BDF_PATH_PATTERN.findall(path)
-    for match in matches:
-        if not match:
-            continue
+    Linux encodes the PCI bridge hierarchy directly in the resolved sysfs path:
+        /sys/devices/pci0000:00/0000:00:03.1/0000:09:00.0
 
-        if match[0]:
-            pci_root = f"PciRoot(0x{int(match[1], 16):x})"
-        elif match[4]:
-            pci_segments.append(f"Pci(0x{int(match[6], 16):x},0x{int(match[7], 16):x})")
-
-    if not pci_root or not pci_segments:
+    Each <domain>:<bus>:<device>.<function> segment yields (device, function) via
+    _PCI_BDF_PATTERN: [('03', '1'), ('00', '0')], which combined with the root domain
+    from device_slot produces:
+        PciRoot(0x0)/Pci(0x3,0x1)/Pci(0x0,0x0)
+    """
+    path = posixpath.realpath(posixpath.join(PCI_ROOT_PATH, device_slot))
+    matches = [m for part in path.split(posixpath.sep) if (m := _PCI_BDF_PATTERN.match(part))]
+    if not matches:
         return None
 
-    return f"{pci_root}/{'/'.join(pci_segments)}"
+    domain = int(device_slot[:4], 16)
+    segments = [f"Pci(0x{int(m[1], 16):x},0x{int(m[2], 16):x})" for m in matches]
+    return f"PciRoot(0x{domain:x})/{'/'.join(segments)}"
 
 
 def _read_from_sysfs(base: str, *paths) -> Optional[str]:

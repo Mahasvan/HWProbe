@@ -51,12 +51,7 @@ class LinuxHardwareManager(HardwareManagerInterface):
         if not self.info.graphics or not len(self.info.graphics.modules):
             self.fetch_graphics_info()
 
-        # Both 'ty' and 'pyright' complain for two reasons:
-        # 1. The attribute 'graphics' is optional and may not be present
-        # 2. The attribute 'modules' is attached to the 'graphics' attribute, which is optional
-        #
-        # However, with all of our checks in this method, we know that 'graphics' is present and 'modules' is not empty.
-        return fetch_display_info(self.info.graphics.modules) # ty: ignore[unresolved-attribute] # pyright: ignore[reportOptionalMemberAccess]
+        return fetch_display_info(self.info.graphics.modules if self.info.graphics else [])
 
     def fetch_hardware_info(self) -> HardwareInfo:
         self.fetch_cpu_info()
