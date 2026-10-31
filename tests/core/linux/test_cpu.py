@@ -145,6 +145,8 @@ class TestX86Flags:
     def test_x86_flags_sse_variants(self):
         cpu_lines = "flags\t\t: sse sse2 sse3 ssse3 sse4_1 sse4_2\n"
         flags = _x86_flags(cpu_lines)
+
+        assert flags is not None
         assert "SSE" in flags
         assert "SSE2" in flags
         assert "SSE3" in flags
@@ -155,6 +157,7 @@ class TestX86Flags:
     def test_x86_flags_with_lm(self):
         cpu_lines = "flags\t\t: sse lm\n"
         flags = _x86_flags(cpu_lines)
+        assert flags is not None
         assert "LM" in flags
 
     def test_x86_flags_missing(self):
